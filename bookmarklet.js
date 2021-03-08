@@ -16,6 +16,7 @@ MATCH_TEMPLATE = "/anime/[ID]/";
 CHECK_EXISTING = false;
 UPDATE_TAGS = false;
 TAGS_ENGLISH_TITLE = false;
+TAGS_NATIVE_TITLE = false;
 TAGS_SEASON = false;
 TAGS_YEAR = false;
 TAGS_STUDIO = false;
@@ -26,11 +27,9 @@ TAGS_SCORE = false;
 TAGS_RANK = false;
 
 
-/* CSS_TEMPLATE = "[ID] | [TITLE] | [ENGTITLE] | [IMGURL] | [GENRES] | [STUDIOS] | [PRODUCERS] | [SEASON] | [YEAR] | [RANK] | [SCORE] | [STARTDATE] | [ENDDATE] | [DESC]"; */
+/* CSS_TEMPLATE = "[ID] | [TITLE] | [TITLEENG] | [TITLERAW] | [IMGURL] | [GENRES] | [STUDIOS] | [PRODUCERS] | [SEASON] | [YEAR] | [RANK] | [SCORE] | [STARTDATE] | [ENDDATE] | [DESC]"; */
 
 /* defines the start of certain sections on the anime page */
-ENGLISH_START = "English:</span>";
-SYN_START = "Synonyms:</span>";
 DESC_START = "Synopsis</h2>";
 RANK_START = "Ranked:</span>";
 
@@ -86,7 +85,7 @@ tempDiv.appendChild(template);
 template.type = "text";
 template.value = CSS_TEMPLATE;
 template.style.width = "50%";
-template.title = "CSS template.  Replacements are [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [ENGTITLE], [GENRES], [STUDIOS], [PRODUCERS], [SEASON], [YEAR], [RANK], [SCORE], [STARTDATE], [ENDDATE], and [DESC]. ([DEL] will just be deleted)";
+template.title = "CSS template.  Replacements are [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEENG], [GENRES], [STUDIOS], [PRODUCERS], [SEASON], [YEAR], [RANK], [SCORE], [STARTDATE], [ENDDATE], and [DESC]. ([DEL] will just be deleted)";
 
 chkExistingLabel = document.createElement("span");
 tempDiv.appendChild(chkExistingLabel);
@@ -123,6 +122,12 @@ tempDiv.appendChild(chkEnglish);
 chkEnglish.type = "checkbox";
 chkEnglish.title = "English title";
 chkEnglish.checked = TAGS_ENGLISH_TITLE;
+
+chkNative = document.createElement("input");
+tempDiv.appendChild(chkNative);
+chkNative.type = "checkbox";
+chkNative.title = "Native title";
+chkNative.checked = TAGS_NATIVE_TITLE;
 
 chkSeason = document.createElement("input");
 tempDiv.appendChild(chkSeason);
@@ -247,7 +252,9 @@ function ProcessNext()
 				tags[j] = tags[j].replace(/^\s+|\s+$/g, "");
 			}
 			
-			/* english title */
+			/* alternate titles */
+
+			ENGLISH_START = "English:</span>";
 			englishHtml = null;
 			englishHtmlStartIndex = str.indexOf(ENGLISH_START);
 			if(str.indexOf(ENGLISH_START) != -1)
@@ -269,7 +276,7 @@ function ProcessNext()
 				}
 			}
 			
-			/* synonyms */
+			SYN_START = "Synonyms:</span>";
 			if(englishHtml == null)
 			{
 				synHtmlStartIndex = str.indexOf(SYN_START);
@@ -292,6 +299,28 @@ function ProcessNext()
 								k--;
 							}
 						}
+					}
+				}
+			}
+
+			NATIVE_START = "Japanese:</span>";
+			nativeHtml = null;
+			nativeHtmlStartIndex = str.indexOf(NATIVE_START);
+			if(str.indexOf(NATIVE_START) != -1)
+			{
+				nativeHtmlStartIndex += NATIVE_START.length;
+				nativeHtmlEndIndex = str.indexOf("</div>", nativeHtmlStartIndex);
+				nativeHtml = str.substring(nativeHtmlStartIndex, nativeHtmlEndIndex);
+				
+				nativeHtml = nativeHtml.replace(/^\s+|\s+$/g, "").replace(/,/g, "");
+				nativeUpper = nativeHtml.toUpperCase();
+				for(k = 0; k < tagsLength; k++)
+				{
+					if(tags[k].length == 0 || tags[k].toUpperCase() == nativeUpper)
+					{
+						tags.splice(k, 1);
+						tagsLength--;
+						k--;
 					}
 				}
 			}
@@ -452,6 +481,7 @@ function ProcessNext()
 			if(chkTags.checked)
 			{
 				if(englishHtml && chkEnglish.checked) { tags.push(englishHtml); }
+				if(nativeHtml && chkNative.checked) { tags.push(nativeHtml); }
 				if(season && chkSeason.checked) { tags.push(season); }
 				if(year && chkYear.checked) { tags.push(year); }
 				if(studios && chkStudio.checked) { tags = tags.concat(studios); }
@@ -494,7 +524,8 @@ function ProcessNext()
 				.replace(/\[IMGURLV\]/g, imgUrlv)
 				.replace(/\[IMGURLL\]/g, imgUrll)
 				.replace(/\[TITLE\]/g, altText)
-				.replace(/\[ENGTITLE\]/g, englishHtml ? englishHtml : altText)
+				.replace(/\[TITLEENG\]/g, englishHtml ? englishHtml : altText)
+				.replace(/\[TITLERAW\]/g, nativeHtml ? nativeHtml : "")
 				.replace(/\[GENRES\]/g, genres ? genres.join(", ") : "")
 				.replace(/\[STUDIOS\]/g, studios ? studios.join(", ") : "")
 				.replace(/\[PRODUCERS\]/g, producers ? producers.join(", ") : "")
