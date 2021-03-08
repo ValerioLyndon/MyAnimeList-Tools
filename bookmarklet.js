@@ -31,7 +31,6 @@ TAGS_RANK = false;
 /* defines the start of certain sections on the anime page */
 ENGLISH_START = "English:</span>";
 SYN_START = "Synonyms:</span>";
-GENRES_START = "Genres:</span>";
 DESC_START = "Synopsis</h2>";
 RANK_START = "Ranked:</span>";
 
@@ -111,7 +110,7 @@ tempDiv.appendChild(br1);
 chkTags = document.createElement("input");
 tempDiv.appendChild(chkTags);
 chkTags.type = "checkbox";
-chkTags.title = "Update Tags";
+chkTags.title = "Update Tags - CURRENTLY BROKEN";
 chkTags.checked = UPDATE_TAGS;
 
 tagsLabel = document.createElement("span");
@@ -412,33 +411,23 @@ function ProcessNext()
 			}
 			
 			/* genres */
-			genres = null;
-			genresHtmlStartIndex = str.indexOf(GENRES_START);
-			if(str.indexOf(GENRES_START) != -1)
+			genres = [];
+			genresRaw = $(doc).find('[itemprop="genre"]');
+			if(genresRaw.length !== 0)
 			{
-				genresHtmlStartIndex += RANK_START.length;
-				genresHtmlEndIndex = str.indexOf("</div>", genresHtmlStartIndex);
-				genresHtml = str.substring(genresHtmlStartIndex, genresHtmlEndIndex);
-				
-				genres = genresHtml.split(",");
-				genresLength = genres.length;
-				for(j = 0; j < genresLength; j++)
+				for(i = 0; i < genresRaw.length; i++)
 				{
-					genres[j] = genres[j].replace("<span itemprop=\"genre\">", "").replace("</span>", "");
-					g1 = genres[j].indexOf("\">") + 2;
-					g2 = genres[j].indexOf("</a>");
-					if(g2 == -1) { genres = null; break; }
-					genres[j] = genres[j].substring(g1, g2).replace(/^\s+|\s+$/g, "").replace(/,/g, "");
-					
-					for(k = 0; k < tagsLength; k++)
+					genres[i] = genresRaw.eq(i).text().trim();
+
+					/* for(k = 0; k < tagsLength; k++)
 					{
-						if(tags[k].length == 0 || tags[k].toUpperCase() == genres[j].toUpperCase())
+						if(tags[k].length == 0 || tags[k].toUpperCase() == genres[i].toUpperCase())
 						{
 							tags.splice(k, 1);
 							tagsLength--;
 							k--;
 						}
-					}
+					} */
 				}
 			}
 			
