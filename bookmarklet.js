@@ -514,7 +514,7 @@ function ProcessNext()
 			altText = img.alt;
 			
 			/* Synopsis (description) */
-			desc = $(doc).find("[itemprop=\"description\"]").text().replace(/\r\n/g, " ").replace(/\n/g, "\\a").replace(/\"/g, "\\\"").replace(/^\s+|\s+$/g, "");
+			desc = $(doc).find("[itemprop=\"description\"]").text().replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").replace(/^\s+|\s+$/g, "");
 			
 			cssLine = template.value
 				.replace(/\[DEL\]/g, "")
