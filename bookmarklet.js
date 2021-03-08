@@ -1,13 +1,18 @@
-javascript: /* MyAnimeList CSS Generator and Tags updater
+javascript: /*
+MyAnimeList CSS Generator and Tags updater
+
 - Original code   2018/Aug/10 by BurntJello http://burntjello.webs.com
 - Extra features  2019        by Cateinya
 - Fixes           2020/Oct    by Cry5talz 
 - Further changes 2021+       by Valerio Lyndon
+
+Last modification: 2021/Mar/07
 */
+
 /* modify these to change your defaults */
-CSS_TEMPLATE = '/* [TITLE] *[DEL]/ .progress-[ID]:after {content: "MAL - [SCORE]";} .title a[href*="/[ID]/"] ~ [class^="re"]:after {content: "SYNOPSIS\\a\\a[DESC]";}';
-MATCH_TEMPLATE = "#tags-[ID]:";
+CSS_TEMPLATE = '/* [TITLE] *[DEL]/ .data.image a[href^="/anime/[ID]/"]::before { background-image: url([IMGURL]); }';
 DELAY = "500";
+MATCH_TEMPLATE = "/anime/[ID]/";
 CHECK_EXISTING = false;
 UPDATE_TAGS = false;
 TAGS_ENGLISH_TITLE = false;
@@ -76,7 +81,7 @@ matchTemplate = document.createElement("input");
 tempDiv.appendChild(matchTemplate);
 matchTemplate.type = "text";
 matchTemplate.value = MATCH_TEMPLATE;
-matchTemplate.title = "Line matching template.  Only matching on [ID] is not enough, include previous\/next characters to ensure the match is unique.";
+matchTemplate.title = "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.";
 
 template = document.createElement("input");
 tempDiv.appendChild(template);
@@ -174,14 +179,16 @@ tempDiv.appendChild(existing);
 existing.style.height = "30%";
 existing.style.width = "95%";
 existing.style.display = "block";
-existing.title = "Copy existing thumbnail/description styles here.  The style for one anime ID must all be on the same line.";
+existing.title = "Copy previously generated code here. The style for one anime ID must all be on the same line.";
+existing.placeholder = "Copy previously generated code here. The style for one anime ID must all be on the same line.";
 
 result = document.createElement("textarea");
 tempDiv.appendChild(result);
 result.style.height = "50%";
 result.style.width = "95%";
 result.style.display = "block";
-result.title = "Updated styles are written here.";
+result.title = "Newly generated code will be output here.";
+result.placeholder = "Newly generated code will be output here.";
 result.readOnly = "readonly";
 
 errorCount = 0;
