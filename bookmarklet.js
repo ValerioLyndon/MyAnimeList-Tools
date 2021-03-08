@@ -34,7 +34,6 @@ SYN_START = "Synonyms:</span>";
 GENRES_START = "Genres:</span>";
 DESC_START = "Synopsis</h2>";
 RANK_START = "Ranked:</span>";
-SCORE_SELECTOR = "[itemprop=\"ratingValue\"]";
 
 /* Anime page only */
 STUDIOS_START = "Studios:</span>";
@@ -88,7 +87,7 @@ tempDiv.appendChild(template);
 template.type = "text";
 template.value = CSS_TEMPLATE;
 template.style.width = "50%";
-template.title = "CSS template.  Replacements are [ID], [IMGURL], [IMGURLT], [IMGURLV], [TITLE], [ENGTITLE], [GENRES], [STUDIOS], [PRODUCERS], [SEASON], [YEAR], [RANK], [SCORE], [STARTDATE], [ENDDATE], and [DESC]. ([DEL] will just be deleted)";
+template.title = "CSS template.  Replacements are [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [ENGTITLE], [GENRES], [STUDIOS], [PRODUCERS], [SEASON], [YEAR], [RANK], [SCORE], [STARTDATE], [ENDDATE], and [DESC]. ([DEL] will just be deleted)";
 
 chkExistingLabel = document.createElement("span");
 tempDiv.appendChild(chkExistingLabel);
@@ -455,7 +454,7 @@ function ProcessNext()
 			
 			/* score */
 			scoreHtml = "";
-			scoreEle = $(doc).find(SCORE_SELECTOR);
+			scoreEle = $(doc).find("[itemprop=\"ratingValue\"]");
 			if(scoreEle.length > 0)
 			{
 				scoreHtml = scoreEle.text().trim();
@@ -485,9 +484,13 @@ function ProcessNext()
 			
 			/* thumbs */
 			img = $(doc).find("img[itemprop=\"image\"]")[0];
-			imgUrl = img.src;
+			imgUrl = img.getAttribute("data-src") || img.src;
+			/* Replace jpg with webp for better file quality/size */
+			imgUrl = imgUrl.replace(".jpg", ".webp");
+			
 			imgUrlt = imgUrl.replace(".jpg", "t.jpg");
 			imgUrlv = imgUrl.replace(".jpg", "v.jpg");
+			imgUrll = imgUrl.replace(".jpg", "l.jpg");
 			
 			altText = img.alt;
 			
@@ -500,6 +503,7 @@ function ProcessNext()
 				.replace(/\[IMGURL\]/g, imgUrl)
 				.replace(/\[IMGURLT\]/g, imgUrlt)
 				.replace(/\[IMGURLV\]/g, imgUrlv)
+				.replace(/\[IMGURLL\]/g, imgUrll)
 				.replace(/\[TITLE\]/g, altText)
 				.replace(/\[ENGTITLE\]/g, englishHtml ? englishHtml : altText)
 				.replace(/\[GENRES\]/g, genres ? genres.join(", ") : "")
@@ -540,7 +544,7 @@ function ProcessNext()
 			}
 			if(errorCount > 0)
 			{
-				alert(errorCount + " errors occurred while processing.  See console for details.\n\n'Some' udpates were probably successful.\nYou may need to rerun the tool to catch the rest (with updated CSS as input and after refreshing your list page).");
+				alert(errorCount + " errors occurred while processing.  See console for details.\n\n'Some' updates were probably successful.\nYou may need to rerun the tool to catch the rest (with updated CSS as input and after refreshing your list page).");
 			}
 		};
 	}
