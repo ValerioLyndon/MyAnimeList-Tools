@@ -511,8 +511,6 @@ function ProcessNext()
 			/* thumbs */
 			img = $(doc).find("img[itemprop=\"image\"]")[0];
 			imgUrl = img.getAttribute("data-src") || img.src;
-			/* Replace jpg with webp for better file quality/size */
-			imgUrl = imgUrl.replace(".jpg", ".webp");
 			
 			imgUrlt = imgUrl.replace(".jpg", "t.jpg");
 			imgUrlv = imgUrl.replace(".jpg", "v.jpg");
