@@ -109,7 +109,7 @@ tempDiv.appendChild(br1);
 chkTags = document.createElement("input");
 tempDiv.appendChild(chkTags);
 chkTags.type = "checkbox";
-chkTags.title = "Update Tags - CURRENTLY BROKEN";
+chkTags.title = "Update Tags";
 chkTags.checked = UPDATE_TAGS;
 
 tagsLabel = document.createElement("span");
@@ -451,16 +451,17 @@ function ProcessNext()
 				for(j = 0; j < genresRaw.length; j++)
 				{
 					genres[j] = genresRaw.eq(j).text().trim();
-
-					/* for(k = 0; k < tagsLength; k++)
+					
+					/* removes duplicates from tags */
+					for(k = 0; k < tagsLength; k++)
 					{
-						if(tags[k].length == 0 || tags[k].toUpperCase() == genres[i].toUpperCase())
+						if(tags[k].length == 0 || tags[k].toUpperCase() == genres[j].toUpperCase())
 						{
 							tags.splice(k, 1);
 							tagsLength--;
 							k--;
 						}
-					} */
+					}
 				}
 			}
 			
@@ -482,7 +483,8 @@ function ProcessNext()
 			{
 				scoreHtml = scoreEle.text().trim();
 			}
-
+			
+			/* Update Tags */
 			if(chkTags.checked)
 			{
 				if(englishHtml && chkEnglish.checked) { tags.push(englishHtml); }
