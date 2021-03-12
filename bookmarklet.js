@@ -6,7 +6,7 @@ MyAnimeList CSS Generator and Tags updater
 - Fixes           2020/Oct    by Cry5talz 
 - Further changes 2021+       by Valerio Lyndon
 
-Last modification: 2021/Mar/07
+Last modification: 2021/Mar/12
 */
 
 /* modify these to change your defaults */
