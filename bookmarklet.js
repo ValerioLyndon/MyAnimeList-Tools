@@ -47,152 +47,105 @@ SERIALIZATION_START = "Serialization:</span>"; /* (To be added) */
 moreIds = new Array();
 modernStyle = (document.getElementById("list_surround")) ? false : true;
 
-tempDiv = document.createElement("div");
-document.body.appendChild(tempDiv);
-tempDiv.style.position = "fixed";
-tempDiv.style.left = "50px";
-tempDiv.style.top = "50px";
-tempDiv.style.bottom = "50px";
-tempDiv.style.right = "50px";
-tempDiv.style.backgroundColor = "#FFFFFF";
-tempDiv.style.borderStyle = "solid";
-tempDiv.style.zIndex = "99999";
+gui = document.createElement("div");
+document.body.appendChild(gui);
+gui.style.position = "fixed";
+gui.style.left = "50px";
+gui.style.top = "50px";
+gui.style.bottom = "50px";
+gui.style.right = "50px";
+gui.style.backgroundColor = "#FFFFFF";
+gui.style.borderStyle = "solid";
+gui.style.zIndex = "99999";
 
 thumbBtn = document.createElement("input");
-tempDiv.appendChild(thumbBtn);
+gui.appendChild(thumbBtn);
 thumbBtn.type = "button";
 thumbBtn.value = "Start";
 
 statusText = document.createElement("span");
-tempDiv.appendChild(statusText);
+gui.appendChild(statusText);
 statusText.style.color = "#000000";
 
-delay = document.createElement("input");
-tempDiv.appendChild(delay);
-delay.type = "text";
-delay.value = DELAY;
-delay.style.width = "50px";
-delay.title = "Delay (ms) between requests to avoid spamming the server.";
-
-matchTemplate = document.createElement("input");
-tempDiv.appendChild(matchTemplate);
-matchTemplate.type = "text";
-matchTemplate.value = MATCH_TEMPLATE;
-matchTemplate.title = "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.";
-
-template = document.createElement("input");
-tempDiv.appendChild(template);
-template.type = "text";
-template.value = CSS_TEMPLATE;
-template.style.width = "50%";
-template.title = "CSS template.  Replacements are [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEENG], [GENRES], [STUDIOS], [PRODUCERS], [SEASON], [YEAR], [RANK], [SCORE], [STARTDATE], [ENDDATE], and [DESC]. ([DEL] will just be deleted)";
-
-chkExistingLabel = document.createElement("span");
-tempDiv.appendChild(chkExistingLabel);
-chkExistingLabel.style.color = "#000000";
-chkExistingLabel.appendChild(document.createTextNode(" Check Existing Images:"));
-
-chkExisting = document.createElement("input");
-tempDiv.appendChild(chkExisting);
-chkExisting.type = "checkbox";
-chkExisting.title = "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load.  I do not recommend using this while adding new anime or updating tags!";
-chkExisting.checked = CHECK_EXISTING;
-
 exitBtn = document.createElement("input");
-tempDiv.appendChild(exitBtn);
+gui.appendChild(exitBtn);
 exitBtn.type = "button";
 exitBtn.value = "Exit";
 
-br1 = document.createElement("br");
-tempDiv.appendChild(br1);
+function field(value, title, desc) {
+	lbl = document.createElement('label');
+	lbl.textContent = title;
+	lbl.style.display = 'inline-block';
+	lbl.style.marginRight = '10px';
+	$(lbl).append($('<br />'));
 
-chkTags = document.createElement("input");
-tempDiv.appendChild(chkTags);
-chkTags.type = "checkbox";
-chkTags.title = "Update Tags";
-chkTags.checked = UPDATE_TAGS;
+	input = document.createElement('input');
+	input.type = 'text';
+	input.value = value;
+	input.title = desc;
 
-tagsLabel = document.createElement("span");
-tempDiv.appendChild(tagsLabel);
-tagsLabel.style.color = "#000000";
-tagsLabel.appendChild(document.createTextNode("Update Tags:"));
+	lbl.appendChild(input)
+	gui.appendChild(lbl);
+	return input;
+}
 
-chkEnglish = document.createElement("input");
-tempDiv.appendChild(chkEnglish);
-chkEnglish.type = "checkbox";
-chkEnglish.title = "English title";
-chkEnglish.checked = TAGS_ENGLISH_TITLE;
+function chk(checked, title, desc = false) {
+	var lbl = document.createElement('label');
+	lbl.textContent = title;
+	if(desc) {
+		lbl.title = desc;
+	}
 
-chkNative = document.createElement("input");
-tempDiv.appendChild(chkNative);
-chkNative.type = "checkbox";
-chkNative.title = "Native title";
-chkNative.checked = TAGS_NATIVE_TITLE;
+	var chk = document.createElement("input");
+	chk.type = "checkbox";
+	chk.checked = checked;
 
-chkSeason = document.createElement("input");
-tempDiv.appendChild(chkSeason);
-chkSeason.type = "checkbox";
-chkSeason.title = "Season";
-chkSeason.checked = TAGS_SEASON;
+	lbl.prepend(chk);
+	gui.appendChild(lbl);
+	return chk;
+}
 
-chkYear = document.createElement("input");
-tempDiv.appendChild(chkYear);
-chkYear.type = "checkbox";
-chkYear.title = "Year";
-chkYear.checked = TAGS_YEAR;
+delay = field(DELAY, "Delay", "Delay (ms) between requests to avoid spamming the server.");
+delay.style.width = "50px";
 
-chkStudio = document.createElement("input");
-tempDiv.appendChild(chkStudio);
-chkStudio.type = "checkbox";
-chkStudio.title = "Studio";
-chkStudio.checked = TAGS_STUDIO;
+matchTemplate = field(MATCH_TEMPLATE, "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
 
-chkGenres = document.createElement("input");
-tempDiv.appendChild(chkGenres);
-chkGenres.type = "checkbox";
-chkGenres.title = "Genres";
-chkGenres.checked = TAGS_GENRES;
+template = field(CSS_TEMPLATE, "Template", "CSS template.  Replacements are [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEENG], [GENRES], [STUDIOS], [PRODUCERS], [SEASON], [YEAR], [RANK], [SCORE], [STARTDATE], [ENDDATE], and [DESC]. ([DEL] will just be deleted)");
+template.style.width = "50vw";
 
-chkProducers = document.createElement("input");
-tempDiv.appendChild(chkProducers);
-chkProducers.type = "checkbox";
-chkProducers.title = "Producers";
-chkProducers.checked = TAGS_PRODUCERS;
+chkExisting = chk(CHECK_EXISTING, "Validate existing images", "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load.  I do not recommend using this while adding new anime or updating tags!");
 
-chkAired = document.createElement("input");
-tempDiv.appendChild(chkAired);
-chkAired.type = "checkbox";
-chkAired.title = "Aired";
-chkAired.checked = TAGS_AIRED;
+$(gui).append($('<br />'));
 
-chkScore = document.createElement("input");
-tempDiv.appendChild(chkScore);
-chkScore.type = "checkbox";
-chkScore.title = "Score";
-chkScore.checked = TAGS_SCORE;
+chkTags = chk(UPDATE_TAGS, "Update Tags:");
 
-chkRank = document.createElement("input");
-tempDiv.appendChild(chkRank);
-chkRank.type = "checkbox";
-chkRank.title = "Rank";
-chkRank.checked = TAGS_RANK;
+chkEnglish = chk(TAGS_ENGLISH_TITLE, "English title");
+chkNative = chk(TAGS_NATIVE_TITLE, "Native title");
+chkSeason = chk(TAGS_SEASON, "Season");
+chkYear = chk(TAGS_YEAR, "Year");
+chkStudio = chk(TAGS_STUDIO, "Studio");
+chkGenres = chk(TAGS_GENRES, "Genres");
+chkProducers = chk(TAGS_PRODUCERS, "Producers");
+chkAired = chk(TAGS_AIRED, "Aired");
+chkScore = chk(TAGS_SCORE, "Score");
+chkRank = chk(TAGS_RANK, "Rank");
 
 existing = document.createElement("textarea");
-tempDiv.appendChild(existing);
 existing.style.height = "30%";
 existing.style.width = "95%";
 existing.style.display = "block";
 existing.title = "Copy previously generated code here. The style for one anime ID must all be on the same line.";
 existing.placeholder = "Copy previously generated code here. The style for one anime ID must all be on the same line.";
+gui.appendChild(existing);
 
 result = document.createElement("textarea");
-tempDiv.appendChild(result);
 result.style.height = "50%";
 result.style.width = "95%";
 result.style.display = "block";
 result.title = "Newly generated code will be output here.";
 result.placeholder = "Newly generated code will be output here.";
 result.readOnly = "readonly";
+gui.appendChild(result);
 
 errorCount = 0;
 i = 0;
@@ -562,7 +515,7 @@ function ProcessNext()
 		thumbBtn.value = "Done (close)";
 		thumbBtn.onclick = function()
 		{
-			document.body.removeChild(tempDiv);
+			document.body.removeChild(gui);
 			if(chkTags.checked)
 			{
 				alert("Refesh the page for tag updates to show.");
@@ -647,7 +600,7 @@ function Process()
 }
 
 thumbBtn.onclick = function() { Process(); };
-exitBtn.onclick = function() { document.body.removeChild(tempDiv); };
+exitBtn.onclick = function() { document.body.removeChild(gui); };
 
 function Start()
 {
