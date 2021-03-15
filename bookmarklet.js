@@ -6,7 +6,6 @@ MyAnimeList CSS Generator and Tags updater
 - Fixes           2020/Oct    by Cry5talz 
 - Further changes 2021+       by Valerio Lyndon
 
-Last modification: 2021/Mar/12
 Last modification: 2021/Mar/14
 */
 
@@ -20,44 +19,53 @@ TAGS_ENGLISH_TITLE = false;
 TAGS_NATIVE_TITLE = false;
 TAGS_SEASON = false;
 TAGS_YEAR = false;
-TAGS_STUDIO = false;
 TAGS_GENRES = false;
-TAGS_PRODUCERS = false;
-TAGS_AIRED = false;
 TAGS_SCORE = false;
 TAGS_RANK = false;
+TAGS_STUDIO = false;
+TAGS_PRODUCERS = false;
+TAGS_AIRED = false;
+TAGS_PUBLISHED = false;
 
 
 /* CSS_TEMPLATE = "[ID] | [TITLE] | [TITLEENG] | [TITLERAW] | [IMGURL] | [GENRES] | [STUDIOS] | [PRODUCERS] | [SEASON] | [YEAR] | [RANK] | [SCORE] | [STARTDATE] | [ENDDATE] | [DESC]"; */
 
-/* defines the start of certain sections on the anime page */
-DESC_START = "Synopsis</h2>";
-RANK_START = "Ranked:</span>";
+/* TOOL CODE */
 
-/* Anime page only */
-STUDIOS_START = "Studios:</span>";
-PRODUCERS_START = "Producers:</span>";
-AIRED_START = "Aired:</span>";
-
-/* Manga page only */
-PUBLISHED_START = "Published:</span>";
-AUTHORS_START = "Authors:</span>"; /* (To be added) */
-SERIALIZATION_START = "Serialization:</span>"; /* (To be added) */
-
-/* tool code */
-moreIds = new Array();
 modernStyle = (document.getElementById("list_surround")) ? false : true;
+animeManga = window.location.href.replace("https://myanimelist.net/", "").split("/")[0].replace("list", "");
+
+/* Create GUI */
+
+css = document.createElement('style');
+css.id = 'burnt-css';
+css.textContent = `
+#burnt-gui {
+	box-sizing: border-box;
+	color: #000;
+	font: 12px/1 sans-serif;
+}
+#burnt-gui * {
+	box-sizing: inherit;
+	color: #000;
+	font: inherit;
+}
+`;
+document.head.appendChild(css);
 
 gui = document.createElement("div");
 document.body.appendChild(gui);
-gui.style.position = "fixed";
-gui.style.left = "50px";
-gui.style.top = "50px";
-gui.style.bottom = "50px";
-gui.style.right = "50px";
-gui.style.backgroundColor = "#FFFFFF";
-gui.style.borderStyle = "solid";
-gui.style.zIndex = "99999";
+gui.style.cssText = `
+	position: fixed;
+	left: 50px;
+	top: 50px;
+	bottom: 50px;
+	right: 50px;
+	z-index: 99999;
+	background-color: #fff;
+	border-style: solid;
+`;
+gui.id = "burnt-gui";
 
 thumbBtn = document.createElement("input");
 gui.appendChild(thumbBtn);
@@ -66,7 +74,7 @@ thumbBtn.value = "Start";
 
 statusText = document.createElement("span");
 gui.appendChild(statusText);
-statusText.style.color = "#000000";
+statusText.style.color = "black";
 
 exitBtn = document.createElement("input");
 gui.appendChild(exitBtn);
@@ -77,15 +85,18 @@ function field(value, title, desc) {
 	lbl = document.createElement('label');
 	lbl.textContent = title;
 	lbl.style.display = 'inline-block';
-	lbl.style.marginRight = '10px';
+	lbl.style.marginLeft = '10px';
+	lbl.style.fontWeight = '700';
+	lbl.style.textAlign = 'left';
 	$(lbl).append($('<br />'));
 
 	input = document.createElement('input');
 	input.type = 'text';
 	input.value = value;
 	input.title = desc;
+	input.style.fontWeight = '400';
 
-	lbl.appendChild(input)
+	lbl.appendChild(input);
 	gui.appendChild(lbl);
 	return input;
 }
@@ -111,7 +122,6 @@ delay.style.width = "50px";
 
 matchTemplate = field(MATCH_TEMPLATE, "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
 
-template = field(CSS_TEMPLATE, "Template", "CSS template.  Replacements are [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEENG], [GENRES], [STUDIOS], [PRODUCERS], [SEASON], [YEAR], [RANK], [SCORE], [STARTDATE], [ENDDATE], and [DESC]. ([DEL] will just be deleted)");
 template = field(CSS_TEMPLATE, "Template", "CSS template.  Replacements are [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEENG], [TITLERAW] [GENRES], [STUDIOS], [PRODUCERS], [SEASON], [YEAR], [RANK], [SCORE], [STARTDATE], [ENDDATE], and [DESC]. ([DEL] will just be deleted)");
 template.style.width = "50vw";
 
@@ -125,12 +135,23 @@ chkEnglish = chk(TAGS_ENGLISH_TITLE, "English title");
 chkNative = chk(TAGS_NATIVE_TITLE, "Native title");
 chkSeason = chk(TAGS_SEASON, "Season");
 chkYear = chk(TAGS_YEAR, "Year");
-chkStudio = chk(TAGS_STUDIO, "Studio");
 chkGenres = chk(TAGS_GENRES, "Genres");
-chkProducers = chk(TAGS_PRODUCERS, "Producers");
-chkAired = chk(TAGS_AIRED, "Aired");
 chkScore = chk(TAGS_SCORE, "Score");
 chkRank = chk(TAGS_RANK, "Rank");
+/*Anime Only */
+chkStudio = chk(TAGS_STUDIO, "Studio");
+chkProducers = chk(TAGS_PRODUCERS, "Producers");
+chkAired = chk(TAGS_AIRED, "Aired");
+/*Manga only*/
+chkPublished = chk(TAGS_PUBLISHED, "Published");
+
+if(animeManga === 'anime') {
+	chkPublished.parentNode.style.display = 'none';
+} else {
+	chkStudio.parentNode.style.display = 'none';
+	chkProducers.parentNode.style.display = 'none';
+	chkAired.parentNode.style.display = 'none';
+}
 
 existing = document.createElement("textarea");
 existing.style.height = "30%";
@@ -149,6 +170,10 @@ result.placeholder = "Newly generated code will be output here.";
 result.readOnly = "readonly";
 gui.appendChild(result);
 
+/* Functions */
+
+moreIds = [];
+
 errorCount = 0;
 i = 0;
 function ProcessNext()
@@ -159,7 +184,6 @@ function ProcessNext()
 		
 		try
 		{
-			animeManga = window.location.href.replace("https://myanimelist.net/", "").split("/")[0].replace("list", "");
 			id = moreId.replace("more", "");
 			url = "https://myanimelist.net/" + animeManga + "/" + id;
 
@@ -285,9 +309,11 @@ function ProcessNext()
 			}
 			
 			/* date */
+			AIRED_START = "Aired:</span>";
+			PUBLISHED_START = "Published:</span>";
+			DATE_START = ( animeManga == "anime" ) ? AIRED_START : PUBLISHED_START;
 			season = null;
 			year = null;
-			DATE_START = ( animeManga == "anime" ) ? AIRED_START : PUBLISHED_START;
 			dateHtmlStartIndex = str.indexOf(DATE_START) + DATE_START.length;
 			if(str.indexOf(DATE_START) != -1)
 			{
@@ -328,6 +354,7 @@ function ProcessNext()
 			}
 			
 			/* studio (anime) */
+			STUDIOS_START = "Studios:</span>";
 			studios = null;
 			studiosHtmlStartIndex = str.indexOf(STUDIOS_START);
 			if(str.indexOf(STUDIOS_START) != -1)
@@ -359,6 +386,7 @@ function ProcessNext()
 			}
 			
 			/* producers (anime) */
+			PRODUCERS_START = "Producers:</span>";
 			producers = null;
 			producersHtmlStartIndex = str.indexOf(PRODUCERS_START);
 			if(str.indexOf(PRODUCERS_START) != -1)
@@ -421,6 +449,7 @@ function ProcessNext()
 			}
 			
 			/* rank */
+			RANK_START = "Ranked:</span>";
 			rankHtml = "";
 			rankHtmlStartIndex = str.indexOf(RANK_START);
 			if(rankHtmlStartIndex != -1)
@@ -450,6 +479,7 @@ function ProcessNext()
 				if(producers && chkProducers.checked) { tags = tags.concat(producers); }
 				if(genres && chkGenres.checked) { tags = tags.concat(genres); }
 				if(chkAired.checked) { tags.push("Aired: " + dateArr[0].replace(/^\s+|\s+$/g, "") + (dateArr.length == 2 ? " to " + dateArr[1].replace(/^\s+|\s+$/g, "") : "")); }
+				if(chkPublished.checked) { tags.push("Published: " + dateArr[0].replace(/^\s+|\s+$/g, "") + (dateArr.length == 2 ? " to " + dateArr[1].replace(/^\s+|\s+$/g, "") : "")); }
 				if(chkScore.checked) { tags.push("Score: " + scoreHtml); }
 				if(chkRank.checked) { tags.push("Ranked: " + rankHtml); }
 				
@@ -517,7 +547,7 @@ function ProcessNext()
 		thumbBtn.value = "Done (close)";
 		thumbBtn.onclick = function()
 		{
-			document.body.removeChild(gui);
+			Exit();
 			if(chkTags.checked)
 			{
 				alert("Refesh the page for tag updates to show.");
@@ -602,11 +632,17 @@ function Process()
 }
 
 thumbBtn.onclick = function() { Process(); };
-exitBtn.onclick = function() { document.body.removeChild(gui); };
+exitBtn.onclick = Exit;
 
 function Start()
 {
 	alert("It's best to use 'All Anime' view.\n\nCopy existing styles to the textarea before starting.\n\nThis script will remove what is no longer needed, skip what already exists, and add the rest.\n\nThe input controls have tooltips, hover over them to see what they are for.");
+}
+
+function Exit()
+{
+	$('#burnt-gui').remove();
+	$('#burnt-css').remove();
 }
 
 Start();
