@@ -384,7 +384,7 @@ function ProcessNext()
 					}
 				}
 			}
-			
+
 			/* producers (anime) */
 			PRODUCERS_START = "Producers:</span>";
 			producers = null;
@@ -485,12 +485,20 @@ function ProcessNext()
 				
 				newTagStr = tags.join(", ");
 				
+				if(animeManga === 'anime') {
+					reqUrl = 'https://myanimelist.net/includes/ajax.inc.php?t=22&tags=';
+					amid = 'aid';
+				} else {
+					reqUrl = 'https://myanimelist.net/includes/ajax.inc.php?t=30&tags=';
+					amid = 'mid';
+				}
+
 				request2 = new XMLHttpRequest();
-				request2.open("post", "https://myanimelist.net/includes/ajax.inc.php?t=22&tags=" + encodeURIComponent(newTagStr), false);
+				request2.open("post", reqUrl + encodeURIComponent(newTagStr), false);
 				request2.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
 				request2.setRequestHeader("X-Requested-With", "XMLHttpRequest");
 				var csrf = $('meta[name="csrf_token"]').attr('content');
-				request2.send("aid=" + id + "&csrf_token=" + csrf);
+				request2.send(amid + '=' + id + '&csrf_token=' + csrf);
 			}
 			
 			/* thumbs */
