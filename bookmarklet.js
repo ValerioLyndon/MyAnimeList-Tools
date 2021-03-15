@@ -199,7 +199,7 @@ function ProcessNext()
 			{
 				if(modernStyle)
 				{
-					tagEl = document.getElementById("tags-" + id);
+					tagEl = document.querySelector(`.tags-${id}`);
 					if(tagEl)
 					{
 						tagEls = tagEl.querySelectorAll('div a');
