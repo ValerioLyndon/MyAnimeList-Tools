@@ -7,6 +7,7 @@ MyAnimeList CSS Generator and Tags updater
 - Further changes 2021+       by Valerio Lyndon
 
 Last modification: 2021/Mar/12
+Last modification: 2021/Mar/14
 */
 
 /* modify these to change your defaults */
@@ -111,6 +112,7 @@ delay.style.width = "50px";
 matchTemplate = field(MATCH_TEMPLATE, "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
 
 template = field(CSS_TEMPLATE, "Template", "CSS template.  Replacements are [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEENG], [GENRES], [STUDIOS], [PRODUCERS], [SEASON], [YEAR], [RANK], [SCORE], [STARTDATE], [ENDDATE], and [DESC]. ([DEL] will just be deleted)");
+template = field(CSS_TEMPLATE, "Template", "CSS template.  Replacements are [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEENG], [TITLERAW] [GENRES], [STUDIOS], [PRODUCERS], [SEASON], [YEAR], [RANK], [SCORE], [STARTDATE], [ENDDATE], and [DESC]. ([DEL] will just be deleted)");
 template.style.width = "50vw";
 
 chkExisting = chk(CHECK_EXISTING, "Validate existing images", "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load.  I do not recommend using this while adding new anime or updating tags!");
@@ -482,8 +484,8 @@ function ProcessNext()
 				.replace(/\[IMGURLV\]/g, imgUrlv)
 				.replace(/\[IMGURLL\]/g, imgUrll)
 				.replace(/\[TITLE\]/g, altText)
-				.replace(/\[TITLEENG\]/g, englishHtml ? englishHtml : altText)
-				.replace(/\[TITLERAW\]/g, nativeHtml ? nativeHtml : "")
+				.replace(/(\[TITLEENG\]|\[ENGTITLE\])/g, englishHtml ? englishHtml : altText)
+				.replace(/(\[TITLERAW\]|\[RAWTITLE\])/g, nativeHtml ? nativeHtml : "")
 				.replace(/\[GENRES\]/g, genres ? genres.join(", ") : "")
 				.replace(/\[STUDIOS\]/g, studios ? studios.join(", ") : "")
 				.replace(/\[PRODUCERS\]/g, producers ? producers.join(", ") : "")
