@@ -5,9 +5,10 @@ MyAnimeList CSS Generator and Tags updater
 - Extra features  2019        by Cateinya
 - Fixes           2020/Oct    by Cry5talz 
 - Further changes 2021+       by Valerio Lyndon
-
-Last modification: 2021/Mar/14
 */
+
+ver = '3.0';
+verMod = '2021/Apr/03';
 
 /* modify these to change your defaults */
 CSS_TEMPLATE = '/* [TITLE] *[DEL]/ .data.image a[href^="/anime/[ID]/"]::before { background-image: url([IMGURL]); }';
@@ -37,75 +38,130 @@ animeManga = window.location.href.replace("https://myanimelist.net/", "").split(
 
 /* Create GUI */
 
-css = document.createElement('style');
-css.id = 'burnt-css';
-css.textContent = `
-#burnt-gui {
-	box-sizing: border-box;
-	color: #000;
-	font: 12px/1 sans-serif;
+function css(css) {
+	var newCSS = document.createElement('style');
+	newCSS.className = 'burnt-css';
+	newCSS.textContent = css;
+	document.head.appendChild(newCSS);
+	return newCSS;
 }
-#burnt-gui * {
-	box-sizing: inherit;
-	color: #000;
-	font: inherit;
-}
-`;
-document.head.appendChild(css);
 
-gui = document.createElement("div");
-document.body.appendChild(gui);
-gui.style.cssText = `
+css(`
+#burnt-gui {
 	position: fixed;
 	left: 50px;
 	top: 50px;
 	bottom: 50px;
 	right: 50px;
 	z-index: 99999;
+	display: flex;
+	flex-flow: row nowrap;
 	background-color: #fff;
 	border-style: solid;
-`;
+	box-sizing: border-box;
+	color: #000;
+	font: 12px/1.5 sans-serif;
+	text-align: left;
+}
+#burnt-status {
+	background: #e6e6e6;
+	padding: 2px 6px;
+	margin: 5px 0 10px;
+	--percent: 0%;
+	background-image: linear-gradient(
+			to right,
+			#4277f2 var(--percent),
+			transparent var(--percent)
+		);
+}
+#burnt-gui * {
+	box-sizing: inherit;
+	color: #000;
+	font: inherit;
+}
+.burnt-tag {
+	display: block;
+	margin-left: 10px;
+}
+.burnt-tag-disabled {
+	opacity: 0.5;
+	pointer-events: none;
+}
+.burnt-textarea {
+	display: flex;
+	width: 50%;
+	flex-flow: column nowrap;
+}
+`);
+
+gui = document.createElement("div");
+document.body.appendChild(gui);
 gui.id = "burnt-gui";
 
+guiL = document.createElement('div');
+gui.appendChild(guiL);
+guiL.style.cssText = `
+	width: 250px;
+	padding: 10px 0 10px 10px;
+	overflow-x: hidden;
+	overflow-y: auto;
+	flex: 0 0 auto;
+`;
+
+guiR = document.createElement('div');
+gui.appendChild(guiR);
+guiR.style.cssText = `
+	display: flex;
+	width: 90%;
+	padding: 10px;
+	flex: 1 1 auto;
+	flex-flow: row nowrap;
+`;
+
 thumbBtn = document.createElement("input");
-gui.appendChild(thumbBtn);
+guiL.appendChild(thumbBtn);
 thumbBtn.type = "button";
 thumbBtn.value = "Start";
 
-statusText = document.createElement("span");
-gui.appendChild(statusText);
-statusText.style.color = "black";
-
 exitBtn = document.createElement("input");
-gui.appendChild(exitBtn);
+guiL.appendChild(exitBtn);
 exitBtn.type = "button";
 exitBtn.value = "Exit";
+
+statusText = document.createElement("div");
+statusText.id = "burnt-status";
+guiL.appendChild(statusText);
 
 function field(value, title, desc) {
 	lbl = document.createElement('label');
 	lbl.textContent = title;
 	lbl.style.display = 'inline-block';
-	lbl.style.marginLeft = '10px';
+	lbl.style.marginRight = '10px';
+	lbl.style.marginBottom = '5px';
 	lbl.style.fontWeight = '700';
 	lbl.style.textAlign = 'left';
 	$(lbl).append($('<br />'));
 
 	input = document.createElement('input');
 	input.type = 'text';
+	input.style.width = '100%';
 	input.value = value;
 	input.title = desc;
 	input.style.fontWeight = '400';
 
 	lbl.appendChild(input);
-	gui.appendChild(lbl);
+	guiL.appendChild(lbl);
 	return input;
 }
 
-function chk(checked, title, desc = false) {
+function chk(checked, title, className = false, desc = false) {
 	var lbl = document.createElement('label');
 	lbl.textContent = title;
 	if(desc) {
 		lbl.title = desc;
+	}
+	if(className) {
+		lbl.className = className;
 	}
 
 	var chk = document.createElement("input");
@@ -113,7 +169,7 @@ function chk(checked, title, desc = false) {
 	chk.checked = checked;
 
 	lbl.prepend(chk);
-	gui.appendChild(lbl);
+	guiL.appendChild(lbl);
 	return chk;
 }
 
@@ -123,27 +179,36 @@ delay.style.width = "50px";
 matchTemplate = field(MATCH_TEMPLATE, "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
 
 template = field(CSS_TEMPLATE, "Template", "CSS template.  Replacements are [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEENG], [TITLERAW] [GENRES], [STUDIOS], [PRODUCERS], [SEASON], [YEAR], [RANK], [SCORE], [STARTDATE], [ENDDATE], and [DESC]. ([DEL] will just be deleted)");
-template.style.width = "50vw";
+template.parentNode.style.width = "100%";
 
-chkExisting = chk(CHECK_EXISTING, "Validate existing images", "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load.  I do not recommend using this while adding new anime or updating tags!");
+$(guiL).append($('<br />'));
 
-$(gui).append($('<br />'));
+chkTags = chk(UPDATE_TAGS, "Update Tags:", 'burnt-chk burnt-tagtoggle');
 
-chkTags = chk(UPDATE_TAGS, "Update Tags:");
+chkTags.parentNode.addEventListener('click', toggleTags);
 
-chkEnglish = chk(TAGS_ENGLISH_TITLE, "English title");
-chkNative = chk(TAGS_NATIVE_TITLE, "Native title");
-chkSeason = chk(TAGS_SEASON, "Season");
-chkYear = chk(TAGS_YEAR, "Year");
-chkGenres = chk(TAGS_GENRES, "Genres");
-chkScore = chk(TAGS_SCORE, "Score");
-chkRank = chk(TAGS_RANK, "Rank");
+function toggleTags() {
+	bool = chkTags.checked;
+	if(bool) {
+		$('.burnt-tag').removeClass('burnt-tag-disabled');
+	} else {
+		$('.burnt-tag').addClass('burnt-tag-disabled');
+	}
+}
+
+chkEnglish = chk(TAGS_ENGLISH_TITLE, "English title", 'burnt-chk burnt-tag');
+chkNative = chk(TAGS_NATIVE_TITLE, "Native title", 'burnt-chk burnt-tag');
+chkSeason = chk(TAGS_SEASON, "Season", 'burnt-chk burnt-tag');
+chkYear = chk(TAGS_YEAR, "Year", 'burnt-chk burnt-tag');
+chkGenres = chk(TAGS_GENRES, "Genres", 'burnt-chk burnt-tag');
+chkScore = chk(TAGS_SCORE, "Score", 'burnt-chk burnt-tag');
+chkRank = chk(TAGS_RANK, "Rank", 'burnt-chk burnt-tag');
 /*Anime Only */
-chkStudio = chk(TAGS_STUDIO, "Studio");
-chkProducers = chk(TAGS_PRODUCERS, "Producers");
-chkAired = chk(TAGS_AIRED, "Aired");
+chkStudio = chk(TAGS_STUDIO, "Studio", 'burnt-chk burnt-tag');
+chkProducers = chk(TAGS_PRODUCERS, "Producers", 'burnt-chk burnt-tag');
+chkAired = chk(TAGS_AIRED, "Aired", 'burnt-chk burnt-tag');
 /*Manga only*/
-chkPublished = chk(TAGS_PUBLISHED, "Published");
+chkPublished = chk(TAGS_PUBLISHED, "Published", 'burnt-chk burnt-tag');
 
 if(animeManga === 'anime') {
 	chkPublished.parentNode.style.display = 'none';
@@ -153,22 +218,50 @@ if(animeManga === 'anime') {
 	chkAired.parentNode.style.display = 'none';
 }
 
+$(guiL).append($('<br />'));
+
+chkExisting = chk(CHECK_EXISTING, "Validate existing images", 'burnt-chk', "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load.  I do not recommend using this while adding new anime or updating tags!");
+
+$(guiL).append($(`<br /><br /><small style="font-size: 10px; font-style: italic;">MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</small>`));
+
+
+textareaL = document.createElement('div');
+textareaL.className = 'burnt-textarea';
+guiR.appendChild(textareaL);
+
+$(textareaL).append($('<b style="font-weight: bold;">Input</b>'));
+
 existing = document.createElement("textarea");
-existing.style.height = "30%";
-existing.style.width = "95%";
-existing.style.display = "block";
+existing.style.cssText = `
+	display: block;
+	height: 100%;
+	width: 100%;
+	resize: none;
+`;
 existing.title = "Copy previously generated code here. The style for one anime ID must all be on the same line.";
 existing.placeholder = "Copy previously generated code here. The style for one anime ID must all be on the same line.";
-gui.appendChild(existing);
+textareaL.appendChild(existing);
+
+textareaR = document.createElement('div');
+textareaR.className = 'burnt-textarea';
+textareaR.style.paddingLeft = '10px';
+guiR.appendChild(textareaR);
+
+$(textareaR).append($('<b style="font-weight: bold;">Output</b>'));
 
 result = document.createElement("textarea");
-result.style.height = "50%";
-result.style.width = "95%";
-result.style.display = "block";
+result.style.cssText = `
+	display: block;
+	height: 100%;
+	width: 100%;
+	resize: none;
+`;
 result.title = "Newly generated code will be output here.";
 result.placeholder = "Newly generated code will be output here.";
 result.readOnly = "readonly";
-gui.appendChild(result);
+textareaR.appendChild(result);
+
+toggleTags();
 
 /* Functions */
 
@@ -547,6 +640,8 @@ function ProcessNext()
 		i++;
 		
 		statusText.innerHTML = "Processed " + i + " of " + moreIds.length;
+		percent = i / moreIds.length * 100;
+		statusText.style.cssText = '--percent: ' + percent + '%';
 		
 		setTimeout(ProcessNext, delay.value);
 	}
@@ -650,7 +745,7 @@ function Start()
 function Exit()
 {
 	$('#burnt-gui').remove();
-	$('#burnt-css').remove();
+	$('.burnt-css').remove();
 }
 
 Start();
