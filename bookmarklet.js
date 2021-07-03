@@ -218,6 +218,7 @@ if(animeManga === 'anime') {
 	chkStudio.parentNode.style.display = 'none';
 	chkProducers.parentNode.style.display = 'none';
 	chkAired.parentNode.style.display = 'none';
+	chkRating.parentNode.style.display = 'none';
 }
 
 $(guiL).append($('<br />'));
@@ -589,6 +590,7 @@ function ProcessNext()
 				if(chkPublished.checked) { tags.push("Published: " + dateArr[0].replace(/^\s+|\s+$/g, "") + (dateArr.length == 2 ? " to " + dateArr[1].replace(/^\s+|\s+$/g, "") : "")); }
 				if(chkScore.checked) { tags.push("Score: " + scoreHtml); }
 				if(chkRank.checked) { tags.push("Ranked: " + rankHtml); }
+				if(chkRating.checked) { tags.push("Rating: " + ratingHtml); }
 				
 				newTagStr = tags.join(", ");
 				
