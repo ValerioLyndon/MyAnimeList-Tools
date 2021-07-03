@@ -664,8 +664,11 @@ function ProcessNext()
 	}
 	else
 	{
-		thumbBtn.value = "Done (close)";
-		thumbBtn.onclick = function()
+		thumbBtn.value = "Done";
+		thumbBtn.disabled = "disabled";
+		exitBtn.disabled = false;
+		exitBtn.value = "Exit";
+		exitBtn.onclick = function()
 		{
 			Exit();
 			if(chkTags.checked)
