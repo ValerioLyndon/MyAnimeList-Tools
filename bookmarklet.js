@@ -8,13 +8,14 @@ MyAnimeList CSS Generator and Tags updater
 */
 
 ver = '4.0_prerelease';
-verMod = '2021/Jul/02';
+verMod = '2021/Jul/03';
 
 /* modify these to change your defaults */
 CSS_TEMPLATE = '/* [TITLE] *[DEL]/ .data.image a[href^="/anime/[ID]/"]::before { background-image: url([IMGURL]); }';
 DELAY = "500";
 MATCH_TEMPLATE = "/anime/[ID]/";
 CHECK_EXISTING = false;
+CLEAR_TAGS = false;
 UPDATE_TAGS = false;
 TAGS_ENGLISH_TITLE = false;
 TAGS_NATIVE_TITLE = false;
@@ -80,8 +81,10 @@ css(`
 	color: #000;
 	font: inherit;
 }
-.burnt-tag {
+.burnt-chk {
 	display: block;
+}
+.burnt-tag {
 	margin-left: 10px;
 }
 .burnt-tag-disabled {
@@ -223,9 +226,13 @@ if(animeManga === 'anime') {
 
 $(guiL).append($('<br />'));
 
+chkClearTags = chk(CLEAR_TAGS, "Overwrite current tags", 'burnt-chk burnt-tag', "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nNot recommended if you use tags for anything outside of this tool. But even with this disabled, I would still consider your tags forfeit as soon as you click start as it will be a monumentous task to remove all the generated content from your tags.");
+
+$(guiL).append($('<br />'));
+
 chkExisting = chk(CHECK_EXISTING, "Validate existing images", 'burnt-chk', "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load.  I do not recommend using this while adding new anime or updating tags!");
 
-$(guiL).append($(`<br /><br /><small style="font-size: 10px; font-style: italic;">MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</small>`));
+$(guiL).append($(`<br /><small style="font-size: 10px; font-style: italic;">MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</small>`));
 
 
 textareaL = document.createElement('div');
@@ -289,7 +296,7 @@ function ProcessNext()
 			str = request.responseText;
 			doc = new DOMParser().parseFromString(request.responseText, "text/html");
 		
-			/* tags */
+			/* get current tags */
 			tags = new Array();
 			if(chkTags.checked)
 			{
@@ -323,12 +330,17 @@ function ProcessNext()
 					}
 				}
 			}
-			tagsLength = tags.length;
 			
-			/* remove extra whitespace */
-			for(j = 0; j < tagsLength; j++)
-			{
-				tags[j] = tags[j].trim();
+			if(chkClearTags.checked) {
+				tags = [];
+				tagsLength = 0;
+			} else {
+				tagsLength = tags.length;
+				/* remove extra whitespace */
+				for(j = 0; j < tagsLength; j++)
+				{
+					tags[j] = tags[j].trim();
+				}
 			}
 			
 			/* alternate titles */
