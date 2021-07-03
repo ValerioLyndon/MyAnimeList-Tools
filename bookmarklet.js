@@ -81,6 +81,9 @@ css(`
 	color: #000;
 	font: inherit;
 }
+.burnt-btn + .burnt-btn {
+	margin-left: 3px; 
+}
 .burnt-chk {
 	display: block;
 }
@@ -95,6 +98,10 @@ css(`
 	display: flex;
 	width: 50%;
 	flex-flow: column nowrap;
+}
+#burnt-gui textarea {
+	font-family: monospace;
+	word-break: break-all;
 }
 `);
 
@@ -124,11 +131,13 @@ guiR.style.cssText = `
 
 thumbBtn = document.createElement("input");
 guiL.appendChild(thumbBtn);
+thumbBtn.classList.add('burnt-btn');
 thumbBtn.type = "button";
 thumbBtn.value = "Start";
 
 exitBtn = document.createElement("input");
 guiL.appendChild(exitBtn);
+exitBtn.classList.add('burnt-btn');
 exitBtn.type = "button";
 exitBtn.value = "Exit";
 
