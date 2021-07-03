@@ -273,7 +273,15 @@ textareaR.appendChild(result);
 
 toggleTags();
 
-/* Functions */
+/* Common Functions */
+
+function decodeHtml(html) {
+	var txt = document.createElement("textarea");
+	txt.innerHTML = html;
+	return txt.value;
+}
+
+/* Primary Functions */
 
 moreIds = [];
 
@@ -353,6 +361,7 @@ function ProcessNext()
 				englishHtmlStartIndex += ENGLISH_START.length;
 				englishHtmlEndIndex = str.indexOf("</div>", englishHtmlStartIndex);
 				englishHtml = str.substring(englishHtmlStartIndex, englishHtmlEndIndex);
+				englishHtml = decodeHtml(englishHtml);
 				
 				englishHtml = englishHtml.replace(/^\s+|\s+$/g, "").replace(/,/g, "");
 				englishUpper = englishHtml.toUpperCase();
@@ -376,6 +385,7 @@ function ProcessNext()
 					synHtmlStartIndex += SYN_START.length;
 					synHtmlEndIndex = str.indexOf("</div>", synHtmlStartIndex);
 					synHtml = str.substring(synHtmlStartIndex, synHtmlEndIndex);
+					synHtml = decodeHtml(synHtml);
 					synArr = synHtml.split(",");
 					if(synArr.length > 0)
 					{
@@ -402,6 +412,7 @@ function ProcessNext()
 				nativeHtmlStartIndex += NATIVE_START.length;
 				nativeHtmlEndIndex = str.indexOf("</div>", nativeHtmlStartIndex);
 				nativeHtml = str.substring(nativeHtmlStartIndex, nativeHtmlEndIndex);
+				nativeHtml = decodeHtml(nativeHtml);
 				
 				nativeHtml = nativeHtml.replace(/^\s+|\s+$/g, "").replace(/,/g, "");
 				nativeUpper = nativeHtml.toUpperCase();
@@ -479,6 +490,7 @@ function ProcessNext()
 					g2 = studios[j].indexOf("</a>");
 					if(g2 == -1) { studios = null; break; }
 					studios[j] = studios[j].substring(g1, g2).replace(/^\s+|\s+$/g, "");
+					studios[j] = decodeHtml(studios[j]);
 					studioUpper = studios[j].toUpperCase();
 					
 					for(k = 0; k < tagsLength; k++)
@@ -513,11 +525,12 @@ function ProcessNext()
 						g2 = producers[j].indexOf("</a>");
 						if(g2 == -1) { producers = null; break; }
 						producers[j] = producers[j].substring(g1, g2).replace(/^\s+|\s+$/g, "");
-						studioUpper = producers[j].toUpperCase();
+						producers[j] = decodeHtml(producers[j]);
+						producersUpper = producers[j].toUpperCase();
 						
 						for(k = 0; k < tagsLength; k++)
 						{
-							if(tags[k].length == 0 || tags[k].toUpperCase() == studioUpper)
+							if(tags[k].length == 0 || tags[k].toUpperCase() == producersUpper)
 							{
 								tags.splice(k, 1);
 								tagsLength--;
