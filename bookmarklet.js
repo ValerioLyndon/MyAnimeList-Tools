@@ -471,8 +471,13 @@ function ProcessNext()
 					year = date1Arr[1].replace(/^\s+|\s+$/g, "");
 					for(k = 0; k < tagsLength; k++)
 					{
-						if(tags[k].length == 0 || tags[k].toUpperCase() == season.toUpperCase() || tags[k] == year)
-						{
+						if(
+							tags[k].length == 0 ||
+							tags[k].toUpperCase() == season.toUpperCase() ||
+							tags[k] == year ||
+							tags[k].indexOf('Aired: ') != -1 ||
+							tags[k].indexOf('Published: ') != -1
+						) {
 							tags.splice(k, 1);
 							tagsLength--;
 							k--;
@@ -620,8 +625,8 @@ function ProcessNext()
 				if(studios && chkStudio.checked) { tags = tags.concat(studios); }
 				if(producers && chkProducers.checked) { tags = tags.concat(producers); }
 				if(genres && chkGenres.checked) { tags = tags.concat(genres); }
-				if(chkAired.checked) { tags.push("Aired: " + dateArr[0].replace(/^\s+|\s+$/g, "") + (dateArr.length == 2 ? " to " + dateArr[1].replace(/^\s+|\s+$/g, "") : "")); }
-				if(chkPublished.checked) { tags.push("Published: " + dateArr[0].replace(/^\s+|\s+$/g, "") + (dateArr.length == 2 ? " to " + dateArr[1].replace(/^\s+|\s+$/g, "") : "")); }
+				if(chkAired.checked) { tags.push("Aired: " + dateArr[0].replace(/^\s+|\s+$/g, "").replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].replace(/^\s+|\s+$/g, "").replace(',', '') : "")); }
+				if(chkPublished.checked) { tags.push("Published: " + dateArr[0].replace(/^\s+|\s+$/g, "").replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].replace(/^\s+|\s+$/g, "").replace(',', '') : "")); }
 				if(chkScore.checked) { tags.push("Score: " + scoreHtml); }
 				if(chkRank.checked) { tags.push("Ranked: " + rankHtml); }
 				if(chkRating.checked) { tags.push("Rating: " + ratingHtml); }
@@ -657,6 +662,7 @@ function ProcessNext()
 			/* Synopsis (description) */
 			desc = $(doc).find("[itemprop=\"description\"]").text().replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").replace(/^\s+|\s+$/g, "");
 			
+			/* Generate CSS */
 			cssLine = template.value
 				.replace(/\[DEL\]/g, "")
 				.replace(/\[ID\]/g, id)
