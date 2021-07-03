@@ -7,8 +7,8 @@ MyAnimeList CSS Generator and Tags updater
 - Further changes 2021+       by Valerio Lyndon
 */
 
-ver = '3.0';
-verMod = '2021/Apr/03';
+ver = '4.0_prerelease';
+verMod = '2021/Jul/02';
 
 /* modify these to change your defaults */
 CSS_TEMPLATE = '/* [TITLE] *[DEL]/ .data.image a[href^="/anime/[ID]/"]::before { background-image: url([IMGURL]); }';
@@ -27,9 +27,10 @@ TAGS_STUDIO = false;
 TAGS_PRODUCERS = false;
 TAGS_AIRED = false;
 TAGS_PUBLISHED = false;
+TAGS_RATING = false;
 
 
-/* CSS_TEMPLATE = "[ID] | [TITLE] | [TITLEENG] | [TITLERAW] | [IMGURL] | [GENRES] | [STUDIOS] | [PRODUCERS] | [SEASON] | [YEAR] | [RANK] | [SCORE] | [STARTDATE] | [ENDDATE] | [DESC]"; */
+/* CSS_TEMPLATE = "[ID] | [TITLE] | [TITLEENG] | [TITLERAW] | [IMGURL] | [GENRES] | [STUDIOS] | [PRODUCERS] | [SEASON] | [YEAR] | [RANK] | [SCORE] | [STARTDATE] | [ENDDATE] | [RATING] | [DESC]"; */
 
 /* TOOL CODE */
 
@@ -207,6 +208,7 @@ chkRank = chk(TAGS_RANK, "Rank", 'burnt-chk burnt-tag');
 chkStudio = chk(TAGS_STUDIO, "Studio", 'burnt-chk burnt-tag');
 chkProducers = chk(TAGS_PRODUCERS, "Producers", 'burnt-chk burnt-tag');
 chkAired = chk(TAGS_AIRED, "Aired", 'burnt-chk burnt-tag');
+chkRating = chk(TAGS_RATING, "Rating", 'burnt-chk burnt-tag');
 /*Manga only*/
 chkPublished = chk(TAGS_PUBLISHED, "Published", 'burnt-chk burnt-tag');
 
@@ -518,6 +520,18 @@ function ProcessNext()
 					}
 				}
 			}
+
+			/* rating (anime) */
+			RATING_START = "Rating:</span>";
+			ratingHtml = "";
+			ratingHtmlStartIndex = str.indexOf(RATING_START);
+			if(ratingHtmlStartIndex != -1)
+			{
+				ratingHtmlStartIndex += RATING_START.length;
+				ratingHtmlStartIndex += 3; /* to avoid spaces that break end index */
+				ratingHtmlEndIndex = str.indexOf(" ", ratingHtmlStartIndex);
+				ratingHtml = str.substring(ratingHtmlStartIndex, ratingHtmlEndIndex);
+			}
 			
 			/* genres */
 			genres = [];
@@ -626,6 +640,7 @@ function ProcessNext()
 				.replace(/\[SCORE\]/g, scoreHtml)
 				.replace(/\[STARTDATE\]/g, dateArr[0].replace(/^\s+|\s+$/g, ""))
 				.replace(/\[ENDDATE\]/g, dateArr.length == 2 ? dateArr[1].replace(/^\s+|\s+$/g, "") : "")
+				.replace(/\[RATING\]/g, ratingHtml)
 				.replace(/\[DESC\]/g, desc);
 			
 			result.value += cssLine + "\n";
