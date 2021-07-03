@@ -31,7 +31,7 @@ TAGS_PUBLISHED = false;
 TAGS_RATING = false;
 
 
-/* CSS_TEMPLATE = "[ID] | [TITLE] | [TITLEENG] | [TITLERAW] | [IMGURL] | [GENRES] | [STUDIOS] | [PRODUCERS] | [SEASON] | [YEAR] | [RANK] | [SCORE] | [STARTDATE] | [ENDDATE] | [RATING] | [DESC]"; */
+/* CSS_TEMPLATE = "[ID] | [TYPE] | [TITLE] | [TITLEENG] | [TITLERAW] | [IMGURL] | [GENRES] | [STUDIOS] | [PRODUCERS] | [SEASON] | [YEAR] | [RANK] | [SCORE] | [STARTDATE] | [ENDDATE] | [RATING] | [DESC]"; */
 
 /* TOOL CODE */
 
@@ -660,6 +660,7 @@ function ProcessNext()
 			cssLine = template.value
 				.replace(/\[DEL\]/g, "")
 				.replace(/\[ID\]/g, id)
+				.replace(/\[TYPE\]/g, animeManga)
 				.replace(/\[IMGURL\]/g, imgUrl)
 				.replace(/\[IMGURLT\]/g, imgUrlt)
 				.replace(/\[IMGURLV\]/g, imgUrlv)
