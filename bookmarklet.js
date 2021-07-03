@@ -672,7 +672,7 @@ function ProcessNext()
 			}
 			if(errorCount > 0)
 			{
-				alert(errorCount + " errors occurred while processing.  See console for details.\n\n'Some' updates were probably successful.\nYou may need to rerun the tool to catch the rest (with updated CSS as input and after refreshing your list page).");
+				alert(errorCount + " errors occurred while processing.  See your browser's console for details.\n\nSome updates were probably successful.\nYou can try rerunning the tool to fix these errors (with updated CSS as input and after refreshing your list page).");
 			}
 		};
 	}
@@ -754,7 +754,7 @@ exitBtn.onclick = Exit;
 
 function Start()
 {
-	alert("It's best to use 'All Anime' view.\n\nCopy existing styles to the textarea before starting.\n\nThis script will remove what is no longer needed, skip what already exists, and add the rest.\n\nThe input controls have tooltips, hover over them to see what they are for.");
+	alert("It's best to use the 'All Anime' view.\n\nCopy existing styles to the textarea before starting. This script will remove what is no longer needed, skip what already exists, and add the rest.\n\nThe options have tooltips, hover over them to see detailed info.");
 }
 
 function Exit()
