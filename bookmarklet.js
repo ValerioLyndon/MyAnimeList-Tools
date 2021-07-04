@@ -340,6 +340,7 @@ function ProcessNext()
 					else
 					{
 						alert('Tags are not shown on your list!\n\nPlease uncheck the "Update tags" box, or check the "Tags" box at https://myanimelist.net/editprofile.php?go=listpreferences and try again.');
+						moreIds = [];
 					}
 					
 				}
@@ -353,6 +354,7 @@ function ProcessNext()
 					else
 					{
 						alert('Tags are not shown on your list!\n\nPlease uncheck the "Update tags" box, or check the "Tags" box at https://myanimelist.net/editprofile.php?go=listpreferences and try again.');
+						moreIds = [];
 					}
 				}
 			}
