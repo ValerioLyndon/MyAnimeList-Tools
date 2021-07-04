@@ -28,12 +28,13 @@ TAGS_RANK = false;
 TAGS_STUDIO = false;
 TAGS_PRODUCERS = false;
 TAGS_LICENSORS = false;
+TAGS_SERIALIZATION = false;
 TAGS_AIRED = false;
 TAGS_PUBLISHED = false;
 TAGS_RATING = false;
 
 
-/* CSS_TEMPLATE = "[ID] | [TYPE] | [TITLE] | [TITLEENG] | [TITLERAW] | [IMGURL] | [GENRES] | [AUTHORS] | [STUDIOS] | [PRODUCERS] | [LICENSORS] | [SEASON] | [YEAR] | [RANK] | [SCORE] | [STARTDATE] | [ENDDATE] | [RATING] | [DESC]"; */
+/* CSS_TEMPLATE = "[ID] | [TYPE] | [TITLE] | [TITLEENG] | [TITLERAW] | [IMGURL] | [GENRES] | [AUTHORS] | [STUDIOS] | [PRODUCERS] | [LICENSORS] | [SERIALIZATION] | [SEASON] | [YEAR] | [RANK] | [SCORE] | [STARTDATE] | [ENDDATE] | [RATING] | [DESC]"; */
 
 /* TOOL CODE */
 
@@ -227,10 +228,12 @@ chkRating = chk(TAGS_RATING, "Rating", 'burnt-chk burnt-tag');
 /*Manga only*/
 chkPublished = chk(TAGS_PUBLISHED, "Published", 'burnt-chk burnt-tag');
 chkAuthors = chk(TAGS_AUTHORS, "Authors", 'burnt-chk burnt-tag');
+chkSerialization = chk(TAGS_SERIALIZATION, "Serialization", 'burnt-chk burnt-tag');
 
 if(animeManga === 'anime') {
 	chkPublished.parentNode.style.display = 'none';
 	chkAuthors.parentNode.style.display = 'none';
+	chkSerialization.parentNode.style.display = 'none';
 } else {
 	chkStudio.parentNode.style.display = 'none';
 	chkProducers.parentNode.style.display = 'none';
@@ -642,6 +645,48 @@ function ProcessNext()
 				}
 			}
 
+			/* serialization (manga) */
+			SERIALIZATION_START = "Serialization:</span>";
+			serialization = null;
+			serializationHtmlStartIndex = str.indexOf(SERIALIZATION_START);
+			if(str.indexOf(SERIALIZATION_START) != -1)
+			{
+				serializationHtmlStartIndex += SERIALIZATION_START.length;
+				serializationHtmlEndIndex = str.indexOf("</div>", serializationHtmlStartIndex);
+				serializationHtml = str.substring(serializationHtmlStartIndex, serializationHtmlEndIndex);
+	
+				serialization = serializationHtml.split(",");
+				serializationLength = serialization.length;
+				for(j = 0; j < serializationLength; j++)
+				{
+					if(serialization[j].indexOf("<sup>") == -1)
+					{
+						g1 = serialization[j].indexOf("\">") + 2;
+						g2 = serialization[j].indexOf("</a>");
+						if(g2 == -1) { serialization = null; break; }
+						serialization[j] = serialization[j].substring(g1, g2).replace(/^\s+|\s+$/g, "");
+						serialization[j] = decodeHtml(serialization[j]);
+						serializationUpper = serialization[j].toUpperCase();
+						
+						for(k = 0; k < tagsLength; k++)
+						{
+							if(tags[k].length == 0 || tags[k].toUpperCase() == serializationUpper)
+							{
+								tags.splice(k, 1);
+								tagsLength--;
+								k--;
+							}
+						}
+					}
+					else
+					{
+						serialization.splice(j, 1);
+						serializationLength--;
+						j--;
+					}
+				}
+			}
+
 			/* rating (anime) */
 			RATING_START = "Rating:</span>";
 			ratingHtml = "";
@@ -706,6 +751,7 @@ function ProcessNext()
 				if(studios && chkStudio.checked) { tags = tags.concat(studios); }
 				if(producers && chkProducers.checked) { tags = tags.concat(producers); }
 				if(licensors && chkLicensors.checked) { tags = tags.concat(licensors); }
+				if(serialization && chkSerialization.checked) { tags = tags.concat(serialization); }
 				if(genres && chkGenres.checked) { tags = tags.concat(genres); }
 				if(authors && chkAuthors.checked) { tags = tags.concat(authors); }
 				if(chkAired.checked) { tags.push("Aired: " + dateArr[0].replace(/^\s+|\s+$/g, "").replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].replace(/^\s+|\s+$/g, "").replace(',', '') : "")); }
@@ -761,6 +807,7 @@ function ProcessNext()
 				.replace(/\[STUDIOS\]/g, studios ? studios.join(", ") : "")
 				.replace(/\[PRODUCERS\]/g, producers ? producers.join(", ") : "")
 				.replace(/\[LICENSORS\]/g, licensors ? licensors.join(", ") : "")
+				.replace(/\[SERIALIZATION\]/g, serialization ? serialization.join(", ") : "")
 				.replace(/\[AUTHORS\]/g, authors ? authors.join(" & ") : "")
 				.replace(/\[SEASON\]/g, season)
 				.replace(/\[YEAR\]/g, year)
