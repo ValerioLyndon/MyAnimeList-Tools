@@ -27,12 +27,13 @@ TAGS_SCORE = false;
 TAGS_RANK = false;
 TAGS_STUDIO = false;
 TAGS_PRODUCERS = false;
+TAGS_LICENSORS = false;
 TAGS_AIRED = false;
 TAGS_PUBLISHED = false;
 TAGS_RATING = false;
 
 
-/* CSS_TEMPLATE = "[ID] | [TYPE] | [TITLE] | [TITLEENG] | [TITLERAW] | [IMGURL] | [GENRES] | [AUTHORS] | [STUDIOS] | [PRODUCERS] | [SEASON] | [YEAR] | [RANK] | [SCORE] | [STARTDATE] | [ENDDATE] | [RATING] | [DESC]"; */
+/* CSS_TEMPLATE = "[ID] | [TYPE] | [TITLE] | [TITLEENG] | [TITLERAW] | [IMGURL] | [GENRES] | [AUTHORS] | [STUDIOS] | [PRODUCERS] | [LICENSORS] | [SEASON] | [YEAR] | [RANK] | [SCORE] | [STARTDATE] | [ENDDATE] | [RATING] | [DESC]"; */
 
 /* TOOL CODE */
 
@@ -220,6 +221,7 @@ chkRank = chk(TAGS_RANK, "Rank", 'burnt-chk burnt-tag');
 /*Anime Only */
 chkStudio = chk(TAGS_STUDIO, "Studio", 'burnt-chk burnt-tag');
 chkProducers = chk(TAGS_PRODUCERS, "Producers", 'burnt-chk burnt-tag');
+chkLicensors = chk(TAGS_LICENSORS, "Licensors", 'burnt-chk burnt-tag');
 chkAired = chk(TAGS_AIRED, "Aired", 'burnt-chk burnt-tag');
 chkRating = chk(TAGS_RATING, "Rating", 'burnt-chk burnt-tag');
 /*Manga only*/
@@ -232,6 +234,7 @@ if(animeManga === 'anime') {
 } else {
 	chkStudio.parentNode.style.display = 'none';
 	chkProducers.parentNode.style.display = 'none';
+	chkLicensors.parentNode.style.display = 'none';
 	chkAired.parentNode.style.display = 'none';
 	chkRating.parentNode.style.display = 'none';
 }
@@ -522,7 +525,7 @@ function ProcessNext()
 				}
 			}
 			
-			/* authors */
+			/* authors (manga) */
 			AUTHORS_START = "Authors:</span>";
 			authors = null;
 			authorsHtmlStartIndex = str.indexOf(AUTHORS_START);
@@ -597,6 +600,48 @@ function ProcessNext()
 				}
 			}
 
+			/* licensors (anime) */
+			LICENSORS_START = "Licensors:</span>";
+			licensors = null;
+			licensorsHtmlStartIndex = str.indexOf(LICENSORS_START);
+			if(str.indexOf(LICENSORS_START) != -1)
+			{
+				licensorsHtmlStartIndex += LICENSORS_START.length;
+				licensorsHtmlEndIndex = str.indexOf("</div>", licensorsHtmlStartIndex);
+				licensorsHtml = str.substring(licensorsHtmlStartIndex, licensorsHtmlEndIndex);
+	
+				licensors = licensorsHtml.split(",");
+				licensorsLength = licensors.length;
+				for(j = 0; j < licensorsLength; j++)
+				{
+					if(licensors[j].indexOf("<sup>") == -1)
+					{
+						g1 = licensors[j].indexOf("\">") + 2;
+						g2 = licensors[j].indexOf("</a>");
+						if(g2 == -1) { licensors = null; break; }
+						licensors[j] = licensors[j].substring(g1, g2).replace(/^\s+|\s+$/g, "");
+						licensors[j] = decodeHtml(licensors[j]);
+						licensorsUpper = licensors[j].toUpperCase();
+						
+						for(k = 0; k < tagsLength; k++)
+						{
+							if(tags[k].length == 0 || tags[k].toUpperCase() == licensorsUpper)
+							{
+								tags.splice(k, 1);
+								tagsLength--;
+								k--;
+							}
+						}
+					}
+					else
+					{
+						licensors.splice(j, 1);
+						licensorsLength--;
+						j--;
+					}
+				}
+			}
+
 			/* rating (anime) */
 			RATING_START = "Rating:</span>";
 			ratingHtml = "";
@@ -660,6 +705,7 @@ function ProcessNext()
 				if(year && chkYear.checked) { tags.push(year); }
 				if(studios && chkStudio.checked) { tags = tags.concat(studios); }
 				if(producers && chkProducers.checked) { tags = tags.concat(producers); }
+				if(licensors && chkLicensors.checked) { tags = tags.concat(licensors); }
 				if(genres && chkGenres.checked) { tags = tags.concat(genres); }
 				if(authors && chkAuthors.checked) { tags = tags.concat(authors); }
 				if(chkAired.checked) { tags.push("Aired: " + dateArr[0].replace(/^\s+|\s+$/g, "").replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].replace(/^\s+|\s+$/g, "").replace(',', '') : "")); }
@@ -714,6 +760,7 @@ function ProcessNext()
 				.replace(/\[GENRES\]/g, genres ? genres.join(", ") : "")
 				.replace(/\[STUDIOS\]/g, studios ? studios.join(", ") : "")
 				.replace(/\[PRODUCERS\]/g, producers ? producers.join(", ") : "")
+				.replace(/\[LICENSORS\]/g, licensors ? licensors.join(", ") : "")
 				.replace(/\[AUTHORS\]/g, authors ? authors.join(" & ") : "")
 				.replace(/\[SEASON\]/g, season)
 				.replace(/\[YEAR\]/g, year)
