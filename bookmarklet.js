@@ -34,6 +34,7 @@ TAGS_PUBLISHED = false;
 TAGS_RATING = false;
 
 
+
 /* CSS_TEMPLATE = "[ID] | [TYPE] | [TITLE] | [TITLEENG] | [TITLERAW] | [IMGURL] | [GENRES] | [AUTHORS] | [STUDIOS] | [PRODUCERS] | [LICENSORS] | [SERIALIZATION] | [SEASON] | [YEAR] | [RANK] | [SCORE] | [STARTDATE] | [ENDDATE] | [RATING] | [DESC]"; */
 
 /* TOOL CODE */
@@ -42,14 +43,6 @@ modernStyle = (document.getElementById("list_surround")) ? false : true;
 animeManga = window.location.href.replace("https://myanimelist.net/", "").split("/")[0].replace("list", "");
 
 /* Create GUI */
-
-function css(css) {
-	var newCSS = document.createElement('style');
-	newCSS.className = 'burnt-css';
-	newCSS.textContent = css;
-	document.head.appendChild(newCSS);
-	return newCSS;
-}
 
 css(`
 #burnt-gui {
@@ -291,6 +284,8 @@ textareaR.appendChild(result);
 
 toggleTags();
 
+
+
 /* Common Functions */
 
 function decodeHtml(html) {
@@ -298,6 +293,16 @@ function decodeHtml(html) {
 	txt.innerHTML = html;
 	return txt.value;
 }
+
+function css(css) {
+	var newCSS = document.createElement('style');
+	newCSS.className = 'burnt-css';
+	newCSS.textContent = css;
+	document.head.appendChild(newCSS);
+	return newCSS;
+}
+
+
 
 /* Primary Functions */
 
@@ -314,7 +319,7 @@ function ProcessNext()
 		try
 		{
 			id = moreId.replace("more", "");
-			url = "https://myanimelist.net/" + animeManga + "/" + id;
+			url = `https://myanimelist.net/${animeManga}/${id}`;
 
 			request = new XMLHttpRequest();
 			request.open("get", url, false);
@@ -337,25 +342,20 @@ function ProcessNext()
 							tags.push(tagEls[j].textContent);
 						}
 					}
-					else
-					{
-						alert('Tags are not shown on your list!\n\nPlease uncheck the "Update tags" box, or check the "Tags" box at https://myanimelist.net/editprofile.php?go=listpreferences and try again.');
-						moreIds = [];
-					}
 					
 				}
 				else
 				{
-					tagEl = document.getElementById("tagRow" + id);
+					tagEl = document.getElementById(`tagRow${id}`);
 					if(tagEl)
 					{
 						tags = tagEl.innerHTML.split(",");
 					}
-					else
-					{
-						alert('Tags are not shown on your list!\n\nPlease uncheck the "Update tags" box, or check the "Tags" box at https://myanimelist.net/editprofile.php?go=listpreferences and try again.');
-						moreIds = [];
-					}
+				}
+				if(!tagEl)
+				{
+					alert('Tags are not shown on your list!\n\nPlease uncheck the "Update tags" box, or check the "Tags" box at https://myanimelist.net/editprofile.php?go=listpreferences and try again.');
+					moreIds = [];
 				}
 			}
 			
@@ -408,102 +408,109 @@ function ProcessNext()
 
 			/* alternate titles */
 
-			englishHtml = null;
-			ENGLISH_START = "English:</span>";
-			englishHtmlStartIndex = str.indexOf(ENGLISH_START);
-			if(str.indexOf(ENGLISH_START) != -1)
+			titleEng = null;
+			titleEngStartTxt = 'English:</span>';
+			titleEngStartIndex = str.indexOf(titleEngStartTxt);
+			if(str.indexOf(titleEngStartTxt) != -1)
 			{
-				englishHtmlStartIndex += ENGLISH_START.length;
-				englishHtmlEndIndex = str.indexOf("</div>", englishHtmlStartIndex);
-				englishHtml = str.substring(englishHtmlStartIndex, englishHtmlEndIndex);
-				englishHtml = decodeHtml(englishHtml);
+				titleEngStartIndex += titleEngStartTxt.length;
+				titleEngEndIndex = str.indexOf('</div>', titleEngStartIndex);
+				titleEng = str.substring(titleEngStartIndex, titleEngEndIndex);
+				titleEng = decodeHtml(titleEng);
 				
-				englishHtml = englishHtml.trim().replace(/,/g, "");
-				removeTagIfExist(englishHtml);
+				titleEng = titleEng.trim().replace(',', '');
+				removeTagIfExist(titleEng);
 			}
 			
-			if(englishHtml == null)
+			/* fallback on Synonym if no english title found */
+			if(titleEng == null)
 			{
-				SYN_START = "Synonyms:</span>";
-				synHtmlStartIndex = str.indexOf(SYN_START);
-				if(str.indexOf(SYN_START) != -1)
+				titleSynStartTxt = 'Synonyms:</span>';
+				titleSynStartIndex = str.indexOf(titleSynStartTxt);
+				if(str.indexOf(titleSynStartTxt) != -1)
 				{
-					synHtmlStartIndex += SYN_START.length;
-					synHtmlEndIndex = str.indexOf("</div>", synHtmlStartIndex);
-					synHtml = str.substring(synHtmlStartIndex, synHtmlEndIndex);
-					synHtml = decodeHtml(synHtml);
-					synArr = synHtml.split(",");
-					if(synArr.length > 0)
+					titleSynStartIndex += titleSynStartTxt.length;
+					titleSynEndIndex = str.indexOf('</div>', titleSynStartIndex);
+					titleSyn = str.substring(titleSynStartIndex, titleSynEndIndex);
+					titleSyn = decodeHtml(titleSyn);
+					titleSynArr = titleSyn.split(',');
+					if(titleSynArr.length > 0)
 					{
-						englishHtml = synArr[0].trim();
-						removeTagIfExist(englishHtml);
+						titleEng = titleSynArr[0].trim();
+						removeTagIfExist(titleEng);
 					}
 				}
 			}
 
-			nativeHtml = null;
-			NATIVE_START = "Japanese:</span>";
-			nativeHtmlStartIndex = str.indexOf(NATIVE_START);
-			if(str.indexOf(NATIVE_START) != -1)
+			titleNative = null;
+			titleNativeStartTxt = "Japanese:</span>";
+			titleNativeStartIndex = str.indexOf(titleNativeStartTxt);
+			if(str.indexOf(titleNativeStartTxt) != -1)
 			{
-				nativeHtmlStartIndex += NATIVE_START.length;
-				nativeHtmlEndIndex = str.indexOf("</div>", nativeHtmlStartIndex);
-				nativeHtml = str.substring(nativeHtmlStartIndex, nativeHtmlEndIndex);
-				nativeHtml = decodeHtml(nativeHtml);
+				titleNativeStartIndex += titleNativeStartTxt.length;
+				titleNativeEndIndex = str.indexOf("</div>", titleNativeStartIndex);
+				titleNative = str.substring(titleNativeStartIndex, titleNativeEndIndex);
+				titleNative = decodeHtml(titleNative);
 				
-				nativeHtml = nativeHtml.trim().replace(/,/g, "");
-				removeTagIfExist(nativeHtml);
+				titleNative = titleNative.trim().replace(',', '');
+				removeTagIfExist(titleNative);
 			}
 			
 			/* date */
 			season = null;
 			year = null;
-			AIRED_START = "Aired:</span>";
-			PUBLISHED_START = "Published:</span>";
-			DATE_START = ( animeManga == "anime" ) ? AIRED_START : PUBLISHED_START;
-			dateHtmlStartIndex = str.indexOf(DATE_START) + DATE_START.length;
-			if(str.indexOf(DATE_START) != -1)
+			dateStartTxt = ( animeManga == "anime" ) ? 'Aired:</span>' : 'Published:</span>';
+			dateStartIndex = str.indexOf(dateStartTxt) + dateStartTxt.length;
+			if(str.indexOf(dateStartTxt) != -1)
 			{
-				dateHtmlEndIndex = str.indexOf("</div>", dateHtmlStartIndex);
-				dateHtml = str.substring(dateHtmlStartIndex, dateHtmlEndIndex);
+				dateEndIndex = str.indexOf("</div>", dateStartIndex);
+				dateHtml = str.substring(dateStartIndex, dateEndIndex);
+				/* dateHtml should output "Oct 4, 2003 to Oct 2, 2004" or similar */
 				dateArr = dateHtml.split(" to ");
-				date1Arr = dateArr[0].split(",");
-				if(date1Arr.length == 2)
+				dateBegunArr = dateArr[0].split(",");
+
+				if(dateBegunArr.length == 2)
 				{
 					season = null;
-					if(date1Arr[0].indexOf("Jan") != -1 || date1Arr[0].indexOf("Feb") != -1 || date1Arr[0].indexOf("Mar") != -1)
+					if(dateBegunArr[0].indexOf("Jan") != -1 || dateBegunArr[0].indexOf("Feb") != -1 || dateBegunArr[0].indexOf("Mar") != -1)
 					{
 						season = "Winter";
 					}
-					if(date1Arr[0].indexOf("Apr") != -1 || date1Arr[0].indexOf("May") != -1 || date1Arr[0].indexOf("Jun") != -1)
+					else if(dateBegunArr[0].indexOf("Apr") != -1 || dateBegunArr[0].indexOf("May") != -1 || dateBegunArr[0].indexOf("Jun") != -1)
 					{
 						season = "Spring";
 					}
-					if(date1Arr[0].indexOf("Jul") != -1 || date1Arr[0].indexOf("Aug") != -1 || date1Arr[0].indexOf("Sep") != -1)
+					else if(dateBegunArr[0].indexOf("Jul") != -1 || dateBegunArr[0].indexOf("Aug") != -1 || dateBegunArr[0].indexOf("Sep") != -1)
 					{
 						season = "Summer";
 					}
-					if(date1Arr[0].indexOf("Oct") != -1 || date1Arr[0].indexOf("Nov") != -1 || date1Arr[0].indexOf("Dec") != -1)
+					else if(dateBegunArr[0].indexOf("Oct") != -1 || dateBegunArr[0].indexOf("Nov") != -1 || dateBegunArr[0].indexOf("Dec") != -1)
 					{
 						season = "Fall";
 					}
-					year = date1Arr[1].trim();
+					year = dateBegunArr[1].trim();
 					removeTagIfExist(season);
 					removeTagIfExist(year);
-					removeTagIfExist('Aired: ', mode = 2);
-					removeTagIfExist('Published: ', mode = 2);
 				}
+
+				startDate = dateArr[0].trim();
+				endDate = dateArr.length == 2 ? dateArr[1].trim() : "";
+
+				airedTag = "Aired: " + dateArr[0].trim().replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].trim().replace(',', '') : "");
+				removeTagIfExist('Aired: ', mode = 2);
+				publishedTag = "Published: " + dateArr[0].trim().replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].trim().replace(',', '') : "");
+				removeTagIfExist('Published: ', mode = 2);
 			}
 			
 			/* studio (anime) */
-			STUDIOS_START = "Studios:</span>";
 			studios = null;
-			studiosHtmlStartIndex = str.indexOf(STUDIOS_START);
-			if(str.indexOf(STUDIOS_START) != -1)
+			studiosStartTxt = "Studios:</span>";
+			studiosStartIndex = str.indexOf(studiosStartTxt);
+			if(str.indexOf(studiosStartTxt) != -1)
 			{
-				studiosHtmlStartIndex += STUDIOS_START.length;
-				studiosHtmlEndIndex = str.indexOf("</div>", studiosHtmlStartIndex);
-				studiosHtml = str.substring(studiosHtmlStartIndex, studiosHtmlEndIndex);
+				studiosStartIndex += studiosStartTxt.length;
+				studiosEndIndex = str.indexOf("</div>", studiosStartIndex);
+				studiosHtml = str.substring(studiosStartIndex, studiosEndIndex);
 				
 				studios = studiosHtml.split(",");
 				studiosLength = studios.length;
@@ -519,37 +526,37 @@ function ProcessNext()
 			}
 			
 			/* authors (manga) */
-			AUTHORS_START = "Authors:</span>";
 			authors = null;
-			authorsHtmlStartIndex = str.indexOf(AUTHORS_START);
-			if(str.indexOf(AUTHORS_START) != -1)
+			authorsStartTxt = "Authors:</span>";
+			authorsStartIndex = str.indexOf(authorsStartTxt);
+			if(str.indexOf(authorsStartTxt) != -1)
 			{
-				authorsHtmlStartIndex += AUTHORS_START.length;
-				authorsHtmlEndIndex = str.indexOf("</div>", authorsHtmlStartIndex);
-				authorsHtml = str.substring(authorsHtmlStartIndex, authorsHtmlEndIndex);
+				authorsStartIndex += authorsStartTxt.length;
+				authorsEndIndex = str.indexOf("</div>", authorsStartIndex);
+				authorsHtml = str.substring(authorsStartIndex, authorsEndIndex);
 
 				authors = authorsHtml.split(", <a");
 				authorsLength = authors.length;
 				for(j = 0; j < authorsLength; j++)
 				{
-					g1 = authors[j].indexOf("\">") + 2;
-					g2 = authors[j].indexOf("</a>");
-					if(g2 == -1) { authors = null; break; }
-					authors[j] = authors[j].substring(g1, g2).trim().replaceAll(',','');
+					startAt = authors[j].indexOf("\">") + 2;
+					endAt = authors[j].indexOf("</a>");
+					if(endAt == -1) { authors = null; break; }
+					authors[j] = authors[j].substring(startAt, endAt).trim().replaceAll(',','');
 					authors[j] = decodeHtml(authors[j]);
 					removeTagIfExist(authors[j]);
 				}
 			}
 
 			/* producers (anime) */
-			PRODUCERS_START = "Producers:</span>";
 			producers = null;
-			producersHtmlStartIndex = str.indexOf(PRODUCERS_START);
-			if(str.indexOf(PRODUCERS_START) != -1)
+			producersStartTxt = "Producers:</span>";
+			producersStartIndex = str.indexOf(producersStartTxt);
+			if(str.indexOf(producersStartTxt) != -1)
 			{
-				producersHtmlStartIndex += PRODUCERS_START.length;
-				producersHtmlEndIndex = str.indexOf("</div>", producersHtmlStartIndex);
-				producersHtml = str.substring(producersHtmlStartIndex, producersHtmlEndIndex);
+				producersStartIndex += producersStartTxt.length;
+				producersEndIndex = str.indexOf("</div>", producersStartIndex);
+				producersHtml = str.substring(producersStartIndex, producersEndIndex);
 	
 				producers = producersHtml.split(",");
 				producersLength = producers.length;
@@ -557,10 +564,10 @@ function ProcessNext()
 				{
 					if(producers[j].indexOf("<sup>") == -1)
 					{
-						g1 = producers[j].indexOf("\">") + 2;
-						g2 = producers[j].indexOf("</a>");
-						if(g2 == -1) { producers = null; break; }
-						producers[j] = producers[j].substring(g1, g2).trim();
+						startAt = producers[j].indexOf("\">") + 2;
+						endAt = producers[j].indexOf("</a>");
+						if(endAt == -1) { producers = null; break; }
+						producers[j] = producers[j].substring(startAt, endAt).trim();
 						producers[j] = decodeHtml(producers[j]);
 						removeTagIfExist(producers[j]);
 					}
@@ -574,14 +581,14 @@ function ProcessNext()
 			}
 
 			/* licensors (anime) */
-			LICENSORS_START = "Licensors:</span>";
 			licensors = null;
-			licensorsHtmlStartIndex = str.indexOf(LICENSORS_START);
-			if(str.indexOf(LICENSORS_START) != -1)
+			licensorsStartTxt = "Licensors:</span>";
+			licensorsStartIndex = str.indexOf(licensorsStartTxt);
+			if(str.indexOf(licensorsStartTxt) != -1)
 			{
-				licensorsHtmlStartIndex += LICENSORS_START.length;
-				licensorsHtmlEndIndex = str.indexOf("</div>", licensorsHtmlStartIndex);
-				licensorsHtml = str.substring(licensorsHtmlStartIndex, licensorsHtmlEndIndex);
+				licensorsStartIndex += licensorsStartTxt.length;
+				licensorsEndIndex = str.indexOf("</div>", licensorsStartIndex);
+				licensorsHtml = str.substring(licensorsStartIndex, licensorsEndIndex);
 	
 				licensors = licensorsHtml.split(",");
 				licensorsLength = licensors.length;
@@ -589,10 +596,10 @@ function ProcessNext()
 				{
 					if(licensors[j].indexOf("<sup>") == -1)
 					{
-						g1 = licensors[j].indexOf("\">") + 2;
-						g2 = licensors[j].indexOf("</a>");
-						if(g2 == -1) { licensors = null; break; }
-						licensors[j] = licensors[j].substring(g1, g2).trim();
+						startAt = licensors[j].indexOf("\">") + 2;
+						endAt = licensors[j].indexOf("</a>");
+						if(endAt == -1) { licensors = null; break; }
+						licensors[j] = licensors[j].substring(startAt, endAt).trim();
 						licensors[j] = decodeHtml(licensors[j]);
 						removeTagIfExist(licensors[j]);
 					}
@@ -606,31 +613,31 @@ function ProcessNext()
 			}
 
 			/* serialization (manga) */
-			SERIALIZATION_START = "Serialization:</span>";
-			serialization = null;
-			serializationHtmlStartIndex = str.indexOf(SERIALIZATION_START);
-			if(str.indexOf(SERIALIZATION_START) != -1)
+			serializations = null;
+			serializationStartTxt = "Serialization:</span>";
+			serializationStartIndex = str.indexOf(serializationStartTxt);
+			if(str.indexOf(serializationStartTxt) != -1)
 			{
-				serializationHtmlStartIndex += SERIALIZATION_START.length;
-				serializationHtmlEndIndex = str.indexOf("</div>", serializationHtmlStartIndex);
-				serializationHtml = str.substring(serializationHtmlStartIndex, serializationHtmlEndIndex);
+				serializationStartIndex += serializationStartTxt.length;
+				serializationEndIndex = str.indexOf("</div>", serializationStartIndex);
+				serializationHtml = str.substring(serializationStartIndex, serializationEndIndex);
 	
-				serialization = serializationHtml.split(",");
-				serializationLength = serialization.length;
+				serializations = serializationHtml.split(",");
+				serializationLength = serializations.length;
 				for(j = 0; j < serializationLength; j++)
 				{
-					if(serialization[j].indexOf("<sup>") == -1)
+					if(serializations[j].indexOf("<sup>") == -1)
 					{
-						g1 = serialization[j].indexOf("\">") + 2;
-						g2 = serialization[j].indexOf("</a>");
-						if(g2 == -1) { serialization = null; break; }
-						serialization[j] = serialization[j].substring(g1, g2).trim();
-						serialization[j] = decodeHtml(serialization[j]);
-						removeTagIfExist(serialization[j]);
+						startAt = serializations[j].indexOf("\">") + 2;
+						endAt = serializations[j].indexOf("</a>");
+						if(endAt == -1) { serializations = null; break; }
+						serializations[j] = serializations[j].substring(startAt, endAt).trim();
+						serializations[j] = decodeHtml(serializations[j]);
+						removeTagIfExist(serializations[j]);
 					}
 					else
 					{
-						serialization.splice(j, 1);
+						serializations.splice(j, 1);
 						serializationLength--;
 						j--;
 					}
@@ -638,23 +645,23 @@ function ProcessNext()
 			}
 
 			/* rating (anime) */
-			ratingHtml = "?";
-			RATING_START = "Rating:</span>";
-			ratingHtmlStartIndex = str.indexOf(RATING_START);
-			if(ratingHtmlStartIndex != -1)
+			rating = "?";
+			ratingStartTxt = "Rating:</span>";
+			ratingStartIndex = str.indexOf(ratingStartTxt);
+			if(ratingStartIndex != -1)
 			{
-				ratingHtmlStartIndex += RATING_START.length;
-				ratingHtmlStartIndex += 3; /* to avoid spaces that break end index */
-				ratingHtmlEndIndex = str.indexOf(" ", ratingHtmlStartIndex);
-				ratingHtml = str.substring(ratingHtmlStartIndex, ratingHtmlEndIndex);
+				ratingStartIndex += ratingStartTxt.length;
+				ratingStartIndex += 3; /* to avoid spaces that break end index */
+				ratingEndIndex = str.indexOf(" ", ratingStartIndex);
+				rating = str.substring(ratingStartIndex, ratingEndIndex);
 			}
-			ratingTag = "Rating: " + ratingHtml;
+			ratingTag = `Rating: ${rating}`;
 			removeTagIfExist('Rating: ', mode = 2);
 			
 			/* genres */
 			genres = [];
 			genresRaw = $(doc).find('[itemprop="genre"]');
-			if(genresRaw.length !== 0)
+			if(genresRaw.length > 0)
 			{
 				for(j = 0; j < genresRaw.length; j++)
 				{
@@ -664,44 +671,44 @@ function ProcessNext()
 			}
 			
 			/* rank */
-			rankHtml = "?";
-			RANK_START = "Ranked:</span>";
-			rankHtmlStartIndex = str.indexOf(RANK_START);
-			if(rankHtmlStartIndex != -1)
+			rank = "?";
+			rankStartTxt = "Ranked:</span>";
+			rankStartIndex = str.indexOf(rankStartTxt);
+			if(rankStartIndex != -1)
 			{
-				rankHtmlStartIndex += RANK_START.length;
-				rankHtmlEndIndex = str.indexOf("<sup>", rankHtmlStartIndex);
-				rankHtml = str.substring(rankHtmlStartIndex, rankHtmlEndIndex);
-				rankHtml = rankHtml.trim().replace("#", "");
+				rankStartIndex += rankStartTxt.length;
+				rankEndIndex = str.indexOf("<sup>", rankStartIndex);
+				rank = str.substring(rankStartIndex, rankEndIndex);
+				rank = rank.trim().replace("#", "");
 			}
-			rankTag = "Ranked: " + rankHtml;
+			rankTag = `Ranked: ${rank}`;
 			removeTagIfExist('Ranked: ', mode = 2);
 			
 			/* score */
-			scoreHtml = "?";
+			score = "?";
 			scoreEle = $(doc).find("[itemprop=\"ratingValue\"]");
 			if(scoreEle.length > 0)
 			{
-				scoreHtml = scoreEle.text().trim();
+				score = scoreEle.text().trim();
 			}
-			scoreTag = "Score: " + scoreHtml;
+			scoreTag = `Score: ${score}`;
 			removeTagIfExist('Score: ', mode = 2);
 			
 			/* Update Tags */
 			if(chkTags.checked)
 			{
-				if(englishHtml && chkEnglish.checked) { tags.push(englishHtml); }
-				if(nativeHtml && chkNative.checked) { tags.push(nativeHtml); }
+				if(titleEng && chkEnglish.checked) { tags.push(titleEng); }
+				if(titleNative && chkNative.checked) { tags.push(titleNative); }
 				if(season && chkSeason.checked) { tags.push(season); }
 				if(year && chkYear.checked) { tags.push(year); }
 				if(studios && chkStudio.checked) { tags.push(studios); }
 				if(producers && chkProducers.checked) { tags.push(producers); }
 				if(licensors && chkLicensors.checked) { tags.push(licensors); }
-				if(serialization && chkSerialization.checked) { tags.push(serialization); }
+				if(serializations && chkSerialization.checked) { tags.push(serializations); }
 				if(genres && chkGenres.checked) { tags.push(genres); }
 				if(authors && chkAuthors.checked) { tags.push(authors); }
-				if(chkAired.checked) { tags.push("Aired: " + dateArr[0].trim().replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].trim().replace(',', '') : "")); }
-				if(chkPublished.checked) { tags.push("Published: " + dateArr[0].trim().replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].trim().replace(',', '') : "")); }
+				if(chkAired.checked) { tags.push(airedTag); }
+				if(chkPublished.checked) { tags.push(publishedTag); }
 				if(chkScore.checked) { tags.push(scoreTag); }
 				if(chkRank.checked) { tags.push(rankTag); }
 				if(chkRating.checked) { tags.push(ratingTag); }
@@ -721,7 +728,7 @@ function ProcessNext()
 				request2.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
 				request2.setRequestHeader("X-Requested-With", "XMLHttpRequest");
 				var csrf = $('meta[name="csrf_token"]').attr('content');
-				request2.send(amid + '=' + id + '&csrf_token=' + csrf);
+				request2.send(`${amid}=${id}&csrf_token=${csrf}`);
 			}
 			
 			/* thumbs */
@@ -739,45 +746,44 @@ function ProcessNext()
 			
 			/* Generate CSS */
 			cssLine = template.value
-				.replace(/\[DEL\]/g, "")
-				.replace(/\[ID\]/g, id)
-				.replace(/\[TYPE\]/g, animeManga)
-				.replace(/\[IMGURL\]/g, imgUrl)
-				.replace(/\[IMGURLT\]/g, imgUrlt)
-				.replace(/\[IMGURLV\]/g, imgUrlv)
-				.replace(/\[IMGURLL\]/g, imgUrll)
-				.replace(/\[TITLE\]/g, altText)
-				.replace(/(\[TITLEENG\]|\[ENGTITLE\])/g, englishHtml ? englishHtml : altText)
-				.replace(/(\[TITLERAW\]|\[RAWTITLE\])/g, nativeHtml ? nativeHtml : "")
-				.replace(/\[GENRES\]/g, genres ? genres.join(", ") : "")
-				.replace(/\[STUDIOS\]/g, studios ? studios.join(", ") : "")
-				.replace(/\[PRODUCERS\]/g, producers ? producers.join(", ") : "")
-				.replace(/\[LICENSORS\]/g, licensors ? licensors.join(", ") : "")
-				.replace(/\[SERIALIZATION\]/g, serialization ? serialization.join(", ") : "")
-				.replace(/\[AUTHORS\]/g, authors ? authors.join(" & ") : "")
-				.replace(/\[SEASON\]/g, season)
-				.replace(/\[YEAR\]/g, year)
-				.replace(/\[RANK\]/g, rankHtml)
-				.replace(/\[SCORE\]/g, scoreHtml)
-				.replace(/\[STARTDATE\]/g, dateArr[0].trim())
-				.replace(/\[ENDDATE\]/g, dateArr.length == 2 ? dateArr[1].trim() : "")
-				.replace(/\[RATING\]/g, ratingHtml)
-				.replace(/\[DESC\]/g, desc);
+				.replaceAll('[DEL]', '')
+				.replaceAll('[ID]', id)
+				.replaceAll('[TYPE]', animeManga)
+				.replaceAll('[IMGURL]', imgUrl)
+				.replaceAll('[IMGURLT]', imgUrlt)
+				.replaceAll('[IMGURLV]', imgUrlv)
+				.replaceAll('[IMGURLL]', imgUrll)
+				.replaceAll('[TITLE]', altText)
+				.replaceAll(/(\[TITLEENG\]|\[ENGTITLE\])/g, titleEng ? titleEng : altText)
+				.replaceAll(/(\[TITLERAW\]|\[RAWTITLE\])/g, titleNative ? titleNative : "")
+				.replaceAll('[GENRES]', genres ? genres.join(", ") : "")
+				.replaceAll('[STUDIOS]', studios ? studios.join(", ") : "")
+				.replaceAll('[PRODUCERS]', producers ? producers.join(", ") : "")
+				.replaceAll('[LICENSORS]', licensors ? licensors.join(", ") : "")
+				.replaceAll('[SERIALIZATION]', serializations ? serializations.join(", ") : "")
+				.replaceAll('[AUTHORS]', authors ? authors.join(" & ") : "")
+				.replaceAll('[SEASON]', season)
+				.replaceAll('[YEAR]', year)
+				.replaceAll('[RANK]', rank)
+				.replaceAll('[SCORE]', score)
+				.replaceAll('[STARTDATE]', startDate)
+				.replaceAll('[ENDDATE]', endDate)
+				.replaceAll('[RATING]', rating)
+				.replaceAll('[DESC]', desc);
 			
 			result.value += cssLine + "\n";
 		}
 		catch(e)
 		{
-			/*alert("error " + moreId + ":" + e);*/
-			console.log("error " + moreId, e);
+			console.log(`error on ${moreId}: ${e}`);
 			errorCount++;
 		}
 		
 		i++;
 		
-		statusText.innerHTML = "Processed " + i + " of " + moreIds.length;
+		statusText.innerHTML = `Processed ${i} of ${moreIds.length}`;
 		percent = i / moreIds.length * 100;
-		statusText.style.cssText = '--percent: ' + percent + '%';
+		statusText.style.cssText = `--percent: ${percent}%`;
 		
 		setTimeout(ProcessNext, delay.value);
 	}
@@ -796,7 +802,7 @@ function ProcessNext()
 			}
 			if(errorCount > 0)
 			{
-				alert(errorCount + " errors occurred while processing.  See your browser's console for details.\n\nSome updates were probably successful.\nYou can try rerunning the tool to fix these errors (with updated CSS as input and after refreshing your list page).");
+				alert(`${errorCount} errors occurred while processing.  See your browser's console for details.\n\nSome updates were probably successful.\nYou can try rerunning the tool to fix these errors (with updated CSS as input and after refreshing your list page).`);
 			}
 		};
 	}
@@ -849,12 +855,10 @@ function Process()
 				tempImg.animeId = ids[k];
 				tempImg.onload = function(imgLoadEvent)
 				{
-					/*console.log("imgLoadEvent(" + imgUrl + ")", imgLoadEvent.target.naturalHeight);*/
 					result.value += imgLoadEvent.target.oldLine + "\n";
 				};
 				tempImg.onerror = function(imgErrorEvent)
 				{
-					/*console.log("imgErrorEvent(" + imgUrl + ")", imgErrorEvent);*/
 					moreIds.push(imgErrorEvent.target.animeId);
 				};
 				tempImg.src = imgUrl;
@@ -873,18 +877,13 @@ function Process()
 	setTimeout(ProcessNext, imageLoadDelay);
 }
 
-thumbBtn.onclick = function() { Process(); };
-exitBtn.onclick = Exit;
-
-function Start()
-{
-	alert("It's best to use the 'All Anime' view.\n\nCopy existing styles to the textarea before starting. This script will remove what is no longer needed, skip what already exists, and add the rest.\n\nThe options have tooltips, hover over them to see detailed info.");
-}
-
 function Exit()
 {
 	$('#burnt-gui').remove();
 	$('.burnt-css').remove();
 }
 
-Start();
+thumbBtn.onclick = function() { Process(); };
+exitBtn.onclick = Exit;
+
+alert("It's best to use the 'All Anime' view.\n\nCopy existing styles to the textarea before starting. This script will remove what is no longer needed, skip what already exists, and add the rest.\n\nThe options have tooltips, hover over them to see detailed info.");
