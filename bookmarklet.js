@@ -359,20 +359,55 @@ function ProcessNext()
 			
 			if(chkClearTags.checked) {
 				tags = [];
-				tagsLength = 0;
 			} else {
-				tagsLength = tags.length;
 				/* remove extra whitespace */
-				for(j = 0; j < tagsLength; j++)
+				for(j = 0; j < tags.length; j++)
 				{
 					tags[j] = tags[j].trim();
 				}
 			}
+
+			/* common functions */
 			
+			function removeTagIfExist(match, mode = 0)
+			/* takes input tag and checks if it is already in the tag list.
+			If it is, it removes it. This is so that the new tags added later are not duplicates.
+			It is done this way instead of simply removing the new tag so that the new tags can
+			maintain their order in relation to each other.
+			
+			Modes:
+			0 = old tag is exact match,
+			1 = old tag contains match
+			2 = old tag begins with match
+			3 = old tag ends with match */
+			{
+				if(tags.length == 0) {
+					return;
+				}
+
+				tagsLength = tags.length;
+				for(k = 0; k < tagsLength; k++)
+				{
+					tagNormalized = tags[k].toUpperCase();
+					matchNormalized = match.toUpperCase();
+					if(
+						tags[k].length == 0 ||
+						mode == 0 && tagNormalized == matchNormalized ||
+						mode == 1 && tagNormalized.indexOf(matchNormalized) != -1 ||
+						mode == 2 && tagNormalized.startsWith(matchNormalized) ||
+						mode == 3 && tagNormalized.endsWith(matchNormalized)
+					) {
+						tags.splice(k, 1);
+						tagsLength--;
+						k--;
+					}
+				}
+			}
+
 			/* alternate titles */
 
-			ENGLISH_START = "English:</span>";
 			englishHtml = null;
+			ENGLISH_START = "English:</span>";
 			englishHtmlStartIndex = str.indexOf(ENGLISH_START);
 			if(str.indexOf(ENGLISH_START) != -1)
 			{
@@ -381,22 +416,13 @@ function ProcessNext()
 				englishHtml = str.substring(englishHtmlStartIndex, englishHtmlEndIndex);
 				englishHtml = decodeHtml(englishHtml);
 				
-				englishHtml = englishHtml.replace(/^\s+|\s+$/g, "").replace(/,/g, "");
-				englishUpper = englishHtml.toUpperCase();
-				for(k = 0; k < tagsLength; k++)
-				{
-					if(tags[k].length == 0 || tags[k].toUpperCase() == englishUpper)
-					{
-						tags.splice(k, 1);
-						tagsLength--;
-						k--;
-					}
-				}
+				englishHtml = englishHtml.trim().replace(/,/g, "");
+				removeTagIfExist(englishHtml);
 			}
 			
-			SYN_START = "Synonyms:</span>";
 			if(englishHtml == null)
 			{
+				SYN_START = "Synonyms:</span>";
 				synHtmlStartIndex = str.indexOf(SYN_START);
 				if(str.indexOf(SYN_START) != -1)
 				{
@@ -407,23 +433,14 @@ function ProcessNext()
 					synArr = synHtml.split(",");
 					if(synArr.length > 0)
 					{
-						englishHtml = synArr[0].replace(/^\s+|\s+$/g, "");
-						synUpper = englishHtml.toUpperCase();
-						for(k = 0; k < tagsLength; k++)
-						{
-							if(tags[k].length == 0 || tags[k].toUpperCase() == synUpper)
-							{
-								tags.splice(k, 1);
-								tagsLength--;
-								k--;
-							}
-						}
+						englishHtml = synArr[0].trim();
+						removeTagIfExist(englishHtml);
 					}
 				}
 			}
 
-			NATIVE_START = "Japanese:</span>";
 			nativeHtml = null;
+			NATIVE_START = "Japanese:</span>";
 			nativeHtmlStartIndex = str.indexOf(NATIVE_START);
 			if(str.indexOf(NATIVE_START) != -1)
 			{
@@ -432,25 +449,16 @@ function ProcessNext()
 				nativeHtml = str.substring(nativeHtmlStartIndex, nativeHtmlEndIndex);
 				nativeHtml = decodeHtml(nativeHtml);
 				
-				nativeHtml = nativeHtml.replace(/^\s+|\s+$/g, "").replace(/,/g, "");
-				nativeUpper = nativeHtml.toUpperCase();
-				for(k = 0; k < tagsLength; k++)
-				{
-					if(tags[k].length == 0 || tags[k].toUpperCase() == nativeUpper)
-					{
-						tags.splice(k, 1);
-						tagsLength--;
-						k--;
-					}
-				}
+				nativeHtml = nativeHtml.trim().replace(/,/g, "");
+				removeTagIfExist(nativeHtml);
 			}
 			
 			/* date */
+			season = null;
+			year = null;
 			AIRED_START = "Aired:</span>";
 			PUBLISHED_START = "Published:</span>";
 			DATE_START = ( animeManga == "anime" ) ? AIRED_START : PUBLISHED_START;
-			season = null;
-			year = null;
 			dateHtmlStartIndex = str.indexOf(DATE_START) + DATE_START.length;
 			if(str.indexOf(DATE_START) != -1)
 			{
@@ -477,21 +485,11 @@ function ProcessNext()
 					{
 						season = "Fall";
 					}
-					year = date1Arr[1].replace(/^\s+|\s+$/g, "");
-					for(k = 0; k < tagsLength; k++)
-					{
-						if(
-							tags[k].length == 0 ||
-							tags[k].toUpperCase() == season.toUpperCase() ||
-							tags[k] == year ||
-							tags[k].indexOf('Aired: ') != -1 ||
-							tags[k].indexOf('Published: ') != -1
-						) {
-							tags.splice(k, 1);
-							tagsLength--;
-							k--;
-						}
-					}
+					year = date1Arr[1].trim();
+					removeTagIfExist(season);
+					removeTagIfExist(year);
+					removeTagIfExist('Aired: ', mode = 2);
+					removeTagIfExist('Published: ', mode = 2);
 				}
 			}
 			
@@ -512,19 +510,9 @@ function ProcessNext()
 					g1 = studios[j].indexOf("\">") + 2;
 					g2 = studios[j].indexOf("</a>");
 					if(g2 == -1) { studios = null; break; }
-					studios[j] = studios[j].substring(g1, g2).replace(/^\s+|\s+$/g, "");
+					studios[j] = studios[j].substring(g1, g2).trim();
 					studios[j] = decodeHtml(studios[j]);
-					studioUpper = studios[j].toUpperCase();
-					
-					for(k = 0; k < tagsLength; k++)
-					{
-						if(tags[k].length == 0 || tags[k].toUpperCase() == studioUpper)
-						{
-							tags.splice(k, 1);
-							tagsLength--;
-							k--;
-						}
-					}
+					removeTagIfExist(studios[j]);
 				}
 			}
 			
@@ -545,19 +533,9 @@ function ProcessNext()
 					g1 = authors[j].indexOf("\">") + 2;
 					g2 = authors[j].indexOf("</a>");
 					if(g2 == -1) { authors = null; break; }
-					authors[j] = authors[j].substring(g1, g2).replace(/^\s+|\s+$/g, "").replaceAll(',','');
+					authors[j] = authors[j].substring(g1, g2).trim().replaceAll(',','');
 					authors[j] = decodeHtml(authors[j]);
-					authorUpper = authors[j].toUpperCase();
-					
-					for(k = 0; k < tagsLength; k++)
-					{
-						if(tags[k].length == 0 || tags[k].toUpperCase() == authorUpper)
-						{
-							tags.splice(k, 1);
-							tagsLength--;
-							k--;
-						}
-					}
+					removeTagIfExist(authors[j]);
 				}
 			}
 
@@ -580,19 +558,9 @@ function ProcessNext()
 						g1 = producers[j].indexOf("\">") + 2;
 						g2 = producers[j].indexOf("</a>");
 						if(g2 == -1) { producers = null; break; }
-						producers[j] = producers[j].substring(g1, g2).replace(/^\s+|\s+$/g, "");
+						producers[j] = producers[j].substring(g1, g2).trim();
 						producers[j] = decodeHtml(producers[j]);
-						producersUpper = producers[j].toUpperCase();
-						
-						for(k = 0; k < tagsLength; k++)
-						{
-							if(tags[k].length == 0 || tags[k].toUpperCase() == producersUpper)
-							{
-								tags.splice(k, 1);
-								tagsLength--;
-								k--;
-							}
-						}
+						removeTagIfExist(producers[j]);
 					}
 					else
 					{
@@ -622,19 +590,9 @@ function ProcessNext()
 						g1 = licensors[j].indexOf("\">") + 2;
 						g2 = licensors[j].indexOf("</a>");
 						if(g2 == -1) { licensors = null; break; }
-						licensors[j] = licensors[j].substring(g1, g2).replace(/^\s+|\s+$/g, "");
+						licensors[j] = licensors[j].substring(g1, g2).trim();
 						licensors[j] = decodeHtml(licensors[j]);
-						licensorsUpper = licensors[j].toUpperCase();
-						
-						for(k = 0; k < tagsLength; k++)
-						{
-							if(tags[k].length == 0 || tags[k].toUpperCase() == licensorsUpper)
-							{
-								tags.splice(k, 1);
-								tagsLength--;
-								k--;
-							}
-						}
+						removeTagIfExist(licensors[j]);
 					}
 					else
 					{
@@ -664,19 +622,9 @@ function ProcessNext()
 						g1 = serialization[j].indexOf("\">") + 2;
 						g2 = serialization[j].indexOf("</a>");
 						if(g2 == -1) { serialization = null; break; }
-						serialization[j] = serialization[j].substring(g1, g2).replace(/^\s+|\s+$/g, "");
+						serialization[j] = serialization[j].substring(g1, g2).trim();
 						serialization[j] = decodeHtml(serialization[j]);
-						serializationUpper = serialization[j].toUpperCase();
-						
-						for(k = 0; k < tagsLength; k++)
-						{
-							if(tags[k].length == 0 || tags[k].toUpperCase() == serializationUpper)
-							{
-								tags.splice(k, 1);
-								tagsLength--;
-								k--;
-							}
-						}
+						removeTagIfExist(serialization[j]);
 					}
 					else
 					{
@@ -688,8 +636,8 @@ function ProcessNext()
 			}
 
 			/* rating (anime) */
+			ratingHtml = "?";
 			RATING_START = "Rating:</span>";
-			ratingHtml = "";
 			ratingHtmlStartIndex = str.indexOf(RATING_START);
 			if(ratingHtmlStartIndex != -1)
 			{
@@ -698,6 +646,8 @@ function ProcessNext()
 				ratingHtmlEndIndex = str.indexOf(" ", ratingHtmlStartIndex);
 				ratingHtml = str.substring(ratingHtmlStartIndex, ratingHtmlEndIndex);
 			}
+			ratingTag = "Rating: " + ratingHtml;
+			removeTagIfExist('Rating: ', mode = 2);
 			
 			/* genres */
 			genres = [];
@@ -707,39 +657,33 @@ function ProcessNext()
 				for(j = 0; j < genresRaw.length; j++)
 				{
 					genres[j] = genresRaw.eq(j).text().trim();
-					
-					/* removes duplicates from tags */
-					for(k = 0; k < tagsLength; k++)
-					{
-						if(tags[k].length == 0 || tags[k].toUpperCase() == genres[j].toUpperCase())
-						{
-							tags.splice(k, 1);
-							tagsLength--;
-							k--;
-						}
-					}
+					removeTagIfExist(genres[j]);
 				}
 			}
 			
 			/* rank */
+			rankHtml = "?";
 			RANK_START = "Ranked:</span>";
-			rankHtml = "";
 			rankHtmlStartIndex = str.indexOf(RANK_START);
 			if(rankHtmlStartIndex != -1)
 			{
 				rankHtmlStartIndex += RANK_START.length;
 				rankHtmlEndIndex = str.indexOf("<sup>", rankHtmlStartIndex);
 				rankHtml = str.substring(rankHtmlStartIndex, rankHtmlEndIndex);
-				rankHtml = rankHtml.replace(/^\s+|\s+$/g, "").replace("#", "");
+				rankHtml = rankHtml.trim().replace("#", "");
 			}
+			rankTag = "Ranked: " + rankHtml;
+			removeTagIfExist('Ranked: ', mode = 2);
 			
 			/* score */
-			scoreHtml = "";
+			scoreHtml = "?";
 			scoreEle = $(doc).find("[itemprop=\"ratingValue\"]");
 			if(scoreEle.length > 0)
 			{
 				scoreHtml = scoreEle.text().trim();
 			}
+			scoreTag = "Score: " + scoreHtml;
+			removeTagIfExist('Score: ', mode = 2);
 			
 			/* Update Tags */
 			if(chkTags.checked)
@@ -748,17 +692,17 @@ function ProcessNext()
 				if(nativeHtml && chkNative.checked) { tags.push(nativeHtml); }
 				if(season && chkSeason.checked) { tags.push(season); }
 				if(year && chkYear.checked) { tags.push(year); }
-				if(studios && chkStudio.checked) { tags = tags.concat(studios); }
-				if(producers && chkProducers.checked) { tags = tags.concat(producers); }
-				if(licensors && chkLicensors.checked) { tags = tags.concat(licensors); }
-				if(serialization && chkSerialization.checked) { tags = tags.concat(serialization); }
-				if(genres && chkGenres.checked) { tags = tags.concat(genres); }
-				if(authors && chkAuthors.checked) { tags = tags.concat(authors); }
-				if(chkAired.checked) { tags.push("Aired: " + dateArr[0].replace(/^\s+|\s+$/g, "").replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].replace(/^\s+|\s+$/g, "").replace(',', '') : "")); }
-				if(chkPublished.checked) { tags.push("Published: " + dateArr[0].replace(/^\s+|\s+$/g, "").replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].replace(/^\s+|\s+$/g, "").replace(',', '') : "")); }
-				if(chkScore.checked) { tags.push("Score: " + scoreHtml); }
-				if(chkRank.checked) { tags.push("Ranked: " + rankHtml); }
-				if(chkRating.checked) { tags.push("Rating: " + ratingHtml); }
+				if(studios && chkStudio.checked) { tags.push(studios); }
+				if(producers && chkProducers.checked) { tags.push(producers); }
+				if(licensors && chkLicensors.checked) { tags.push(licensors); }
+				if(serialization && chkSerialization.checked) { tags.push(serialization); }
+				if(genres && chkGenres.checked) { tags.push(genres); }
+				if(authors && chkAuthors.checked) { tags.push(authors); }
+				if(chkAired.checked) { tags.push("Aired: " + dateArr[0].trim().replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].trim().replace(',', '') : "")); }
+				if(chkPublished.checked) { tags.push("Published: " + dateArr[0].trim().replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].trim().replace(',', '') : "")); }
+				if(chkScore.checked) { tags.push(scoreTag); }
+				if(chkRank.checked) { tags.push(rankTag); }
+				if(chkRating.checked) { tags.push(ratingTag); }
 				
 				newTagStr = tags.join(", ");
 				
@@ -789,7 +733,7 @@ function ProcessNext()
 			altText = img.alt;
 			
 			/* Synopsis (description) */
-			desc = $(doc).find("[itemprop=\"description\"]").text().replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").replace(/^\s+|\s+$/g, "");
+			desc = $(doc).find("[itemprop=\"description\"]").text().replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").trim();
 			
 			/* Generate CSS */
 			cssLine = template.value
@@ -813,8 +757,8 @@ function ProcessNext()
 				.replace(/\[YEAR\]/g, year)
 				.replace(/\[RANK\]/g, rankHtml)
 				.replace(/\[SCORE\]/g, scoreHtml)
-				.replace(/\[STARTDATE\]/g, dateArr[0].replace(/^\s+|\s+$/g, ""))
-				.replace(/\[ENDDATE\]/g, dateArr.length == 2 ? dateArr[1].replace(/^\s+|\s+$/g, "") : "")
+				.replace(/\[STARTDATE\]/g, dateArr[0].trim())
+				.replace(/\[ENDDATE\]/g, dateArr.length == 2 ? dateArr[1].trim() : "")
 				.replace(/\[RATING\]/g, ratingHtml)
 				.replace(/\[DESC\]/g, desc);
 			
