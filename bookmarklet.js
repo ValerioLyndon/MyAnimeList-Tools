@@ -216,6 +216,7 @@ function field(value, title, desc) {
 	input.value = value;
 	input.title = desc;
 	input.style.fontWeight = '400';
+	input.spellcheck = false;
 
 	lbl.appendChild(input);
 	guiL.appendChild(lbl);
@@ -397,6 +398,7 @@ autofill.click(function() {
 existing = document.createElement("textarea");
 existing.title = "Copy previously generated code here. The style for one anime ID must all be on the same line.";
 existing.placeholder = "Copy previously generated code here. The style for one anime ID must all be on the same line.";
+existing.spellcheck = false;
 textareaL.appendChild(existing);
 
 textareaR = document.createElement('div');
@@ -410,6 +412,7 @@ result = document.createElement("textarea");
 result.title = "Newly generated code will be output here.";
 result.placeholder = "Newly generated code will be output here.";
 result.readOnly = "readonly";
+result.spellcheck = false;
 textareaR.appendChild(result);
 
 toggleTags();
