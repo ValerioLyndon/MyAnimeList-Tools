@@ -8,32 +8,62 @@ MyAnimeList CSS Generator and Tags updater
 */
 
 ver = '4.0_prerelease';
-verMod = '2021/Jul/03';
+verMod = '2021/Jul/08';
 
-/* modify these to change your defaults */
-CSS_TEMPLATE = '/* [TITLE] *[DEL]/ .data.image a[href^="/anime/[ID]/"]::before { background-image: url([IMGURL]); }';
-DELAY = "500";
-MATCH_TEMPLATE = "/anime/[ID]/";
-CHECK_EXISTING = false;
-CLEAR_TAGS = false;
-UPDATE_TAGS = false;
-TAGS_ENGLISH_TITLE = false;
-TAGS_NATIVE_TITLE = false;
-TAGS_SEASON = false;
-TAGS_YEAR = false;
-TAGS_GENRES = false;
-TAGS_AUTHORS = false;
-TAGS_SCORE = false;
-TAGS_RANK = false;
-TAGS_STUDIO = false;
-TAGS_PRODUCERS = false;
-TAGS_LICENSORS = false;
-TAGS_SERIALIZATION = false;
-TAGS_AIRED = false;
-TAGS_PUBLISHED = false;
-TAGS_RATING = false;
+if(localStorage.getItem('burnt_settings') !== null)
+{
+	settings = JSON.parse(localStorage.getItem('burnt_settings'));
+}
+else
+{
+	settings = {
+		"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/anime/[ID]/\"]::before { background-image: url([IMGURL]); }",
+		"delay": "500",
+		"match_template": "/anime/[ID]/",
+		"update_tags": false,
+		"checked_tags": {
+			"english_title": false,
+			"native_title": false,
+			"season": false,
+			"year": false,
+			"genres": false,
+			"authors": false,
+			"score": false,
+			"rank": false,
+			"studio": false,
+			"producers": false,
+			"licensors": false,
+			"serialization": false,
+			"aired": false,
+			"published": false,
+			"rating": false
+		},
+		"clear_tags": false,
+		"check_existing": false
+	}
+}
 
-
+CSS_TEMPLATE = settings['css_template'];
+DELAY = settings['delay'];
+MATCH_TEMPLATE = settings['match_template'];
+UPDATE_TAGS = settings['update_tags'];
+TAGS_ENGLISH_TITLE = settings['checked_tags']['english_title'];
+TAGS_NATIVE_TITLE = settings['checked_tags']['native_title'];
+TAGS_SEASON = settings['checked_tags']['season'];
+TAGS_YEAR = settings['checked_tags']['year'];
+TAGS_GENRES = settings['checked_tags']['genres'];
+TAGS_AUTHORS = settings['checked_tags']['authors'];
+TAGS_SCORE = settings['checked_tags']['score'];
+TAGS_RANK = settings['checked_tags']['rank'];
+TAGS_STUDIO = settings['checked_tags']['studio'];
+TAGS_PRODUCERS = settings['checked_tags']['producers'];
+TAGS_LICENSORS = settings['checked_tags']['licensors'];
+TAGS_SERIALIZATION = settings['checked_tags']['serialization'];
+TAGS_AIRED = settings['checked_tags']['aired'];
+TAGS_PUBLISHED = settings['checked_tags']['published'];
+TAGS_RATING = settings['checked_tags']['rating'];
+CLEAR_TAGS = settings['clear_tags'];
+CHECK_EXISTING = settings['check_existing'];
 
 /* CSS_TEMPLATE = "[ID] | [TYPE] | [TITLE] | [TITLEENG] | [TITLERAW] | [IMGURL] | [GENRES] | [AUTHORS] | [STUDIOS] | [PRODUCERS] | [LICENSORS] | [SERIALIZATION] | [SEASON] | [YEAR] | [RANK] | [SCORE] | [STARTDATE] | [ENDDATE] | [RATING] | [DESC]"; */
 
@@ -77,6 +107,15 @@ css(`
 	color: #000;
 	font: inherit;
 }
+#burnt-gui hr {
+	height: 4px;
+	background: #e6e6e6;
+	border: 0;
+	margin: 10px 0 15px;
+}
+#burnt-gui *:disabled {
+	opacity: 0.7;
+}
 .burnt-btn + .burnt-btn {
 	margin-left: 3px; 
 }
@@ -91,11 +130,24 @@ css(`
 	pointer-events: none;
 }
 .burnt-textarea {
-	display: flex;
 	width: 50%;
-	flex-flow: column nowrap;
+}
+.burnt-textarea b {
+	display: inline-block;
+	height: 24px;
+}
+.burnt-textarea-btn {
+	height: 20px;
+	padding: 0 2px;
+	margin-left: 3px;
+	float: right;
 }
 #burnt-gui textarea {
+	display: block;
+	width: 100%;
+	height: calc(100% - 24px);
+	margin: 0;
+	resize: none;
 	font-family: monospace;
 	word-break: break-all;
 }
@@ -130,12 +182,19 @@ guiL.appendChild(thumbBtn);
 thumbBtn.classList.add('burnt-btn');
 thumbBtn.type = "button";
 thumbBtn.value = "Start";
+thumbBtn.onclick = function() { Process(); };
 
 exitBtn = document.createElement("input");
 guiL.appendChild(exitBtn);
 exitBtn.classList.add('burnt-btn');
 exitBtn.type = "button";
 exitBtn.value = "Exit";
+function Exit()
+{
+	$('#burnt-gui').remove();
+	$('.burnt-css').remove();
+}
+exitBtn.onclick = Exit;
 
 statusText = document.createElement("div");
 statusText.id = "burnt-status";
@@ -181,6 +240,8 @@ function chk(checked, title, className = false, desc = false) {
 	guiL.appendChild(lbl);
 	return chk;
 }
+
+/* Options section */
 
 delay = field(DELAY, "Delay", "Delay (ms) between requests to avoid spamming the server.");
 delay.style.width = "50px";
@@ -243,8 +304,30 @@ $(guiL).append($('<br />'));
 
 chkExisting = chk(CHECK_EXISTING, "Validate existing images", 'burnt-chk', "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load.  I do not recommend using this while adding new anime or updating tags!");
 
-$(guiL).append($(`<br /><small style="font-size: 10px; font-style: italic;">MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</small>`));
+$(guiL).append($('<hr>'));
 
+/* "Copyright" section */
+
+$(guiL).append($(`<div style="font-size: 10px; font-style: italic; margin-bottom: 5px;">MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</div>`));
+
+/* Settings section */
+
+clearBtn = $('<input type="button" value="Clear Settings" title="Clears any stored settings from previous runs.">');
+if(localStorage.getItem('burnt_settings') !== null || localStorage.getItem('burnt_last_run') !== null)
+{
+	clearBtn.click(function() {
+		localStorage.removeItem('burnt_settings');
+		localStorage.removeItem('burnt_last_run');
+		alert('Please exit and restart the tool to complete the clearing of your settings.');
+	});
+}
+else
+{
+	clearBtn.attr('disabled', 'disabled');
+}
+$(guiL).append(clearBtn);
+
+/* Textareas */
 
 textareaL = document.createElement('div');
 textareaL.className = 'burnt-textarea';
@@ -252,13 +335,66 @@ guiR.appendChild(textareaL);
 
 $(textareaL).append($('<b style="font-weight: bold;">Input</b>'));
 
+lastRun = $('<input type="button" value="Last Run" class="burnt-btn burnt-textarea-btn" title="Fills the input field with the last known output of this tool.">');
+$(textareaL).append(lastRun);
+if(localStorage.getItem('burnt_last_run') !== null)
+{
+	lastRun.click(function() {
+		existing.textContent = localStorage.getItem('burnt_last_run');
+	});
+}
+else {
+	lastRun.attr('disabled', 'disabled');
+}
+
+autofill = $('<input type="button" value="Autofill" class="burnt-btn burnt-textarea-btn" title="Autofill the template fields based on any previously generated code found in the input.">');
+$(textareaL).append(autofill);
+autofill.click(function() {
+	code = existing.value;
+
+	if(code.length < 1)
+	{
+		alert('Please insert code into the input field.');
+		return;
+	}
+	if(code.indexOf('*/') === -1)
+	{
+		alert('Code is missing template information. It is either incorrectly formatted or not generated by this tool.');
+		return;
+	}
+
+	newTemplate = false;
+	newMatchTemplate = false;
+
+	/* Reduce code to first comment block, which should be the tool-generated comment */
+	code = code.split('*/')[0];
+	codeByLine = code.split('\n');
+
+	for(i = 0; i < codeByLine.length; i++)
+	{
+		line = codeByLine[i];
+		if(line.startsWith('Template='))
+		{
+			newTemplate = line.substring(9);
+		}
+		else if(line.startsWith('MatchTemplate='))
+		{
+			newMatchTemplate = line.substring(14);
+		}
+	}
+
+	if(newTemplate && newMatchTemplate)
+	{
+		setTemplate(newTemplate, newMatchTemplate);
+	}
+	else
+	{
+		alert('Code is missing template information. It is either incorrectly formatted or not generated by this tool.');
+		return;
+	}
+});
+
 existing = document.createElement("textarea");
-existing.style.cssText = `
-	display: block;
-	height: 100%;
-	width: 100%;
-	resize: none;
-`;
 existing.title = "Copy previously generated code here. The style for one anime ID must all be on the same line.";
 existing.placeholder = "Copy previously generated code here. The style for one anime ID must all be on the same line.";
 textareaL.appendChild(existing);
@@ -271,12 +407,6 @@ guiR.appendChild(textareaR);
 $(textareaR).append($('<b style="font-weight: bold;">Output</b>'));
 
 result = document.createElement("textarea");
-result.style.cssText = `
-	display: block;
-	height: 100%;
-	width: 100%;
-	resize: none;
-`;
 result.title = "Newly generated code will be output here.";
 result.placeholder = "Newly generated code will be output here.";
 result.readOnly = "readonly";
@@ -288,18 +418,29 @@ toggleTags();
 
 /* Common Functions */
 
-function decodeHtml(html) {
-	var txt = document.createElement("textarea");
+function decodeHtml(html)
+{
+	txt = document.createElement("textarea");
 	txt.innerHTML = html;
 	return txt.value;
 }
 
-function css(css) {
-	var newCSS = document.createElement('style');
+function css(css)
+{
+	newCSS = document.createElement('style');
 	newCSS.className = 'burnt-css';
 	newCSS.textContent = css;
 	document.head.appendChild(newCSS);
 	return newCSS;
+}
+
+function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
+	template.value = newTemplate;
+	matchTemplate.value = newMatchTemplate;
+	if(newCss)
+	{
+		console.log('CSS not implemented yet');
+	}
 }
 
 
@@ -789,6 +930,10 @@ function ProcessNext()
 	}
 	else
 	{
+		if(result.value.length > 0)
+		{
+			localStorage.setItem('burnt_last_run', result.value);
+		}
 		thumbBtn.value = "Done";
 		thumbBtn.disabled = "disabled";
 		exitBtn.disabled = false;
@@ -810,6 +955,8 @@ function ProcessNext()
 
 function Process()
 {
+	saveSettings();
+
 	imageLoadDelay = 0;
 	exitBtn.disabled = "disabled";
 	thumbBtn.value = "Stop";
@@ -877,13 +1024,35 @@ function Process()
 	setTimeout(ProcessNext, imageLoadDelay);
 }
 
-function Exit()
+function saveSettings()
 {
-	$('#burnt-gui').remove();
-	$('.burnt-css').remove();
+	settings = {
+		"css_template": template.value,
+		"delay": delay.value,
+		"match_template": matchTemplate.value,
+		"update_tags": chkTags.checked,
+		"checked_tags": {
+			"english_title": chkEnglish.checked,
+			"native_title": chkNative.checked,
+			"season": chkSeason.checked,
+			"year": chkYear.checked,
+			"genres": chkGenres.checked,
+			"authors": chkAuthors.checked,
+			"score": chkScore.checked,
+			"rank": chkRank.checked,
+			"studio": chkStudio.checked,
+			"producers": chkProducers.checked,
+			"licensors": chkLicensors.checked,
+			"serialization": chkSerialization.checked,
+			"aired": chkAired.checked,
+			"published": chkPublished.checked,
+			"rating": chkRating.checked
+		},
+		"clear_tags": chkClearTags.checked,
+		"check_existing": chkExisting.checked
+	};
+	localStorage.setItem('burnt_settings', JSON.stringify(settings));
 }
 
-thumbBtn.onclick = function() { Process(); };
-exitBtn.onclick = Exit;
 
-alert("It's best to use the 'All Anime' view.\n\nCopy existing styles to the textarea before starting. This script will remove what is no longer needed, skip what already exists, and add the rest.\n\nThe options have tooltips, hover over them to see detailed info.");
+alert("It's best to use the 'All Anime' view.\n\nCopy existing CSS to the textarea before starting. This script will remove what is no longer needed, skip what already exists, and add the rest.\n\nThe options have tooltips, hover over them to see detailed info.");
