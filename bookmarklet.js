@@ -1289,6 +1289,8 @@ function ProcessNext()
 		}
 		thumbBtn.value = "Done";
 		thumbBtn.disabled = "disabled";
+		exportBtn.removeAttr('disabled');
+		clearBtn.removeAttr('disabled');
 		exitBtn.disabled = false;
 		exitBtn.value = "Exit";
 		exitBtn.onclick = function()
@@ -1312,6 +1314,11 @@ function Process()
 
 	imageLoadDelay = 0;
 	exitBtn.disabled = "disabled";
+	importBtn.attr('disabled', 'disabled');
+	exportBtn.attr('disabled', 'disabled');
+	clearBtn.attr('disabled', 'disabled');
+	autofill.attr('disabled', 'disabled');
+	lastRun.attr('disabled', 'disabled');
 	thumbBtn.value = "Stop";
 	thumbBtn.onclick = function(){ moreIds = new Array();};
 	
