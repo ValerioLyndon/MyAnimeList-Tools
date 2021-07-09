@@ -1341,7 +1341,7 @@ function Process()
 		oldLinesCount = oldLines.length;
 		for(j = 0; j < oldLinesCount; j++)
 		{
-			oldId = matchTemplate.value.replace(/\[ID\]/g, ids[k]);
+			oldId = matchTemplate.value.replace(/\[ID\]/g, ids[k]).replace(/\[TYPE\]/g, animeManga);
 			indexOf = oldLines[j].indexOf(oldId);
 			if(indexOf != -1)
 			{
