@@ -18,9 +18,9 @@ if(localStorage.getItem('burnt_settings') !== null)
 else
 {
 	settings = {
-		"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/anime/[ID]/\"]::before { background-image: url([IMGURL]); }",
+		"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
 		"delay": "500",
-		"match_template": "/anime/[ID]/",
+		"match_template": "/[TYPE]/[ID]/",
 		"update_tags": false,
 		"checked_tags": {
 			"english_title": false,
