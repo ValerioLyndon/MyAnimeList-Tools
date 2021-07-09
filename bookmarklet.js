@@ -1,5 +1,6 @@
 javascript: /*
-MyAnimeList CSS Generator and Tags updater
+MyAnimeList-Tools
+A CSS Generator and Tag updater
 
 - Original code   2018/Aug/10 by BurntJello http://burntjello.webs.com
 - Extra features  2019        by Cateinya
@@ -7,7 +8,7 @@ MyAnimeList CSS Generator and Tags updater
 - Further changes 2021+       by Valerio Lyndon
 */
 
-ver = '4.0_prerelease';
+ver = '4.0';
 verMod = '2021/Jul/08';
 
 if(localStorage.getItem('burnt_settings') !== null)
