@@ -611,7 +611,7 @@ function css(css)
 	return newCSS;
 }
 
-function setTemplate(newTemplate, newMatchTemplate, newCss = '') {
+function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 	template.value = newTemplate;
 	matchTemplate.value = newMatchTemplate;
 	if(newCss !== false)
@@ -686,7 +686,14 @@ function setTemplate(newTemplate, newMatchTemplate, newCss = '') {
 			/* Remove any previously added myanimelist-tools CSS */
 			customCss = customCss.replaceAll(/\/\*MYANIMELIST-TOOLS START\*\/(.|\n)*\/\*MYANIMELIST-TOOLS END\*\//g, '');
 
-			finalCss = customCss + '\n\n/*MYANIMELIST-TOOLS START*/\n\n' + newCss + '\n\n/*MYANIMELIST-TOOLS END*/';
+			if(newCss.length > 0)
+			{
+				finalCss = customCss + '\n\n/*MYANIMELIST-TOOLS START*/\n\n' + newCss + '\n\n/*MYANIMELIST-TOOLS END*/';
+			}
+			else
+			{
+				finalCss = customCss;
+			}
 
 			if(finalCss.length >= 65535)
 			{
@@ -711,7 +718,78 @@ function setTemplate(newTemplate, newMatchTemplate, newCss = '') {
 		}
 		else
 		{
-			alert('Automatic import of Custom CSS is not supported on classic lists yet.');
+			oldCss = $('head style[type="text/css"]:first-of-type');
+			
+			/* Update MAL custom CSS */
+
+			styleListUrl = 'https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv';
+			request = new XMLHttpRequest();
+			request.open("get", styleListUrl, false);
+			request.send(null);
+			str = request.responseText;
+			doc = new DOMParser().parseFromString(request.responseText, "text/html");
+
+			styleUrls = [];
+			
+			/* should produce one-two elements something like this:
+			<a href="?go=stylepref&do=cssadv&id=473785">Style ID#473785</a> */
+			$(doc).find('#dialog a').each(function() {
+				id = this.href.split('&id=')[1];
+				url = `https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv&id=${id}`;
+				styleUrls.push(url);
+			});
+
+			if(styleUrls.length < 1)
+			{
+				console.log('MyAnimeList-Tools error: No style IDs found while trying to import.');
+				return false;
+			}
+
+			for(i = 0; i < styleUrls.length; i++)
+			{
+				styleUrl = styleUrls[i];
+				request2 = new XMLHttpRequest();
+				request2.open("get", styleUrl, false);
+				request2.send(null);
+				str2 = request2.responseText;
+				doc2 = new DOMParser().parseFromString(request2.responseText, "text/html");
+
+				customCss = $(doc2).find('textarea[name="cssText"]').text();
+
+				if(customCss.trim() == oldCss.text().trim())
+				{
+					break;
+				}
+			}
+
+			/* Remove any previously added myanimelist-tools CSS */
+			customCss = customCss.replaceAll(/\/\*MYANIMELIST-TOOLS START\*\/(.|\n)*\/\*MYANIMELIST-TOOLS END\*\//g, '');
+
+			if(newCss.length > 0)
+			{
+				finalCss = customCss + '\n\n/*MYANIMELIST-TOOLS START*/\n\n' + newCss + '\n\n/*MYANIMELIST-TOOLS END*/';
+			}
+			else
+			{
+				finalCss = customCss;
+			}
+
+			/* Temporarily update the pages CSS to make sure no page reload is required */
+			oldCss.text(finalCss);
+
+			if(finalCss.length >= 65535)
+			{
+				alert('Your MAL Custom CSS may be longer than the max allowed length. If your CSS has been cut off at the end, you will need to resolve this issue.');
+			}
+
+			/* Send new CSS to MAL */
+			
+			csrf = $('meta[name="csrf_token"]').attr('content');
+			
+			request3 = new XMLHttpRequest();
+			request3.open("post", styleUrl, false);
+			request3.setRequestHeader("Content-Type", 'application/x-www-form-urlencoded');
+			request3.send(`cssText=${encodeURIComponent(finalCss)}&subForm=Update+CSS&csrf_token=${csrf}`);
 		}
 	}
 	return true;
