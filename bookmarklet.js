@@ -75,13 +75,22 @@ animeManga = window.location.href.replace("https://myanimelist.net/", "").split(
 /* Create GUI */
 
 css(`
-#burnt-gui {
+#burnt-bg, #burnt-gui {
 	position: fixed;
+	z-index: 99999;
+}
+#burnt-bg {
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0,0,0,0.5);
+}
+#burnt-gui {
 	left: 50px;
 	top: 50px;
 	bottom: 50px;
 	right: 50px;
-	z-index: 99999;
 	display: flex;
 	flex-flow: row nowrap;
 	background-color: #fff;
@@ -90,6 +99,36 @@ css(`
 	color: #000;
 	font: 12px/1.5 sans-serif;
 	text-align: left;
+}
+.burnt-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 9999;
+	background: rgba(0,0,0,0.5);
+}
+.burnt-popup {
+	position: fixed;
+	left: 50%;
+	top: 50%;
+	z-index: 9999;
+	min-width: 300px;
+	max-width: calc(100% - 100px);
+	min-height: 100px;
+	max-height: calc(100% - 100px);
+	padding: 10px;
+	background: #fff;
+	overflow: auto;
+	transform: translate(-50%,-50%);
+}
+.burnt-popup input:not([type="button"]),
+.burnt-popup textarea {
+	display: block;
+	width: 100%;
+	max-width: 600px;
+	margin-bottom: 6px;
 }
 #burnt-status {
 	background: #e6e6e6;
@@ -154,8 +193,13 @@ css(`
 `);
 
 gui = document.createElement("div");
-document.body.appendChild(gui);
 gui.id = "burnt-gui";
+
+bg = $('<div id="burnt-bg""></div>');
+overlay = $('<div class="burnt-overlay"></div>');
+
+$('body').append(bg);
+$('body').append(gui);
 
 guiL = document.createElement('div');
 gui.appendChild(guiL);
@@ -191,6 +235,7 @@ exitBtn.type = "button";
 exitBtn.value = "Exit";
 function Exit()
 {
+	$('#burnt-bg').remove();
 	$('#burnt-gui').remove();
 	$('.burnt-css').remove();
 }
@@ -307,13 +352,142 @@ chkExisting = chk(CHECK_EXISTING, "Validate existing images", 'burnt-chk', "Atte
 
 $(guiL).append($('<hr>'));
 
+/* Import/Export section */
+
+importBtn = $('<input type="button" value="Import Template" class="burnt-btn" title="Import a CSS template to get started quickly.">');
+importBtn.click(function() {
+	$(gui).append(overlay);
+
+	importOverlay = $(`<div class="burnt-popup">
+		Input a template here. This will update the tool settings and may add some additional code to your MAL Custom CSS. You may wish to backup your Custom CSS before doing this.
+		<br />
+		<br />
+		<input id="burnt-import-field" type="text" spellcheck="false"></input>
+		<br />
+		<input id="burnt-import-btn" type="button" value="Import" class="burnt-btn">
+		<input id="burnt-close" type="button" value="Close" class="burnt-btn">
+	</div>`);
+
+	$(gui).append(importOverlay);
+
+	$('#burnt-import-btn').click(function() {
+		value = $('#burnt-import-field').val();
+
+		if(value.length < 1)
+		{
+			alert('Nothing detected in import field.');
+		}
+		else
+		{
+			try
+			{
+				importedTemplate = JSON.parse(value);
+
+				if(!("template" in importedTemplate) || !("matchtemplate" in importedTemplate))
+				{
+					alert(`Import failed due to incorrect syntax or missing information.`);
+				}
+				else
+				{
+					if(!("css" in importedTemplate))
+					{
+						importedTemplate['css'] = '';
+					}
+
+					t = setTemplate(importedTemplate['template'], importedTemplate['matchtemplate'], importedTemplate['css']);
+					if(!t)
+					{
+						alert('Import failed to update MAL Custom CSS. This is likely due to a code error and should be reported to the developer.');
+					}
+					else
+					{
+						alert('Import succeeded.');
+					}
+
+					importOverlay.remove();
+					overlay.remove();
+				}
+			}
+			catch(e)
+			{
+				alert(`Import failed. If you are using an official template, report this problem to the developer with the following information.\n\nError message for reference:\n${e}\n\nValue for reference:\n${value}`);
+			}
+		}
+	});
+	
+	$('#burnt-close').click(function() {
+		importOverlay.remove();
+		overlay.remove();
+	});
+});
+$(guiL).append(importBtn);
+
+exportBtn = $('<input type="button" value="Create Template" class="burnt-btn" title="Create a CSS template for others to use.">');
+exportBtn.click(function() {
+	$(gui).append(overlay);
+
+	exportOverlay = $(`<div class="burnt-popup">
+		Use this to create a template. The template and match template are required, but you may leave the CSS Styling field blank if desired.
+		<br />
+		<br />
+		
+		<b style="font-weight: bold">Template</b>
+		<input id="burnt-export-template" type="text" spellcheck="false"></input>
+		
+		<b style="font-weight: bold">Match Template</b>
+		<input id="burnt-export-match" type="text" spellcheck="false"></input>
+		
+		<b style="font-weight: bold">CSS Styling</b>
+		<textarea id="burnt-export-css" type="text" spellcheck="false" style="resize: vertical; height: 150px;"></textarea>
+		<br />
+		<input id="burnt-export" type="text" placeholder="Template will be generated here and copied to your clipboard." readonly="readonly">
+		<br />
+		<input id="burnt-export-btn" type="button" value="Generate Template" class="burnt-btn" title="Generates text and copies to your clipboard.">
+		<input id="burnt-close" type="button" value="Close" class="burnt-btn">
+	</div>`);
+	$(gui).append(exportOverlay);
+
+	$('#burnt-export-template').val(template.value);
+	$('#burnt-export-match').val(matchTemplate.value);
+
+	$('#burnt-export-btn').click(function() {
+		newTemplate = $('#burnt-export-template').val();
+		newMatchTemplate = $('#burnt-export-match').val();
+
+		if(newTemplate.length < 1 || newMatchTemplate < 1)
+		{
+			alert('Please fill out both the Template and Match Template fields.');
+		}
+		else
+		{
+			createdTemplate = {
+				"template": newTemplate,
+				"matchtemplate": newMatchTemplate,
+				"css": $('#burnt-export-css').val()
+			};
+			$('#burnt-export').val(JSON.stringify(createdTemplate));
+			
+			document.querySelector('#burnt-export').select();
+			document.execCommand('copy');
+		}
+	});
+	
+	$('#burnt-close').click(function() {
+		exportOverlay.remove();
+		overlay.remove();
+	});
+});
+$(guiL).append(exportBtn);
+
+$(guiL).append($('<hr>'));
+
 /* "Copyright" section */
 
 $(guiL).append($(`<div style="font-size: 10px; font-style: italic; margin-bottom: 5px;">MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</div>`));
 
 /* Settings section */
 
-clearBtn = $('<input type="button" value="Clear Settings" title="Clears any stored settings from previous runs.">');
+clearBtn = $('<input type="button" value="Clear Settings" class="burnt-btn" title="Clears any stored settings from previous runs.">');
 if(localStorage.getItem('burnt_settings') !== null || localStorage.getItem('burnt_last_run') !== null)
 {
 	clearBtn.click(function() {
@@ -437,13 +611,110 @@ function css(css)
 	return newCSS;
 }
 
-function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
+function setTemplate(newTemplate, newMatchTemplate, newCss = '') {
 	template.value = newTemplate;
 	matchTemplate.value = newMatchTemplate;
-	if(newCss)
+	if(newCss !== false)
 	{
-		console.log('CSS not implemented yet');
+		if(modernStyle)
+		{
+			/* Determine theme currently being used */
+
+			stylesheet = $('head style[type="text/css"]:first-of-type').text();
+
+			style = false;
+			styleColIndex = stylesheet.indexOf('background-color', stylesheet.indexOf('.list-unit .list-status-title {')) + 17;
+			styleCol = stylesheet.substr(styleColIndex, 8).replaceAll(/\s|\:|\;/g, '');
+
+			switch(styleCol) {
+				case '#4065BA':
+					if(stylesheet.indexOf('logo_mal_blue.png') !== -1)
+					{
+						style = 2;
+					}
+					else
+					{
+						style = 1;
+					}
+					break;
+				case '#244291':
+					style = 3;
+					break;
+				case '#23B230':
+					style = 4;
+					break;
+				case '#A32E2E':
+					style = 5;
+					break;
+				case '#FAD54A':
+					style = 6;
+					break;
+				case '#0080FF':
+					style = 7;
+					break;
+				case '#39c65d':
+					style = 8;
+					break;
+				case '#ff00bf':
+					style = 9;
+					break;
+				case '#DB1C03':
+					style = 10;
+					break;
+			}
+
+			if(style === false)
+			{
+				alert('Failed to update Custom CSS');
+				return false;
+			}
+
+			/* Update MAL custom CSS */
+
+			styleUrl = `https://myanimelist.net/ownlist/style/theme/${style}`;
+			request = new XMLHttpRequest();
+			request.open("get", styleUrl, false);
+			request.send(null);
+			str = request.responseText;
+			doc = new DOMParser().parseFromString(request.responseText, "text/html");
+
+			customCss = $(doc).find('pre#custom-css').text();
+
+			/* Temporarily update the pages CSS to make sure no page reload is required */
+			$('head').append($(`<style>${newCss}</style>`));
+
+			/* Remove any previously added myanimelist-tools CSS */
+			customCss = customCss.replaceAll(/\/\*MYANIMELIST-TOOLS START\*\/(.|\n)*\/\*MYANIMELIST-TOOLS END\*\//g, '');
+
+			finalCss = customCss + '\n\n/*MYANIMELIST-TOOLS START*/\n\n' + newCss + '\n\n/*MYANIMELIST-TOOLS END*/';
+
+			if(finalCss.length >= 65535)
+			{
+				alert('Your MAL Custom CSS may be longer than the max allowed length. If your CSS has been cut off at the end, you will need to resolve this issue.');
+			}
+
+			/* Send new CSS to MAL */
+			
+			csrf = $('meta[name="csrf_token"]').attr('content');
+			boundary = '---------------------------35347544871910269115864526218';
+			bg_attach = $(doc).find('#style_edit_theme_background_image_attachment').find('[selected]').val() || '';
+			bg_vert = $(doc).find('#style_edit_theme_background_image_vertical_position').find('[selected]').val() || '';
+			bg_hori = $(doc).find('#style_edit_theme_background_image_horizontal_position').find('[selected]').val() || '';
+			bg_repeat = $(doc).find('#style_edit_theme_background_image_repeat').find('[selected]').val() || '';
+			
+			req2header = `--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[show_cover_image]"\n\n1\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[cover_image]"; filename=""\nContent-Type: application/octet-stream\n\n\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[show_background_image]"\n\n1\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[background_image]"; filename=""\nContent-Type: application/octet-stream\n\n\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[background_image_attachment]"\n\n${bg_attach}\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[background_image_vertical_position]"\n\n${bg_vert}\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[background_image_horizontal_position]"\n\n${bg_hori}\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[background_image_repeat]"\n\n${bg_repeat}\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[css]"\n\n${finalCss}\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[save]"\n\n\n--${boundary}\nContent-Disposition: form-data; name="csrf_token"\n\n${csrf}\n--${boundary}--`;
+			
+			request2 = new XMLHttpRequest();
+			request2.open("post", styleUrl, false);
+			request2.setRequestHeader("Content-Type", `multipart/form-data; boundary=${boundary}`);
+			request2.send(req2header);
+		}
+		else
+		{
+			alert('Automatic import of Custom CSS is not supported on classic lists yet.');
+		}
 	}
+	return true;
 }
 
 
@@ -867,11 +1138,11 @@ function ProcessNext()
 					amid = 'mid';
 				}
 
+				csrf = $('meta[name="csrf_token"]').attr('content');
 				request2 = new XMLHttpRequest();
 				request2.open("post", reqUrl + encodeURIComponent(newTagStr), false);
 				request2.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
 				request2.setRequestHeader("X-Requested-With", "XMLHttpRequest");
-				var csrf = $('meta[name="csrf_token"]').attr('content');
 				request2.send(`${amid}=${id}&csrf_token=${csrf}`);
 			}
 			
