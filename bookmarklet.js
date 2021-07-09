@@ -345,11 +345,11 @@ if(animeManga === 'anime') {
 
 $(guiL).append($('<br />'));
 
-chkClearTags = chk(CLEAR_TAGS, "Overwrite current tags", 'burnt-chk burnt-tag', "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nNot recommended if you use tags for anything outside of this tool. But even with this disabled, I would still consider your tags forfeit as soon as you click start as it will be a monumentous task to remove all the generated content from your tags.");
+chkClearTags = chk(CLEAR_TAGS, "Overwrite current tags", 'burnt-chk burnt-tag', "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.");
 
 $(guiL).append($('<br />'));
 
-chkExisting = chk(CHECK_EXISTING, "Validate existing images", 'burnt-chk', "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load.  I do not recommend using this while adding new anime or updating tags!");
+chkExisting = chk(CHECK_EXISTING, "Validate existing images", 'burnt-chk', "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load. Not recommended while adding new anime or updating tags!");
 
 $(guiL).append($('<hr>'));
 
