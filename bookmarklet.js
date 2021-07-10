@@ -19,7 +19,7 @@ else
 {
 	settings = {
 		"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
-		"delay": "500",
+		"delay": "3000",
 		"match_template": "/[TYPE]/[ID]/",
 		"update_tags": false,
 		"checked_tags": {
