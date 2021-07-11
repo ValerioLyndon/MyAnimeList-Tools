@@ -142,6 +142,9 @@ css(`
 			transparent var(--percent)
 		);
 }
+#burnt-time {
+	float: right;
+}
 #burnt-gui * {
 	box-sizing: inherit;
 	color: #000;
@@ -244,7 +247,12 @@ exitBtn.onclick = Exit;
 
 statusText = document.createElement("div");
 statusText.id = "burnt-status";
+statusText.innerHTML = '<span></span>';
 guiL.appendChild(statusText);
+
+timeText = document.createElement('span');
+timeText.id = 'burnt-time';
+statusText.appendChild(timeText);
 
 function field(value, title, desc) {
 	lbl = document.createElement('label');
@@ -619,6 +627,11 @@ function css(css)
 	return newCSS;
 }
 
+function round(value, precision) {
+    var multiplier = Math.pow(10, precision || 0);
+    return Math.round(value * multiplier) / multiplier;
+}
+
 function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 	template.value = newTemplate;
 	matchTemplate.value = newMatchTemplate;
@@ -811,11 +824,35 @@ moreIds = [];
 
 errorCount = 0;
 i = 0;
+timeThen = performance.now() - delay.value;
 function ProcessNext()
 {
 	if(i < moreIds.length)
 	{
 		moreId = moreIds[i];
+
+		/* set estimated time */
+		timeSince = performance.now() - timeThen;
+		timeThen = performance.now();
+
+		idsRemaining = moreIds.length - 1 - i;
+		seconds = idsRemaining * (timeSince / 1000);
+		if(seconds <= 60)
+		{
+			timeRemaining = `${round(seconds)}s`;
+		}
+		else if(seconds > 60 && seconds < 3600)
+		{
+			timeRemaining = `${round(seconds / 60, 1)}m`;
+		}
+		else if(seconds > 3600)
+		{
+			timeRemaining = `${round(seconds / 60 / 60, 1)}h`;
+		}
+		else
+		{
+			timeRemaining = '?';
+		}
 		
 		try
 		{
@@ -1282,9 +1319,11 @@ function ProcessNext()
 		
 		i++;
 		
-		statusText.innerHTML = `Processed ${i} of ${moreIds.length}`;
+		statusText.firstChild.textContent = `Processed ${i} of ${moreIds.length}`;
 		percent = i / moreIds.length * 100;
 		statusText.style.cssText = `--percent: ${percent}%`;
+
+		timeText.textContent = `~ ${timeRemaining} left`;
 		
 		setTimeout(ProcessNext, delay.value);
 	}
