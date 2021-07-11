@@ -8,8 +8,8 @@ A CSS Generator and Tag updater
 - Further changes 2021+       by Valerio Lyndon
 */
 
-ver = '4.0';
-verMod = '2021/Jul/08';
+ver = '5.0_prerelease';
+verMod = '2021/Jul/10';
 
 if(localStorage.getItem('burnt_settings') !== null)
 {
@@ -582,6 +582,13 @@ textareaR.style.paddingLeft = '10px';
 guiR.appendChild(textareaR);
 
 $(textareaR).append($('<b style="font-weight: bold;">Output</b>'));
+
+copyOutput = $('<input type="button" value="Copy to Clipboard" class="burnt-btn burnt-textarea-btn" title="Copies output to clipboard.">');
+$(textareaR).append(copyOutput);
+copyOutput.click(function() {
+	result.select();
+	document.execCommand('copy');
+});
 
 result = document.createElement("textarea");
 result.title = "Newly generated code will be output here.";
