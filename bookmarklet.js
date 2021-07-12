@@ -9,7 +9,7 @@ A CSS Generator and Tag updater
 */
 
 ver = '5.0_prerelease';
-verMod = '2021/Jul/10';
+verMod = '2021/Jul/11';
 
 if(localStorage.getItem('burnt_settings') !== null)
 {
@@ -229,7 +229,8 @@ thumbBtn = document.createElement("input");
 guiL.appendChild(thumbBtn);
 thumbBtn.classList.add('burnt-btn');
 thumbBtn.type = "button";
-thumbBtn.value = "Start";
+thumbBtn.value = "Loading...";
+thumbBtn.disabled = 'disabled';
 thumbBtn.onclick = function() { Process(); };
 
 exitBtn = document.createElement("input");
@@ -245,14 +246,17 @@ function Exit()
 }
 exitBtn.onclick = Exit;
 
-statusText = document.createElement("div");
-statusText.id = "burnt-status";
-statusText.innerHTML = '<span></span>';
-guiL.appendChild(statusText);
+statusBar = document.createElement("div");
+statusBar.id = "burnt-status";
+guiL.appendChild(statusBar);
+
+statusText = document.createElement('span');
+statusText.textContent = 'Setting up...';
+statusBar.appendChild(statusText);
 
 timeText = document.createElement('span');
 timeText.id = 'burnt-time';
-statusText.appendChild(timeText);
+statusBar.appendChild(timeText);
 
 function field(value, title, desc) {
 	lbl = document.createElement('label');
@@ -818,24 +822,75 @@ function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 
 
 
+/* Get list info and enable buttons once done */
+
+data = [];
+baseUrl = window.location.href.split('?')[0];
+offset = 0;
+failures = 0;
+function getListInfo()
+{
+	/* will take a list URL:
+	https://myanimelist.net/animelist/Valerio_Lyndon?status=2
+	and return:
+	https://myanimelist.net/animelist/Valerio_Lyndon/load.json?status=7 */
+	dataUrl = `${baseUrl}/load.json?status=7&offset=${offset}`;
+
+	$.getJSON(dataUrl, function(json)
+	{
+		data = data.concat(json);
+
+		if(json.length === 300)
+		{
+			/*setTimeout(getListInfo, 0);*/
+			offset += 300;
+			statusText.textContent = `Fetching list data (${offset} of ?)...`;
+			getListInfo();
+		}
+		else
+		{
+			statusText.textContent = `Successfully loaded ${data.length} items.`;
+			thumbBtn.value = 'Start';
+			thumbBtn.removeAttribute('disabled');
+		}
+	}).fail(function()
+	{
+		failures++;
+
+		statusText.textContent = `Data fetch failed, retrying in 8...`;
+
+		if(failures > 3)
+		{
+			statusText.textContent = `Failed to fetch list info.`;
+			return;
+		}
+
+		setTimeout(getListInfo, 8000);
+	});
+};
+getListInfo();
+
+
+
 /* Primary Functions */
 
-moreIds = [];
+newData = [];
 
 errorCount = 0;
 i = 0;
 timeThen = performance.now() - delay.value;
 function ProcessNext()
 {
-	if(i < moreIds.length)
+	if(i < newData.length)
 	{
-		moreId = moreIds[i];
+		thisData = newData[i];
+		id = thisData[`${animeManga}_id`];
 
 		/* set estimated time */
 		timeSince = performance.now() - timeThen;
 		timeThen = performance.now();
 
-		idsRemaining = moreIds.length - 1 - i;
+		idsRemaining = newData.length - 1 - i;
 		seconds = idsRemaining * (timeSince / 1000);
 		if(seconds <= 60)
 		{
@@ -856,7 +911,6 @@ function ProcessNext()
 		
 		try
 		{
-			id = moreId.replace("more", "");
 			url = `https://myanimelist.net/${animeManga}/${id}`;
 
 			request = new XMLHttpRequest();
@@ -866,40 +920,13 @@ function ProcessNext()
 			doc = new DOMParser().parseFromString(request.responseText, "text/html");
 		
 			/* get current tags */
-			tags = new Array();
-			if(chkTags.checked)
-			{
-				if(modernStyle)
-				{
-					tagEl = document.querySelector(`.tags-${id}`);
-					if(tagEl)
-					{
-						tagEls = tagEl.querySelectorAll('div a');
-						for(j = 0; j< tagEls.length; j++)
-						{
-							tags.push(tagEls[j].textContent);
-						}
-					}
-					
-				}
-				else
-				{
-					tagEl = document.getElementById(`tagRow${id}`);
-					if(tagEl)
-					{
-						tags = tagEl.innerHTML.split(",");
-					}
-				}
-				if(!tagEl)
-				{
-					alert('Tags are not shown on your list!\n\nPlease uncheck the "Update tags" box, or check the "Tags" box at https://myanimelist.net/editprofile.php?go=listpreferences and try again.');
-					moreIds = [];
-				}
-			}
-			
-			if(chkClearTags.checked) {
+			if(!chkTags.checked || chkClearTags.checked) {
 				tags = [];
-			} else {
+			}
+			else if(chkTags.checked)
+			{
+				tags = thisData['tags'].split(',');
+				
 				/* remove extra whitespace */
 				for(j = 0; j < tags.length; j++)
 				{
@@ -1313,15 +1340,15 @@ function ProcessNext()
 		}
 		catch(e)
 		{
-			console.log(`error on ${moreId}: ${e}`);
+			console.log(`error on ${animeManga} #${id}: ${e}`);
 			errorCount++;
 		}
 		
 		i++;
 		
-		statusText.firstChild.textContent = `Processed ${i} of ${moreIds.length}`;
-		percent = i / moreIds.length * 100;
-		statusText.style.cssText = `--percent: ${percent}%`;
+		statusText.textContent = `Processed ${i} of ${newData.length}`;
+		percent = i / newData.length * 100;
+		statusBar.style.cssText = `--percent: ${percent}%`;
 
 		timeText.textContent = `~ ${timeRemaining} left`;
 		
@@ -1335,6 +1362,8 @@ function ProcessNext()
 		}
 		thumbBtn.value = "Done";
 		thumbBtn.disabled = "disabled";
+		statusText.textContent = `Completed with ${errorCount} errors`;
+		timeText.textContent = '';
 		exportBtn.removeAttr('disabled');
 		clearBtn.removeAttr('disabled');
 		exitBtn.disabled = false;
@@ -1369,37 +1398,29 @@ function Process()
 	thumbBtn.onclick = function() {
 		thumbBtn.value = 'Stopping...';
 		thumbBtn.disabled = 'disabled';
-		moreIds = new Array();
+		newData = [];
 	};
 	
 	result.value += `\/*\nGenerated by MyAnimeList-Tools v${ver}\nhttps://github.com/ValerioLyndon/MyAnimeList-Tools\n\nTemplate=${template.value.replace(/\*\//g, "*[DEL]/")}\nMatchTemplate=${matchTemplate.value}\n*\/\n\n`;
-	
-	if(modernStyle)
+
+	for(k = 0; k < data.length; k++)
 	{
-		ids = $("tr.more-info").map(function () { return this.id.replace("more-", ""); } ).get() ;
-	}
-	else
-	{
-		ids = $("div.hide").map(function () { return this.id.replace("more", ""); } ).get() ;
-	}
-	
-	idsLength = ids.length;
-	for(k = 0; k < idsLength; k++)
-	{
-		indexOf = -1;
+		statusText.textContent = 'Checking your input for matches...';
+		id = data[k][`${animeManga}_id`];
+		skip = false;
 		oldLines = existing.value.split("\n");
 		oldLinesCount = oldLines.length;
 		for(j = 0; j < oldLinesCount; j++)
 		{
-			oldId = matchTemplate.value.replace(/\[ID\]/g, ids[k]).replace(/\[TYPE\]/g, animeManga);
-			indexOf = oldLines[j].indexOf(oldId);
-			if(indexOf != -1)
+			match = matchTemplate.value.replace(/\[ID\]/g, id).replace(/\[TYPE\]/g, animeManga);
+			skip = oldLines[j].indexOf(match) !== -1 ? true : false;
+			if(skip)
 			{
 				break;
 			}
 		}
 
-		if(indexOf != -1)
+		if(skip)
 		{
 			if(chkExisting.checked)
 			{
@@ -1409,14 +1430,15 @@ function Process()
 				imgUrl = oldLines[j].substring(urlStart, urlEnd + 4);
 				tempImg = document.createElement("img");
 				tempImg.oldLine = oldLines[j];
-				tempImg.animeId = ids[k];
+				tempImg.animeId = id;
+				tempImg.data = data[k];
 				tempImg.onload = function(imgLoadEvent)
 				{
 					result.value += imgLoadEvent.target.oldLine + "\n";
 				};
 				tempImg.onerror = function(imgErrorEvent)
 				{
-					moreIds.push(imgErrorEvent.target.animeId);
+					newData.push(imgErrorEvent.target.data);
 				};
 				tempImg.src = imgUrl;
 			}
@@ -1427,7 +1449,7 @@ function Process()
 		}
 		else
 		{
-			moreIds.push(ids[k]);
+			newData.push(data[k])
 		}
 	}
 
@@ -1463,6 +1485,3 @@ function saveSettings()
 	};
 	localStorage.setItem('burnt_settings', JSON.stringify(settings));
 }
-
-
-alert("It's best to use the 'All Anime' view.\n\nCopy existing CSS to the textarea before starting. This script will remove what is no longer needed, skip what already exists, and add the rest.\n\nThe options have tooltips, hover over them to see detailed info.");
