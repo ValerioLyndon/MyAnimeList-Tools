@@ -9,7 +9,7 @@ A CSS Generator and Tag updater
 */
 
 ver = '5.0_prerelease';
-verMod = '2021/Jul/11';
+verMod = '2021/Jul/13';
 
 if(localStorage.getItem('burnt_settings') !== null)
 {
@@ -65,8 +65,6 @@ TAGS_PUBLISHED = settings['checked_tags']['published'];
 TAGS_RATING = settings['checked_tags']['rating'];
 CLEAR_TAGS = settings['clear_tags'];
 CHECK_EXISTING = settings['check_existing'];
-
-/* CSS_TEMPLATE = "[ID] | [TYPE] | [TITLE] | [TITLEENG] | [TITLERAW] | [IMGURL] | [GENRES] | [AUTHORS] | [STUDIOS] | [PRODUCERS] | [LICENSORS] | [SERIALIZATION] | [SEASON] | [YEAR] | [RANK] | [SCORE] | [STARTDATE] | [ENDDATE] | [RATING] | [DESC]"; */
 
 /* TOOL CODE */
 
@@ -309,7 +307,7 @@ delay.style.width = "50px";
 
 matchTemplate = field(MATCH_TEMPLATE, "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
 
-template = field(CSS_TEMPLATE, "Template", "CSS template.  Replacements are [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEENG], [TITLERAW] [GENRES], [STUDIOS], [PRODUCERS], [SEASON], [YEAR], [RANK], [SCORE], [STARTDATE], [ENDDATE], and [DESC]. ([DEL] will just be deleted)");
+template = field(CSS_TEMPLATE, "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEENG], [TITLERAW], [GENRES], [RANK], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
 template.parentNode.style.width = "100%";
 
 $(guiL).append($('<br />'));
