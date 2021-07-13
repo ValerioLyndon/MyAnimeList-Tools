@@ -979,7 +979,9 @@ function ProcessNext()
 				}
 			}
 
-			/* alternate titles */
+			/* titles */
+
+			title = thisData[`${animeManga}_title`];
 
 			titleEng = null;
 			titleEngStartTxt = 'English:</span>';
@@ -1219,14 +1221,9 @@ function ProcessNext()
 
 			/* rating (anime) */
 			rating = "?";
-			ratingStartTxt = "Rating:</span>";
-			ratingStartIndex = str.indexOf(ratingStartTxt);
-			if(ratingStartIndex != -1)
+			if('anime_mpaa_rating_string' in thisData)
 			{
-				ratingStartIndex += ratingStartTxt.length;
-				ratingStartIndex += 3; /* to avoid spaces that break end index */
-				ratingEndIndex = str.indexOf(" ", ratingStartIndex);
-				rating = str.substring(ratingStartIndex, ratingEndIndex);
+				rating = thisData['anime_mpaa_rating_string'];
 			}
 			ratingTag = `Rating: ${rating}`;
 			removeTagIfExist('Rating: ', mode = 2);
@@ -1312,8 +1309,6 @@ function ProcessNext()
 			imgUrlv = imgUrl.replace(".jpg", "v.jpg");
 			imgUrll = imgUrl.replace(".jpg", "l.jpg");
 			
-			altText = img.alt;
-			
 			/* Synopsis (description) */
 			desc = $(doc).find("[itemprop=\"description\"]").text().replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").trim();
 			
@@ -1326,8 +1321,8 @@ function ProcessNext()
 				.replaceAll('[IMGURLT]', imgUrlt)
 				.replaceAll('[IMGURLV]', imgUrlv)
 				.replaceAll('[IMGURLL]', imgUrll)
-				.replaceAll('[TITLE]', altText)
-				.replaceAll(/(\[TITLEENG\]|\[ENGTITLE\])/g, titleEng ? titleEng : altText)
+				.replaceAll('[TITLE]', title)
+				.replaceAll(/(\[TITLEENG\]|\[ENGTITLE\])/g, titleEng ? titleEng : title)
 				.replaceAll(/(\[TITLERAW\]|\[RAWTITLE\])/g, titleNative ? titleNative : "")
 				.replaceAll('[GENRES]', genres ? genres.join(", ") : "")
 				.replaceAll('[STUDIOS]', studios ? studios.join(", ") : "")
