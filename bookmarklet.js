@@ -1338,6 +1338,7 @@ function ProcessNext()
 				.replaceAll('[DESC]', desc);
 			
 			result.value += cssLine + "\n";
+			result.scrollTop = result.scrollHeight;
 		}
 		catch(e)
 		{
