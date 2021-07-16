@@ -9,7 +9,35 @@ A CSS Generator and Tag updater
 */
 
 ver = '5.0_prerelease';
-verMod = '2021/Jul/13';
+verMod = '2021/Jul/15';
+
+defaultSettings = {
+	"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
+	"delay": "3000",
+	"match_template": "/[TYPE]/[ID]/",
+	"update_tags": false,
+	"checked_tags": {
+		"english_title": false,
+		"native_title": false,
+		"season": false,
+		"year": false,
+		"genres": false,
+		"authors": false,
+		"score": false,
+		"rank": false,
+		"studio": false,
+		"producers": false,
+		"licensors": false,
+		"serialization": false,
+		"aired": false,
+		"published": false,
+		"rating": false,
+		"rating": false,
+		"rating": false
+	},
+	"clear_tags": false,
+	"check_existing": false
+};
 
 if(localStorage.getItem('burnt_settings') !== null)
 {
@@ -17,31 +45,7 @@ if(localStorage.getItem('burnt_settings') !== null)
 }
 else
 {
-	settings = {
-		"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
-		"delay": "3000",
-		"match_template": "/[TYPE]/[ID]/",
-		"update_tags": false,
-		"checked_tags": {
-			"english_title": false,
-			"native_title": false,
-			"season": false,
-			"year": false,
-			"genres": false,
-			"authors": false,
-			"score": false,
-			"rank": false,
-			"studio": false,
-			"producers": false,
-			"licensors": false,
-			"serialization": false,
-			"aired": false,
-			"published": false,
-			"rating": false
-		},
-		"clear_tags": false,
-		"check_existing": false
-	}
+	settings = defaultSettings;
 }
 
 CSS_TEMPLATE = settings['css_template'];
@@ -63,6 +67,9 @@ TAGS_SERIALIZATION = settings['checked_tags']['serialization'];
 TAGS_AIRED = settings['checked_tags']['aired'];
 TAGS_PUBLISHED = settings['checked_tags']['published'];
 TAGS_RATING = settings['checked_tags']['rating'];
+/* these two lines are the only ones to check for existence since they were added after settings became a thing */
+TAGS_DURATION = 'duration' in settings['checked_tags'] ? settings['checked_tags']['duration'] : defaultSettings['checked_tags']['total_duration'];
+TAGS_TOTAL_DURATION = 'total_duration' in settings['checked_tags'] ? settings['checked_tags']['total_duration'] : defaultSettings['checked_tags']['total_duration'];
 CLEAR_TAGS = settings['clear_tags'];
 CHECK_EXISTING = settings['check_existing'];
 
@@ -307,7 +314,7 @@ delay.style.width = "50px";
 
 matchTemplate = field(MATCH_TEMPLATE, "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
 
-template = field(CSS_TEMPLATE, "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEENG], [TITLERAW], [GENRES], [RANK], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
+template = field(CSS_TEMPLATE, "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEENG], [TITLERAW], [GENRES], [RANK], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
 template.parentNode.style.width = "100%";
 
 $(guiL).append($('<br />'));
@@ -338,6 +345,8 @@ chkProducers = chk(TAGS_PRODUCERS, "Producers", 'burnt-chk burnt-tag');
 chkLicensors = chk(TAGS_LICENSORS, "Licensors", 'burnt-chk burnt-tag');
 chkAired = chk(TAGS_AIRED, "Aired", 'burnt-chk burnt-tag');
 chkRating = chk(TAGS_RATING, "Rating", 'burnt-chk burnt-tag');
+chkDuration = chk(TAGS_DURATION, "Duration (Episode)", 'burnt-chk burnt-tag');
+chkTotalDuration = chk(TAGS_TOTAL_DURATION, "Duration (Total)", 'burnt-chk burnt-tag');
 /*Manga only*/
 chkPublished = chk(TAGS_PUBLISHED, "Published", 'burnt-chk burnt-tag');
 chkAuthors = chk(TAGS_AUTHORS, "Authors", 'burnt-chk burnt-tag');
@@ -353,6 +362,8 @@ if(animeManga === 'anime') {
 	chkLicensors.parentNode.style.display = 'none';
 	chkAired.parentNode.style.display = 'none';
 	chkRating.parentNode.style.display = 'none';
+	chkDuration.parentNode.style.display = 'none';
+	chkTotalDuration.parentNode.style.display = 'none';
 }
 
 $(guiL).append($('<br />'));
@@ -1225,7 +1236,67 @@ function ProcessNext()
 			}
 			ratingTag = `Rating: ${rating}`;
 			removeTagIfExist('Rating: ', mode = 2);
-			
+
+			/* duration (anime) */
+			duration = '?';
+			totalDuration = '?';
+			durationStartTxt = "Duration:</span>";
+			durationStartIndex = str.indexOf(durationStartTxt);
+			if(durationStartIndex !== -1)
+			{
+				function splitMinute(minutes)
+				{
+					final = [];
+					leftover = minutes % 60;
+					hours = (minutes - leftover) / 60;
+					if(hours > 0)
+					{
+						final.push(hours + 'h');
+					}
+					final.push(leftover + 'm');
+					return final.join(' ');
+				}
+
+				durationStartIndex += durationStartTxt.length;
+				durationEndIndex = str.indexOf("</div>", durationStartIndex);
+
+				durationSubStr = str.substring(durationStartIndex, durationEndIndex);
+				if(durationSubStr.indexOf('hr') !== -1)
+				{
+					splitHr = durationSubStr.split('hr');
+					hours = parseInt(splitHr[0].trim());
+					minutes = parseInt(splitHr[1].replace(/[^0-9]*/g, ''));
+					minutes += hours * 60;
+				}
+				else
+				{
+					minutes = parseInt(durationSubStr.split('min')[0].trim());
+				}
+
+				if(!isNaN(minutes))
+				{
+					duration = splitMinute(minutes);
+
+					episodesStartTxt = 'Episodes:</span>';
+					episodesStartIndex = str.indexOf(episodesStartTxt);
+					if(episodesStartIndex !== -1)
+					{
+						episodesStartIndex += episodesStartTxt.length;
+						episodesEndIndex = str.indexOf("</div>", episodesStartIndex);
+						episodes = parseInt(str.substring(episodesStartIndex, episodesEndIndex).trim());
+
+						if(!isNaN(episodes))
+						{
+							totalDuration = splitMinute(minutes * episodes);
+						}
+					}
+				}
+			}
+			durationTag = `Duration/Ep: ${duration}`;
+			totalDurationTag = `Duration: ${totalDuration}`;
+			removeTagIfExist('Duration/Ep: ', mode = 2);
+			removeTagIfExist('Duration: ', mode = 2);
+
 			/* genres */
 			genres = [];
 			genresRaw = $(doc).find('[itemprop="genre"]');
@@ -1280,6 +1351,8 @@ function ProcessNext()
 				if(chkScore.checked) { tags.push(scoreTag); }
 				if(chkRank.checked) { tags.push(rankTag); }
 				if(chkRating.checked) { tags.push(ratingTag); }
+				if(chkDuration.checked) { tags.push(durationTag); }
+				if(chkTotalDuration.checked) { tags.push(totalDurationTag); }
 				
 				newTagStr = tags.join(", ");
 				
@@ -1335,6 +1408,8 @@ function ProcessNext()
 				.replaceAll('[STARTDATE]', startDate)
 				.replaceAll('[ENDDATE]', endDate)
 				.replaceAll('[RATING]', rating)
+				.replaceAll('[DURATIONEP]', duration)
+				.replaceAll('[DURATIONTOTAL]', totalDuration)
 				.replaceAll('[DESC]', desc);
 			
 			result.value += cssLine + "\n";
@@ -1487,7 +1562,9 @@ function saveSettings()
 			"serialization": chkSerialization.checked,
 			"aired": chkAired.checked,
 			"published": chkPublished.checked,
-			"rating": chkRating.checked
+			"rating": chkRating.checked,
+			"duration": chkDuration.checked,
+			"total_duration": chkTotalDuration.checked
 		},
 		"clear_tags": chkClearTags.checked,
 		"check_existing": chkExisting.checked
