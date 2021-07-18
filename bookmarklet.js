@@ -9,7 +9,7 @@ A CSS Generator and Tag updater
 */
 
 ver = '5.0_prerelease';
-verMod = '2021/Jul/15';
+verMod = '2021/Jul/16';
 
 defaultSettings = {
 	"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
@@ -839,6 +839,7 @@ data = [];
 baseUrl = window.location.href.split('?')[0];
 offset = 0;
 failures = 0;
+faildelay = 0;
 statusPercent = 30;
 function getListInfo()
 {
@@ -850,11 +851,11 @@ function getListInfo()
 
 	$.getJSON(dataUrl, function(json)
 	{
+		failures = 0;
 		data = data.concat(json);
 
 		if(json.length === 300)
 		{
-			/*setTimeout(getListInfo, 0);*/
 			offset += 300;
 			statusText.textContent = `Fetching list data (${offset} of ?)...`;
 			statusPercent += 10;
@@ -871,17 +872,19 @@ function getListInfo()
 	}).fail(function()
 	{
 		failures++;
+		faildelay += 3000;
 
-		statusText.textContent = `Data fetch failed, retrying in 8...`;
+		statusText.textContent = `Data fetch failed, retrying in ${faildelay}ms...`;
 
 		if(failures > 3)
 		{
+			thumbBtn.value = 'Failed';
 			statusText.textContent = `Failed to fetch list info.`;
 			statusBar.style.cssText = '--percent: 100%; --colour: #f24242;';
 			return;
 		}
 
-		setTimeout(getListInfo, 8000);
+		setTimeout(getListInfo, faildelay);
 	});
 };
 getListInfo();
