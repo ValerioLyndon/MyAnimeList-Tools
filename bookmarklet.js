@@ -9,7 +9,7 @@ A CSS Generator and Tag updater
 */
 
 ver = '5.0_prerelease';
-verMod = '2021/Jul/16';
+verMod = '2021/Jul/17';
 
 defaultSettings = {
 	"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
@@ -1574,3 +1574,5 @@ function saveSettings()
 	};
 	localStorage.setItem('burnt_settings', JSON.stringify(settings));
 }
+
+void(0);
