@@ -539,7 +539,7 @@ $(textareaL).append(lastRun);
 if(localStorage.getItem('burnt_last_run') !== null)
 {
 	lastRun.click(function() {
-		existing.textContent = localStorage.getItem('burnt_last_run');
+		existing.value = localStorage.getItem('burnt_last_run');
 	});
 }
 else {
