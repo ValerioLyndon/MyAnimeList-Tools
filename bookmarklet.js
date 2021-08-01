@@ -8,8 +8,8 @@ A CSS Generator and Tag updater
 - Further changes 2021+       by Valerio Lyndon
 */
 
-ver = '5.0';
-verMod = '2021/Jul/17';
+ver = '6.0_prerelease';
+verMod = '2021/Aug/01';
 
 defaultSettings = {
 	"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
@@ -897,6 +897,7 @@ newData = [];
 var timeout;
 
 errorCount = 0;
+warningCount = 0;
 i = 0;
 timeThen = performance.now() - delay.value;
 function ProcessNext()
@@ -1376,12 +1377,23 @@ function ProcessNext()
 			}
 			
 			/* thumbs */
-			img = $(doc).find("img[itemprop=\"image\"]")[0];
-			imgUrl = img.getAttribute("data-src") || img.src;
-			
-			imgUrlt = imgUrl.replace(".jpg", "t.jpg");
-			imgUrlv = imgUrl.replace(".jpg", "v.jpg");
-			imgUrll = imgUrl.replace(".jpg", "l.jpg");
+			try
+			{
+				img = $(doc).find('img[itemprop="image"]')[0];
+				imgUrl = img.getAttribute("data-src") || img.src;
+				
+				imgUrlt = imgUrl.replace(".jpg", "t.jpg");
+				imgUrlv = imgUrl.replace(".jpg", "v.jpg");
+				imgUrll = imgUrl.replace(".jpg", "l.jpg");
+			}
+			catch(e)
+			{
+				imgUrl = imgUrlt = imgUrlv = imgUrll = 'none';
+
+				console.log(`warning on ${animeManga} #${id}: no image found`);
+				warningCount++;
+			}
+
 			
 			/* Synopsis (description) */
 			desc = $(doc).find("[itemprop=\"description\"]").text().replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").trim();
@@ -1461,9 +1473,9 @@ function DoneProcessing()
 		{
 			alert("Refesh the page for tag updates to show.");
 		}
-		if(errorCount > 0)
+		if(errorCount > 0 || warningCount > 0)
 		{
-			alert(`${errorCount} errors occurred while processing.  See your browser's console for details.\n\nSome updates were probably successful.\nYou can try rerunning the tool to fix these errors (with updated CSS as input and after refreshing your list page).`);
+			alert(`${errorCount} errors and ${warningCount} warnings occurred while processing.  See your browser's console for details.\n\nSome updates were probably successful.\nYou can try rerunning the tool to fix these errors (with updated CSS as input and after refreshing your list page).`);
 		}
 	};
 }
