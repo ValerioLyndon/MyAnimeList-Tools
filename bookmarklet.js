@@ -9,7 +9,7 @@ A CSS Generator and Tag updater
 */
 
 ver = '6.0_prerelease';
-verMod = '2021/Aug/01';
+verMod = '2022/May/08';
 
 defaultSettings = {
 	"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
@@ -22,6 +22,8 @@ defaultSettings = {
 		"season": false,
 		"year": false,
 		"genres": false,
+		"themes": false,
+		"demographic": false,
 		"authors": false,
 		"score": false,
 		"rank": false,
@@ -57,6 +59,8 @@ TAGS_NATIVE_TITLE = settings['checked_tags']['native_title'];
 TAGS_SEASON = settings['checked_tags']['season'];
 TAGS_YEAR = settings['checked_tags']['year'];
 TAGS_GENRES = settings['checked_tags']['genres'];
+TAGS_THEMES = settings['checked_tags']['themes'];
+TAGS_DEMOGRAPHIC = settings['checked_tags']['demographic'];
 TAGS_AUTHORS = settings['checked_tags']['authors'];
 TAGS_SCORE = settings['checked_tags']['score'];
 TAGS_RANK = settings['checked_tags']['rank'];
@@ -314,7 +318,7 @@ delay.style.width = "50px";
 
 matchTemplate = field(MATCH_TEMPLATE, "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
 
-template = field(CSS_TEMPLATE, "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEENG], [TITLERAW], [GENRES], [RANK], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
+template = field(CSS_TEMPLATE, "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEENG], [TITLERAW], [GENRES], [THEMES], [DEMOGRAPHIC], [RANK], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
 template.parentNode.style.width = "100%";
 
 $(guiL).append($('<br />'));
@@ -337,6 +341,8 @@ chkNative = chk(TAGS_NATIVE_TITLE, "Native title", 'burnt-chk burnt-tag');
 chkSeason = chk(TAGS_SEASON, "Season", 'burnt-chk burnt-tag');
 chkYear = chk(TAGS_YEAR, "Year", 'burnt-chk burnt-tag');
 chkGenres = chk(TAGS_GENRES, "Genres", 'burnt-chk burnt-tag');
+chkThemes = chk(TAGS_THEMES, "Themes", 'burnt-chk burnt-tag');
+chkDemographic = chk(TAGS_DEMOGRAPHIC, "Demographic", 'burnt-chk burnt-tag');
 chkScore = chk(TAGS_SCORE, "Score", 'burnt-chk burnt-tag');
 chkRank = chk(TAGS_RANK, "Rank", 'burnt-chk burnt-tag');
 /*Anime Only */
@@ -1303,13 +1309,37 @@ function ProcessNext()
 
 			/* genres */
 			genres = [];
-			genresRaw = $(doc).find('[itemprop="genre"]');
+			genresRaw = $(doc).find('span.dark_text:contains("Genre") ~ [itemprop="genre"]');
 			if(genresRaw.length > 0)
 			{
 				for(j = 0; j < genresRaw.length; j++)
 				{
 					genres[j] = genresRaw.eq(j).text().trim();
 					removeTagIfExist(genres[j]);
+				}
+			}
+
+			/* themes */
+			themes = [];
+			themesRaw = $(doc).find('span.dark_text:contains("Theme") ~ [itemprop="genre"]');
+			if(themesRaw.length > 0)
+			{
+				for(j = 0; j < themesRaw.length; j++)
+				{
+					themes[j] = themesRaw.eq(j).text().trim();
+					removeTagIfExist(themes[j]);
+				}
+			}
+
+			/* demographic */
+			demographic = [];
+			demographicRaw = $(doc).find('span.dark_text:contains("Demographic") ~ [itemprop="genre"]');
+			if(demographicRaw.length > 0)
+			{
+				for(j = 0; j < demographicRaw.length; j++)
+				{
+					demographic[j] = demographicRaw.eq(j).text().trim();
+					removeTagIfExist(demographic[j]);
 				}
 			}
 			
@@ -1349,6 +1379,8 @@ function ProcessNext()
 				if(licensors && chkLicensors.checked) { tags.push(licensors); }
 				if(serializations && chkSerialization.checked) { tags.push(serializations); }
 				if(genres && chkGenres.checked) { tags.push(genres); }
+				if(themes && chkThemes.checked) { tags.push(themes); }
+				if(demographic && chkDemographic.checked) { tags.push(demographic); }
 				if(authors && chkAuthors.checked) { tags.push(authors); }
 				if(chkAired.checked) { tags.push(airedTag); }
 				if(chkPublished.checked) { tags.push(publishedTag); }
@@ -1411,6 +1443,8 @@ function ProcessNext()
 				.replaceAll(/(\[TITLEENG\]|\[ENGTITLE\])/g, titleEng ? titleEng : title)
 				.replaceAll(/(\[TITLERAW\]|\[RAWTITLE\])/g, titleNative ? titleNative : "")
 				.replaceAll('[GENRES]', genres ? genres.join(", ") : "")
+				.replaceAll('[THEMES]', themes ? themes.join(", ") : "")
+				.replaceAll('[DEMOGRAPHIC]', demographic ? demographic.join(", ") : "")
 				.replaceAll('[STUDIOS]', studios ? studios.join(", ") : "")
 				.replaceAll('[PRODUCERS]', producers ? producers.join(", ") : "")
 				.replaceAll('[LICENSORS]', licensors ? licensors.join(", ") : "")
@@ -1568,6 +1602,8 @@ function saveSettings()
 			"season": chkSeason.checked,
 			"year": chkYear.checked,
 			"genres": chkGenres.checked,
+			"themes": chkThemes.checked,
+			"demograpic": chkDemographic.checked,
 			"authors": chkAuthors.checked,
 			"score": chkScore.checked,
 			"rank": chkRank.checked,
