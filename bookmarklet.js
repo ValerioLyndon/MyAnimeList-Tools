@@ -1568,9 +1568,19 @@ function DoneProcessing()
 		{
 			alert("Refesh the page for tag updates to show.");
 		}
-		if(errorCount > 0 || warningCount > 0)
+		
+		errorPercent = errorCount / i * 100;
+		if(errorCount === 0 || warningCount > 0)
 		{
-			alert(`${errorCount} errors and ${warningCount} warnings occurred while processing.  See your browser's console for details.\n\nSome updates were probably successful.\nYou can try rerunning the tool to fix these errors (with updated CSS as input and after refreshing your list page).`);
+			alert(`${warningCount} warning(s) occurred while processing.  See your browser's console for details.\n\nIt is likely that all updates were successful. If you notice missing images, try running the tool again.`);
+		}
+		else if(errorCount > 0 && warningCount === 0)
+		{
+			alert(`${errorCount} error(s) occurred while processing. See your browser's console for details.\n\nOut of ${i} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
+		}
+		else if(errorCount > 0 && warningCount > 0)
+		{
+			alert(`${errorCount} error(s) and ${warningCount} warning(s) occurred while processing.  See your browser's console for details.\n\nOut of ${i} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
 		}
 	};
 }
