@@ -34,8 +34,8 @@ defaultSettings = {
 		"aired": false,
 		"published": false,
 		"rating": false,
-		"rating": false,
-		"rating": false
+		"duration": false,
+		"totalduration": false
 	},
 	"clear_tags": false,
 	"check_existing": false
