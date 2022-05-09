@@ -46,42 +46,36 @@ defaultSettings = {
 
 if(localStorage.getItem('burnt_settings') !== null)
 {
-	settings = JSON.parse(localStorage.getItem('burnt_settings'));
+	try
+	{
+		settings = JSON.parse(localStorage.getItem('burnt_settings'));
+	
+		/* Check for missing settings and fill them in. This prevents errors while maintaining user settings, especially in the case of a user updating from an older version. */
+		for(key in defaultSettings)
+		{
+			if (!(key in settings))
+			{
+				settings[key] = defaultSettings[key];
+			}
+		}
+		for(key in defaultSettings['checked_tags'])
+		{
+			if (!(key in settings['checked_tags']))
+			{
+				settings['checked_tags'][key] = defaultSettings['checked_tags'][key];
+			}
+		}
+	}
+	catch(e)
+	{
+		alert("Encountered an error while parsing your previous settings. Your settings have been reverted to defaults. To quickly recover your template settings, try selecting \"Last Run\" and then \"Autofill\". Other settings will need to be manually set. \n\nIf you've never run this tool before, you should never see this.");
+		settings = defaultSettings;
+	}
 }
 else
 {
 	settings = defaultSettings;
 }
-
-CSS_TEMPLATE = settings['css_template'];
-DELAY = settings['delay'];
-MATCH_TEMPLATE = settings['match_template'];
-UPDATE_TAGS = settings['update_tags'];
-TAGS_ENGLISH_TITLE = settings['checked_tags']['english_title'];
-TAGS_FRENCH_TITLE = settings['checked_tags']['french_title'];
-TAGS_SPANISH_TITLE = settings['checked_tags']['spanish_title'];
-TAGS_GERMAN_TITLE = settings['checked_tags']['german_title'];
-TAGS_NATIVE_TITLE = settings['checked_tags']['native_title'];
-TAGS_SEASON = settings['checked_tags']['season'];
-TAGS_YEAR = settings['checked_tags']['year'];
-TAGS_GENRES = settings['checked_tags']['genres'];
-TAGS_THEMES = settings['checked_tags']['themes'];
-TAGS_DEMOGRAPHIC = settings['checked_tags']['demographic'];
-TAGS_AUTHORS = settings['checked_tags']['authors'];
-TAGS_SCORE = settings['checked_tags']['score'];
-TAGS_RANK = settings['checked_tags']['rank'];
-TAGS_STUDIO = settings['checked_tags']['studio'];
-TAGS_PRODUCERS = settings['checked_tags']['producers'];
-TAGS_LICENSORS = settings['checked_tags']['licensors'];
-TAGS_SERIALIZATION = settings['checked_tags']['serialization'];
-TAGS_AIRED = settings['checked_tags']['aired'];
-TAGS_PUBLISHED = settings['checked_tags']['published'];
-TAGS_RATING = settings['checked_tags']['rating'];
-/* these two lines are the only ones to check for existence since they were added after settings became a thing */
-TAGS_DURATION = 'duration' in settings['checked_tags'] ? settings['checked_tags']['duration'] : defaultSettings['checked_tags']['total_duration'];
-TAGS_TOTAL_DURATION = 'total_duration' in settings['checked_tags'] ? settings['checked_tags']['total_duration'] : defaultSettings['checked_tags']['total_duration'];
-CLEAR_TAGS = settings['clear_tags'];
-CHECK_EXISTING = settings['check_existing'];
 
 /* TOOL CODE */
 
@@ -319,17 +313,17 @@ function chk(checked, title, className = false, desc = false) {
 
 /* Options section */
 
-delay = field(DELAY, "Delay", "Delay (ms) between requests to avoid spamming the server.");
+delay = field(settings['delay'], "Delay", "Delay (ms) between requests to avoid spamming the server.");
 delay.style.width = "50px";
 
-matchTemplate = field(MATCH_TEMPLATE, "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
+matchTemplate = field(settings['match_template'], "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
 
-template = field(CSS_TEMPLATE, "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEEN], [TITLEFR], [TITLEES], [TITLEDE], [TITLERAW], [GENRES], [THEMES], [DEMOGRAPHIC], [RANK], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
+template = field(settings['css_template'], "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEEN], [TITLEFR], [TITLEES], [TITLEDE], [TITLERAW], [GENRES], [THEMES], [DEMOGRAPHIC], [RANK], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
 template.parentNode.style.width = "100%";
 
 $(guiL).append($('<br />'));
 
-chkTags = chk(UPDATE_TAGS, "Update Tags:", 'burnt-chk burnt-tagtoggle');
+chkTags = chk(settings['update_tags'], "Update Tags:", 'burnt-chk burnt-tagtoggle');
 
 chkTags.parentNode.addEventListener('click', toggleTags);
 
@@ -342,30 +336,30 @@ function toggleTags() {
 	}
 }
 
-chkEnglish = chk(TAGS_ENGLISH_TITLE, "English title", 'burnt-chk burnt-tag');
-chkFrench = chk(TAGS_FRENCH_TITLE, "French title", 'burnt-chk burnt-tag');
-chkSpanish = chk(TAGS_SPANISH_TITLE, "Spanish title", 'burnt-chk burnt-tag');
-chkGerman = chk(TAGS_GERMAN_TITLE, "German title", 'burnt-chk burnt-tag');
-chkNative = chk(TAGS_NATIVE_TITLE, "Native title", 'burnt-chk burnt-tag');
-chkSeason = chk(TAGS_SEASON, "Season", 'burnt-chk burnt-tag');
-chkYear = chk(TAGS_YEAR, "Year", 'burnt-chk burnt-tag');
-chkGenres = chk(TAGS_GENRES, "Genres", 'burnt-chk burnt-tag');
-chkThemes = chk(TAGS_THEMES, "Themes", 'burnt-chk burnt-tag');
-chkDemographic = chk(TAGS_DEMOGRAPHIC, "Demographic", 'burnt-chk burnt-tag');
-chkScore = chk(TAGS_SCORE, "Score", 'burnt-chk burnt-tag');
-chkRank = chk(TAGS_RANK, "Rank", 'burnt-chk burnt-tag');
+chkEnglish = chk(settings['checked_tags']['english_title'], "English title", 'burnt-chk burnt-tag');
+chkFrench = chk(settings['checked_tags']['french_title'], "French title", 'burnt-chk burnt-tag');
+chkSpanish = chk(settings['checked_tags']['spanish_title'], "Spanish title", 'burnt-chk burnt-tag');
+chkGerman = chk(settings['checked_tags']['german_title'], "German title", 'burnt-chk burnt-tag');
+chkNative = chk(settings['checked_tags']['native_title'], "Native title", 'burnt-chk burnt-tag');
+chkSeason = chk(settings['checked_tags']['season'], "Season", 'burnt-chk burnt-tag');
+chkYear = chk(settings['checked_tags']['year'], "Year", 'burnt-chk burnt-tag');
+chkGenres = chk(settings['checked_tags']['genres'], "Genres", 'burnt-chk burnt-tag');
+chkThemes = chk(settings['checked_tags']['themes'], "Themes", 'burnt-chk burnt-tag');
+chkDemographic = chk(settings['checked_tags']['demographic'], "Demographic", 'burnt-chk burnt-tag');
+chkScore = chk(settings['checked_tags']['score'], "Score", 'burnt-chk burnt-tag');
+chkRank = chk(settings['checked_tags']['rank'], "Rank", 'burnt-chk burnt-tag');
 /*Anime Only */
-chkStudio = chk(TAGS_STUDIO, "Studio", 'burnt-chk burnt-tag');
-chkProducers = chk(TAGS_PRODUCERS, "Producers", 'burnt-chk burnt-tag');
-chkLicensors = chk(TAGS_LICENSORS, "Licensors", 'burnt-chk burnt-tag');
-chkAired = chk(TAGS_AIRED, "Aired", 'burnt-chk burnt-tag');
-chkRating = chk(TAGS_RATING, "Rating", 'burnt-chk burnt-tag');
-chkDuration = chk(TAGS_DURATION, "Duration (Episode)", 'burnt-chk burnt-tag');
-chkTotalDuration = chk(TAGS_TOTAL_DURATION, "Duration (Total)", 'burnt-chk burnt-tag');
+chkStudio = chk(settings['checked_tags']['studio'], "Studio", 'burnt-chk burnt-tag');
+chkProducers = chk(settings['checked_tags']['producers'], "Producers", 'burnt-chk burnt-tag');
+chkLicensors = chk(settings['checked_tags']['licensors'], "Licensors", 'burnt-chk burnt-tag');
+chkAired = chk(settings['checked_tags']['aired'], "Aired", 'burnt-chk burnt-tag');
+chkRating = chk(settings['checked_tags']['rating'], "Rating", 'burnt-chk burnt-tag');
+chkDuration = chk(settings['checked_tags']['duration'], "Duration (Episode)", 'burnt-chk burnt-tag');
+chkTotalDuration = chk(settings['checked_tags']['total_duration'], "Duration (Total)", 'burnt-chk burnt-tag');
 /*Manga only*/
-chkPublished = chk(TAGS_PUBLISHED, "Published", 'burnt-chk burnt-tag');
-chkAuthors = chk(TAGS_AUTHORS, "Authors", 'burnt-chk burnt-tag');
-chkSerialization = chk(TAGS_SERIALIZATION, "Serialization", 'burnt-chk burnt-tag');
+chkPublished = chk(settings['checked_tags']['published'], "Published", 'burnt-chk burnt-tag');
+chkAuthors = chk(settings['checked_tags']['authors'], "Authors", 'burnt-chk burnt-tag');
+chkSerialization = chk(settings['checked_tags']['serialization'], "Serialization", 'burnt-chk burnt-tag');
 
 if(animeManga === 'anime') {
 	chkPublished.parentNode.style.display = 'none';
@@ -383,11 +377,11 @@ if(animeManga === 'anime') {
 
 $(guiL).append($('<br />'));
 
-chkClearTags = chk(CLEAR_TAGS, "Overwrite current tags", 'burnt-chk burnt-tag', "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.");
+chkClearTags = chk(settings['clear_tags'], "Overwrite current tags", 'burnt-chk burnt-tag', "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.");
 
 $(guiL).append($('<br />'));
 
-chkExisting = chk(CHECK_EXISTING, "Validate existing images", 'burnt-chk', "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load. Not recommended while adding new anime or updating tags!");
+chkExisting = chk(settings['check_existing'], "Validate existing images", 'burnt-chk', "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load. Not recommended while adding new anime or updating tags!");
 
 $(guiL).append($('<hr>'));
 
@@ -1377,14 +1371,11 @@ function ProcessNext()
 
 			/* genres */
 			genres = [];
-			genresRaw = $(doc).find('span.dark_text:contains("Genre") ~ [itemprop="genre"]');
-			if(genresRaw.length > 0)
+			for(each of thisData['genres'])
 			{
-				for(j = 0; j < genresRaw.length; j++)
-				{
-					genres[j] = genresRaw.eq(j).text().trim();
-					removeTagIfExist(genres[j]);
-				}
+				genre = each['name'];
+				genres.push(genre);
+				removeTagIfExist(genre);
 			}
 
 			/* themes */
@@ -1400,17 +1391,13 @@ function ProcessNext()
 			}
 
 			/* demographic */
-			demographic = [];
-			demographicRaw = $(doc).find('span.dark_text:contains("Demographic") ~ [itemprop="genre"]');
-			if(demographicRaw.length > 0)
+			demographics = [];
+			for(each of thisData['demographics'])
 			{
-				for(j = 0; j < demographicRaw.length; j++)
-				{
-					demographic[j] = demographicRaw.eq(j).text().trim();
-					removeTagIfExist(demographic[j]);
-				}
+				demographic = each['name'];
+				demographics.push(demographic);
+				removeTagIfExist(demographic);
 			}
-			
 			/* rank */
 			rank = "?";
 			rankStartTxt = "Ranked:</span>";
@@ -1518,7 +1505,7 @@ function ProcessNext()
 				.replaceAll('[TITLERAW]', titleNative ? titleNative : "")
 				.replaceAll('[GENRES]', genres ? genres.join(", ") : "")
 				.replaceAll('[THEMES]', themes ? themes.join(", ") : "")
-				.replaceAll('[DEMOGRAPHIC]', demographic ? demographic.join(", ") : "")
+				.replaceAll('[DEMOGRAPHIC]', demographics ? demographics.join(", ") : "")
 				.replaceAll('[STUDIOS]', studios ? studios.join(", ") : "")
 				.replaceAll('[PRODUCERS]', producers ? producers.join(", ") : "")
 				.replaceAll('[LICENSORS]', licensors ? licensors.join(", ") : "")
