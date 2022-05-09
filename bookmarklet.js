@@ -116,7 +116,7 @@ css(`
 	left: 0;
 	right: 0;
 	bottom: 0;
-	z-index: 9999;
+	z-index: 9990;
 	background: rgba(0,0,0,0.5);
 }
 .burnt-popup {
@@ -508,6 +508,31 @@ exportBtn.click(function() {
 	});
 });
 $(guiL).append(exportBtn);
+
+$(guiL).append($('<hr>'));
+
+/* Regex Section */
+
+regexCssOverlay = $(`<div class="burnt-popup" style="display: none;">
+	You can modify the display and contents of all CSS replacements here. This is a powerful but advanced feature which makes heavy use of "Regular Expressions".
+	<br />
+	<br />
+</div>`);
+$(gui).append(regexCssOverlay);
+
+$(regexCssOverlay).append($('<input type="button" value="Close" class="burnt-btn burnt-hide">').click(function() {
+	$('.burnt-popup').css('display', 'none');
+	overlay.remove();
+}));
+
+$(regexCssOverlay).append('TODO');
+
+regexCssBtn = $('<input type="button" value="CSS Output Options" class="burnt-btn" title="Modify how the final CSS will output.">');
+regexCssBtn.click(function() {
+	$(gui).append(overlay);
+	$(regexCssOverlay).removeAttr('style');
+});
+$(guiL).append(regexCssBtn);
 
 $(guiL).append($('<hr>'));
 
