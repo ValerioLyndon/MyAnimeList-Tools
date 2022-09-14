@@ -8,15 +8,41 @@ A CSS Generator and Tag updater
 - Further changes 2021+       by Valerio Lyndon
 */
 
-ver = '6.0';
-verMod = '2022/May/08';
+ver = '7.0_prerelease';
+verMod = '2022/Sep/13';
 
 defaultSettings = {
 	"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
 	"delay": "3000",
 	"match_template": "/[TYPE]/[ID]/",
 	"update_tags": false,
+	"update_notes": false,
 	"checked_tags": {
+		"english_title": false,
+		"french_title": false,
+		"spanish_title": false,
+		"german_title": false,
+		"native_title": false,
+		"season": false,
+		"year": false,
+		"genres": false,
+		"themes": false,
+		"demographic": false,
+		"authors": false,
+		"score": false,
+		"rank": false,
+		"studio": false,
+		"producers": false,
+		"licensors": false,
+		"serialization": false,
+		"aired": false,
+		"published": false,
+		"rating": false,
+		"duration": false,
+		"totalduration": false
+	},
+	"checked_notes": {
+		"synopsis": false,
 		"english_title": false,
 		"french_title": false,
 		"spanish_title": false,
@@ -175,12 +201,16 @@ css(`
 .burnt-chk {
 	display: block;
 }
-.burnt-tag {
+.burnt-tag,
+.burnt-notes {
 	margin-left: 10px;
 }
-.burnt-tag-disabled {
+.burnt-tag-disabled,
+.burnt-notes-disabled {
 	opacity: 0.5;
 	pointer-events: none;
+	height: 0;
+	opacity: 0;
 }
 .burnt-textarea {
 	width: 50%;
@@ -323,18 +353,19 @@ template.parentNode.style.width = "100%";
 
 $(guiL).append($('<br />'));
 
-chkTags = chk(settings['update_tags'], "Update Tags:", 'burnt-chk burnt-tagtoggle');
-
-chkTags.parentNode.addEventListener('click', toggleTags);
-
-function toggleTags() {
-	bool = chkTags.checked;
-	if(bool) {
-		$('.burnt-tag').removeClass('burnt-tag-disabled');
+function toggleChks(check, selector) {
+	if(check.checked) {
+		$(selector).removeClass('burnt-tag-disabled');
 	} else {
-		$('.burnt-tag').addClass('burnt-tag-disabled');
+		$(selector).addClass('burnt-tag-disabled');
 	}
 }
+
+/* TAGS */
+
+chkTags = chk(settings['update_tags'], "Update Tags", 'burnt-chk burnt-tagtoggle');
+
+chkTags.addEventListener('input', () => { toggleChks(chkTags,'.burnt-tag'); });
 
 chkEnglish = chk(settings['checked_tags']['english_title'], "English title", 'burnt-chk burnt-tag');
 chkFrench = chk(settings['checked_tags']['french_title'], "French title", 'burnt-chk burnt-tag');
@@ -361,11 +392,56 @@ chkPublished = chk(settings['checked_tags']['published'], "Published", 'burnt-ch
 chkAuthors = chk(settings['checked_tags']['authors'], "Authors", 'burnt-chk burnt-tag');
 chkSerialization = chk(settings['checked_tags']['serialization'], "Serialization", 'burnt-chk burnt-tag');
 
-if(animeManga === 'anime') {
+/* NOTES */
+
+chkNotes = chk(settings['update_notes'], "Update Notes", 'burnt-chk', 'Update your comments/notes section with the new information.');
+
+chkNotes.addEventListener('input', () => {
+	if(chkNotes.checked) {
+		alert('Be warned! This setting will *entirely overwrite* your current notes. Do not use if you want to keep your notes.');
+	}
+	toggleChks(chkNotes,'.burnt-notes');
+});
+
+chkSynopsisNotes = chk(settings['checked_notes']['synopsis'], "Synopsis", 'burnt-chk burnt-notes');
+chkEnglishNotes = chk(settings['checked_notes']['english_title'], "English title", 'burnt-chk burnt-notes');
+chkFrenchNotes = chk(settings['checked_notes']['french_title'], "French title", 'burnt-chk burnt-notes');
+chkSpanishNotes = chk(settings['checked_notes']['spanish_title'], "Spanish title", 'burnt-chk burnt-notes');
+chkGermanNotes = chk(settings['checked_notes']['german_title'], "German title", 'burnt-chk burnt-notes');
+chkNativeNotes = chk(settings['checked_notes']['native_title'], "Native title", 'burnt-chk burnt-notes');
+chkSeasonNotes = chk(settings['checked_notes']['season'], "Season", 'burnt-chk burnt-notes');
+chkYearNotes = chk(settings['checked_notes']['year'], "Year", 'burnt-chk burnt-notes');
+chkGenresNotes = chk(settings['checked_notes']['genres'], "Genres", 'burnt-chk burnt-notes');
+chkThemesNotes = chk(settings['checked_notes']['themes'], "Themes", 'burnt-chk burnt-notes');
+chkDemographicNotes = chk(settings['checked_notes']['demographic'], "Demographic", 'burnt-chk burnt-notes');
+chkScoreNotes = chk(settings['checked_notes']['score'], "Score", 'burnt-chk burnt-notes');
+chkRankNotes = chk(settings['checked_notes']['rank'], "Rank", 'burnt-chk burnt-notes');
+/*Anime Only */
+chkStudioNotes = chk(settings['checked_notes']['studio'], "Studio", 'burnt-chk burnt-notes');
+chkProducersNotes = chk(settings['checked_notes']['producers'], "Producers", 'burnt-chk burnt-notes');
+chkLicensorsNotes = chk(settings['checked_notes']['licensors'], "Licensors", 'burnt-chk burnt-notes');
+chkAiredNotes = chk(settings['checked_notes']['aired'], "Aired", 'burnt-chk burnt-notes');
+chkRatingNotes = chk(settings['checked_notes']['rating'], "Rating", 'burnt-chk burnt-notes');
+chkDurationNotes = chk(settings['checked_notes']['duration'], "Duration (Episode)", 'burnt-chk burnt-notes');
+chkTotalDurationNotes = chk(settings['checked_notes']['total_duration'], "Duration (Total)", 'burnt-chk burnt-notes');
+/*Manga only*/
+chkPublishedNotes = chk(settings['checked_notes']['published'], "Published", 'burnt-chk burnt-notes');
+chkAuthorsNotes = chk(settings['checked_notes']['authors'], "Authors", 'burnt-chk burnt-notes');
+chkSerializationNotes = chk(settings['checked_notes']['serialization'], "Serialization", 'burnt-chk burnt-notes');
+
+/* HIDE IRRELEVANT */
+if(animeManga === 'anime')
+{
 	chkPublished.parentNode.style.display = 'none';
 	chkAuthors.parentNode.style.display = 'none';
 	chkSerialization.parentNode.style.display = 'none';
-} else {
+
+	chkPublishedNotes.parentNode.style.display = 'none';
+	chkAuthorsNotes.parentNode.style.display = 'none';
+	chkSerializationNotes.parentNode.style.display = 'none';
+}
+else
+{
 	chkStudio.parentNode.style.display = 'none';
 	chkProducers.parentNode.style.display = 'none';
 	chkLicensors.parentNode.style.display = 'none';
@@ -373,6 +449,14 @@ if(animeManga === 'anime') {
 	chkRating.parentNode.style.display = 'none';
 	chkDuration.parentNode.style.display = 'none';
 	chkTotalDuration.parentNode.style.display = 'none';
+
+	chkStudioNotes.parentNode.style.display = 'none';
+	chkProducersNotes.parentNode.style.display = 'none';
+	chkLicensorsNotes.parentNode.style.display = 'none';
+	chkAiredNotes.parentNode.style.display = 'none';
+	chkRatingNotes.parentNode.style.display = 'none';
+	chkDurationNotes.parentNode.style.display = 'none';
+	chkTotalDurationNotes.parentNode.style.display = 'none';
 }
 
 $(guiL).append($('<br />'));
@@ -629,7 +713,8 @@ result.readOnly = "readonly";
 result.spellcheck = false;
 textareaR.appendChild(result);
 
-toggleTags();
+toggleChks(chkTags, '.burnt-tag');
+toggleChks(chkNotes, '.burnt-notes');
 
 
 
@@ -1421,8 +1506,15 @@ function ProcessNext()
 			}
 			scoreTag = `Score: ${score}`;
 			removeTagIfExist('Score: ', mode = 2);
+
+			/* Synopsis (description) */
+			synopsis = $(doc).find("[itemprop=\"description\"]").text().trim();
+			synopsisCss = synopsis.replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").trim();
 			
-			/* Update Tags */
+			/* Update Notes & Tags */
+
+			let csrf = $('meta[name="csrf_token"]').attr('content');
+
 			if(chkTags.checked)
 			{
 				if(titleEn && chkEnglish.checked) { tags.push(titleEn); }
@@ -1458,12 +1550,64 @@ function ProcessNext()
 					amid = 'mid';
 				}
 
-				csrf = $('meta[name="csrf_token"]').attr('content');
 				request2 = new XMLHttpRequest();
 				request2.open("post", reqUrl + encodeURIComponent(newTagStr), false);
 				request2.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
 				request2.setRequestHeader("X-Requested-With", "XMLHttpRequest");
 				request2.send(`${amid}=${id}&csrf_token=${csrf}`);
+			}
+
+			if(chkNotes.checked)
+			{
+				let notes = [];
+
+				if(titleEn && chkEnglishNotes.checked) { notes.push(titleEn); }
+				if(titleFr && chkFrenchNotes.checked) { notes.push(titleFr); }
+				if(titleEs && chkSpanishNotes.checked) { notes.push(titleEs); }
+				if(titleDe && chkGermanNotes.checked) { notes.push(titleDe); }
+				if(titleNative && chkNativeNotes.checked) { notes.push(titleNative); }
+				if(season && chkSeasonNotes.checked) { notes.push(season); }
+				if(year && chkYearNotes.checked) { notes.push(year); }
+				if(studios && chkStudioNotes.checked) { notes.push(studios); }
+				if(producers && chkProducersNotes.checked) { notes.push(producers); }
+				if(licensors && chkLicensorsNotes.checked) { notes.push(licensors); }
+				if(serializations && chkSerializationNotes.checked) { notes.push(serializations); }
+				if(genres && chkGenresNotes.checked) { notes.push(genres); }
+				if(themes && chkThemesNotes.checked) { notes.push(themes); }
+				if(demographic && chkDemographicNotes.checked) { notes.push(demographic); }
+				if(authors && chkAuthorsNotes.checked) { notes.push(authors); }
+				if(chkAiredNotes.checked) { notes.push(airedTag); }
+				if(chkPublishedNotes.checked) { notes.push(publishedTag); }
+				if(chkScoreNotes.checked) { notes.push(scoreTag); }
+				if(chkRankNotes.checked) { notes.push(rankTag); }
+				if(chkRatingNotes.checked) { notes.push(ratingTag); }
+				if(chkDurationNotes.checked) { notes.push(durationTag); }
+				if(chkTotalDurationNotes.checked) { notes.push(totalDurationTag); }
+				if(chkSynopsisNotes.checked) { notes.push(synopsis); }
+
+				let notesStr = notes.join("\n\n");
+				let notesRequestUrl = '';
+				let notesRequestDict = {
+					"comments": notesStr,
+					"status": thisData['status'],
+					"csrf_token": csrf
+				};
+
+				if(animeManga === 'anime') {
+					notesRequestDict['anime_id'] = id;
+					notesRequestUrl = 'https://myanimelist.net/ownlist/anime/edit_convert.json';
+				} else {
+					notesRequestDict['manga_id'] = id;
+					notesRequestUrl = 'https://myanimelist.net/ownlist/manga/edit_convert.json';
+				}
+
+				let notesRequestContent = JSON.stringify(notesRequestDict);
+
+				let notesRequest = new XMLHttpRequest();
+				notesRequest.open("post", notesRequestUrl, false);
+				notesRequest.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+				notesRequest.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+				notesRequest.send(notesRequestContent);
 			}
 			
 			/* thumbs */
@@ -1483,10 +1627,6 @@ function ProcessNext()
 				console.log(`warning on ${animeManga} #${id}: no image found`);
 				warningCount++;
 			}
-
-			
-			/* Synopsis (description) */
-			desc = $(doc).find("[itemprop=\"description\"]").text().replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").trim();
 			
 			/* Generate CSS */
 			cssLine = template.value
@@ -1520,7 +1660,7 @@ function ProcessNext()
 				.replaceAll('[RATING]', rating)
 				.replaceAll('[DURATIONEP]', duration)
 				.replaceAll('[DURATIONTOTAL]', totalDuration)
-				.replaceAll('[DESC]', desc);
+				.replaceAll('[DESC]', synopsisCss);
 			
 			result.value += cssLine + "\n";
 			result.scrollTop = result.scrollHeight;
@@ -1564,17 +1704,17 @@ function DoneProcessing()
 	exitBtn.onclick = function()
 	{
 		Exit();
-		if(chkTags.checked)
+		if(chkTags.checked || chkNotes.checked)
 		{
-			alert("Refesh the page for tag updates to show.");
+			alert("Refesh the page for tag and note updates to show.");
 		}
 		
 		errorPercent = errorCount / i * 100;
-		if(errorCount === 0 || warningCount > 0)
+		if(errorCount < 1 && warningCount > 0)
 		{
 			alert(`${warningCount} warning(s) occurred while processing.  See your browser's console for details.\n\nIt is likely that all updates were successful. If you notice missing images, try running the tool again.`);
 		}
-		else if(errorCount > 0 && warningCount === 0)
+		else if(errorCount > 0 && warningCount < 1)
 		{
 			alert(`${errorCount} error(s) occurred while processing. See your browser's console for details.\n\nOut of ${i} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
 		}
@@ -1667,6 +1807,7 @@ function saveSettings()
 		"delay": delay.value,
 		"match_template": matchTemplate.value,
 		"update_tags": chkTags.checked,
+		"update_notes": chkNotes.checked,
 		"checked_tags": {
 			"english_title": chkEnglish.checked,
 			"french_title": chkFrench.checked,
@@ -1690,6 +1831,31 @@ function saveSettings()
 			"rating": chkRating.checked,
 			"duration": chkDuration.checked,
 			"total_duration": chkTotalDuration.checked
+		},
+		"checked_notes": {
+			"synopsis": chkSynopsisNotes.checked,
+			"english_title": chkEnglishNotes.checked,
+			"french_title": chkFrenchNotes.checked,
+			"spanish_title": chkSpanishNotes.checked,
+			"german_title": chkGermanNotes.checked,
+			"native_title": chkNativeNotes.checked,
+			"season": chkSeasonNotes.checked,
+			"year": chkYearNotes.checked,
+			"genres": chkGenresNotes.checked,
+			"themes": chkThemesNotes.checked,
+			"demograpic": chkDemographicNotes.checked,
+			"authors": chkAuthorsNotes.checked,
+			"score": chkScoreNotes.checked,
+			"rank": chkRankNotes.checked,
+			"studio": chkStudioNotes.checked,
+			"producers": chkProducersNotes.checked,
+			"licensors": chkLicensorsNotes.checked,
+			"serialization": chkSerializationNotes.checked,
+			"aired": chkAiredNotes.checked,
+			"published": chkPublishedNotes.checked,
+			"rating": chkRatingNotes.checked,
+			"duration": chkDurationNotes.checked,
+			"total_duration": chkTotalDurationNotes.checked
 		},
 		"clear_tags": chkClearTags.checked,
 		"check_existing": chkExisting.checked
