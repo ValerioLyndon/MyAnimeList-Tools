@@ -9,7 +9,7 @@ A CSS Generator and Tag updater
 */
 
 ver = '7.0_prerelease';
-verMod = '2022/Sep/13';
+verMod = '2023/Mar/24';
 
 defaultSettings = {
 	"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
@@ -506,21 +506,8 @@ importBtn.click(function() {
 				}
 				else
 				{
-					if(!("css" in importedTemplate))
-					{
-						importedTemplate['css'] = '';
-					}
-
-					t = setTemplate(importedTemplate['template'], importedTemplate['matchtemplate'], importedTemplate['css']);
-					if(!t)
-					{
-						alert('Import failed to update MAL Custom CSS. This is likely due to a code error and should be reported to the developer.');
-					}
-					else
-					{
-						alert('Import succeeded.');
-					}
-
+					let cssToImport = 'css' in importedTemplate ? importedTemplate['css'] : false;
+					setTemplate(importedTemplate['template'], importedTemplate['matchtemplate'], cssToImport);
 					importOverlay.remove();
 					overlay.remove();
 				}
@@ -579,13 +566,17 @@ exportBtn.click(function() {
 		{
 			createdTemplate = {
 				"template": newTemplate,
-				"matchtemplate": newMatchTemplate,
-				"css": $('#burnt-export-css').val()
+				"matchtemplate": newMatchTemplate
 			};
+			let css = $('#burnt-export-css').val();
+			if(css.trim().length > 0)
+			{
+				createdTemplate['css'] = css;
+			}
 			$('#burnt-export').val(JSON.stringify(createdTemplate));
 			
 			document.querySelector('#burnt-export').select();
-			document.execCommand('copy');
+			navigator.clipboard.writeText(document.querySelector('#burnt-export').textContent);
 		}
 	});
 	
@@ -744,7 +735,7 @@ function round(value, precision) {
 function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 	template.value = newTemplate;
 	matchTemplate.value = newMatchTemplate;
-	if(newCss !== false)
+	if(newCss !== false && newCss.trim() !== '')
 	{
 		if(modernStyle)
 		{
@@ -795,7 +786,7 @@ function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 
 			if(style === false)
 			{
-				alert('Failed to update Custom CSS');
+				alert('Failed to import CSS: Not able to determine style for change.');
 				return false;
 			}
 
@@ -871,7 +862,7 @@ function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 
 			if(styleUrls.length < 1)
 			{
-				console.log('MyAnimeList-Tools error: No style IDs found while trying to import.');
+				alert('Failed to import CSS: Not able to determine style for change.');
 				return false;
 			}
 
@@ -922,6 +913,7 @@ function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 			request3.send(`cssText=${encodeURIComponent(finalCss)}&subForm=Update+CSS&csrf_token=${csrf}`);
 		}
 	}
+	alert('Import succeeded.');
 	return true;
 }
 
