@@ -8,7 +8,7 @@ A CSS Generator and Tag updater
 - Further changes 2021+       by Valerio Lyndon
 */
 
-ver = '7.0_prerelease';
+ver = '7.0';
 verMod = '2023/Mar/24';
 
 defaultSettings = {
