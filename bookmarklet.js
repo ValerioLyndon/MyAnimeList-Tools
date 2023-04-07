@@ -8,8 +8,8 @@ A CSS Generator and Tag updater
 - Further changes 2021+       by Valerio Lyndon
 */
 
-ver = '7.0';
-verMod = '2023/Mar/24';
+ver = '8.0_prerelease';
+verMod = '2023/Apr/07';
 
 defaultSettings = {
 	"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
@@ -31,6 +31,7 @@ defaultSettings = {
 		"authors": false,
 		"score": false,
 		"rank": false,
+		"popularity": false,
 		"studio": false,
 		"producers": false,
 		"licensors": false,
@@ -56,6 +57,7 @@ defaultSettings = {
 		"authors": false,
 		"score": false,
 		"rank": false,
+		"popularity": false,
 		"studio": false,
 		"producers": false,
 		"licensors": false,
@@ -348,7 +350,7 @@ delay.style.width = "50px";
 
 matchTemplate = field(settings['match_template'], "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
 
-template = field(settings['css_template'], "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEEN], [TITLEFR], [TITLEES], [TITLEDE], [TITLERAW], [GENRES], [THEMES], [DEMOGRAPHIC], [RANK], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
+template = field(settings['css_template'], "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEEN], [TITLEFR], [TITLEES], [TITLEDE], [TITLERAW], [GENRES], [THEMES], [DEMOGRAPHIC], [RANK], [POPULARITY], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
 template.parentNode.style.width = "100%";
 
 $(guiL).append($('<br />'));
@@ -379,6 +381,7 @@ chkThemes = chk(settings['checked_tags']['themes'], "Themes", 'burnt-chk burnt-t
 chkDemographic = chk(settings['checked_tags']['demographic'], "Demographic", 'burnt-chk burnt-tag');
 chkScore = chk(settings['checked_tags']['score'], "Score", 'burnt-chk burnt-tag');
 chkRank = chk(settings['checked_tags']['rank'], "Rank", 'burnt-chk burnt-tag');
+chkPopularity = chk(settings['checked_tags']['popularity'], "Popularity", 'burnt-chk burnt-tag');
 /*Anime Only */
 chkStudio = chk(settings['checked_tags']['studio'], "Studio", 'burnt-chk burnt-tag');
 chkProducers = chk(settings['checked_tags']['producers'], "Producers", 'burnt-chk burnt-tag');
@@ -416,6 +419,7 @@ chkThemesNotes = chk(settings['checked_notes']['themes'], "Themes", 'burnt-chk b
 chkDemographicNotes = chk(settings['checked_notes']['demographic'], "Demographic", 'burnt-chk burnt-notes');
 chkScoreNotes = chk(settings['checked_notes']['score'], "Score", 'burnt-chk burnt-notes');
 chkRankNotes = chk(settings['checked_notes']['rank'], "Rank", 'burnt-chk burnt-notes');
+chkPopularityNotes = chk(settings['checked_notes']['popularity'], "Popularity", 'burnt-chk burnt-notes');
 /*Anime Only */
 chkStudioNotes = chk(settings['checked_notes']['studio'], "Studio", 'burnt-chk burnt-notes');
 chkProducersNotes = chk(settings['checked_notes']['producers'], "Producers", 'burnt-chk burnt-notes');
@@ -1475,6 +1479,7 @@ function ProcessNext()
 				demographics.push(demographic);
 				removeTagIfExist(demographic);
 			}
+
 			/* rank */
 			rank = "?";
 			rankStartTxt = "Ranked:</span>";
@@ -1488,6 +1493,20 @@ function ProcessNext()
 			}
 			rankTag = `Ranked: ${rank}`;
 			removeTagIfExist('Ranked: ', mode = 2);
+			
+			/* popularity */
+			popularity = "?";
+			popularityStartTxt = "Popularity:</span>";
+			popularityStartIndex = str.indexOf(popularityStartTxt);
+			if(popularityStartIndex != -1)
+			{
+				popularityStartIndex += popularityStartTxt.length;
+				popularityEndIndex = str.indexOf("</div>", popularityStartIndex);
+				popularity = str.substring(popularityStartIndex, popularityEndIndex);
+				popularity = popularity.trim().replace("#", "");
+			}
+			popularityTag = `Popularity: ${popularity}`;
+			removeTagIfExist('Popularity: ', mode = 2);
 			
 			/* score */
 			score = "?";
@@ -1528,6 +1547,7 @@ function ProcessNext()
 				if(chkPublished.checked) { tags.push(publishedTag); }
 				if(chkScore.checked) { tags.push(scoreTag); }
 				if(chkRank.checked) { tags.push(rankTag); }
+				if(chkPopularity.checked) { tags.push(popularityTag); }
 				if(chkRating.checked) { tags.push(ratingTag); }
 				if(chkDuration.checked) { tags.push(durationTag); }
 				if(chkTotalDuration.checked) { tags.push(totalDurationTag); }
@@ -1572,6 +1592,7 @@ function ProcessNext()
 				if(chkPublishedNotes.checked) { notes.push(publishedTag); }
 				if(chkScoreNotes.checked) { notes.push(scoreTag); }
 				if(chkRankNotes.checked) { notes.push(rankTag); }
+				if(chkPopularityNotes.checked) { notes.push(popularityTag); }
 				if(chkRatingNotes.checked) { notes.push(ratingTag); }
 				if(chkDurationNotes.checked) { notes.push(durationTag); }
 				if(chkTotalDurationNotes.checked) { notes.push(totalDurationTag); }
@@ -1646,6 +1667,7 @@ function ProcessNext()
 				.replaceAll('[SEASON]', season)
 				.replaceAll('[YEAR]', year)
 				.replaceAll('[RANK]', rank)
+				.replaceAll(/\[POPULARITY\]|\[POP\]/g, popularity)
 				.replaceAll('[SCORE]', score)
 				.replaceAll('[STARTDATE]', startDate)
 				.replaceAll('[ENDDATE]', endDate)
@@ -1814,6 +1836,7 @@ function saveSettings()
 			"authors": chkAuthors.checked,
 			"score": chkScore.checked,
 			"rank": chkRank.checked,
+			"popularity": chkPopularity.checked,
 			"studio": chkStudio.checked,
 			"producers": chkProducers.checked,
 			"licensors": chkLicensors.checked,
@@ -1839,6 +1862,7 @@ function saveSettings()
 			"authors": chkAuthorsNotes.checked,
 			"score": chkScoreNotes.checked,
 			"rank": chkRankNotes.checked,
+			"popularity": chkPopularityNotes.checked,
 			"studio": chkStudioNotes.checked,
 			"producers": chkProducersNotes.checked,
 			"licensors": chkLicensorsNotes.checked,
