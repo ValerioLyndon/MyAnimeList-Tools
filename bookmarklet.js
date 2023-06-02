@@ -8,8 +8,8 @@ A CSS Generator and Tag updater
 - Further changes 2021+       by Valerio Lyndon
 */
 
-ver = '8.0';
-verMod = '2023/Apr/07';
+ver = '8.1';
+verMod = '2023/Jun/01';
 
 defaultSettings = {
 	"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
@@ -72,11 +72,28 @@ defaultSettings = {
 	"check_existing": false
 };
 
+/* handle settings from old versions */
 if(localStorage.getItem('burnt_settings') !== null)
+{
+	localStorage.setItem('burnt_anime_settings', localStorage.getItem('burnt_settings'));
+	localStorage.setItem('burnt_manga_settings', localStorage.getItem('burnt_settings'));
+	localStorage.removeItem('burnt_settings');
+}
+if(localStorage.getItem('burnt_last_run') !== null)
+{
+	localStorage.setItem('burnt_last_anime_run', localStorage.getItem('burnt_settings'));
+	localStorage.setItem('burnt_last_manga_run', localStorage.getItem('burnt_settings'));
+	localStorage.removeItem('burnt_last_run');
+}
+
+var listtype = location.pathname.startsWith('/animelist/') ? 'anime' : 'manga';
+var settings = defaultSettings;
+
+if(localStorage.getItem(`burnt_${listtype}_settings`) !== null)
 {
 	try
 	{
-		settings = JSON.parse(localStorage.getItem('burnt_settings'));
+		settings = JSON.parse(localStorage.getItem(`burnt_${listtype}_settings`));
 	
 		/* Check for missing settings and fill them in. This prevents errors while maintaining user settings, especially in the case of a user updating from an older version. */
 		for(key in defaultSettings)
@@ -99,10 +116,6 @@ if(localStorage.getItem('burnt_settings') !== null)
 		alert("Encountered an error while parsing your previous settings. Your settings have been reverted to defaults. To quickly recover your template settings, try selecting \"Last Run\" and then \"Autofill\". Other settings will need to be manually set. \n\nIf you've never run this tool before, you should never see this.");
 		settings = defaultSettings;
 	}
-}
-else
-{
-	settings = defaultSettings;
 }
 
 /* TOOL CODE */
@@ -600,11 +613,11 @@ $(guiL).append($(`<div style="font-size: 10px; font-style: italic; margin-bottom
 /* Settings section */
 
 clearBtn = $('<input type="button" value="Clear Settings" class="burnt-btn" title="Clears any stored settings from previous runs.">');
-if(localStorage.getItem('burnt_settings') !== null || localStorage.getItem('burnt_last_run') !== null)
+if(localStorage.getItem(`burnt_${listtype}_settings`) !== null || localStorage.getItem(`burnt_last_${listtype}_run`) !== null)
 {
 	clearBtn.click(function() {
-		localStorage.removeItem('burnt_settings');
-		localStorage.removeItem('burnt_last_run');
+		localStorage.removeItem(`burnt_${listtype}_settings`);
+		localStorage.removeItem(`burnt_last_${listtype}_run`);
 		alert('Please exit and restart the tool to complete the clearing of your settings.');
 	});
 }
@@ -624,10 +637,10 @@ $(textareaL).append($('<b style="font-weight: bold;">Input</b>'));
 
 lastRun = $('<input type="button" value="Last Run" class="burnt-btn burnt-textarea-btn" title="Fills the input field with the last known output of this tool.">');
 $(textareaL).append(lastRun);
-if(localStorage.getItem('burnt_last_run') !== null)
+if(localStorage.getItem(`burnt_last_${listtype}_run`) !== null)
 {
 	lastRun.click(function() {
-		existing.value = localStorage.getItem('burnt_last_run');
+		existing.value = localStorage.getItem(`burnt_last_${listtype}_run`);
 	});
 }
 else {
@@ -1705,7 +1718,7 @@ function DoneProcessing()
 {
 	if(result.value.length > 0)
 	{
-		localStorage.setItem('burnt_last_run', result.value);
+		localStorage.setItem(`burnt_last_${listtype}_run`, result.value);
 	}
 	thumbBtn.value = "Done";
 	thumbBtn.disabled = "disabled";
@@ -1876,7 +1889,7 @@ function saveSettings()
 		"clear_tags": chkClearTags.checked,
 		"check_existing": chkExisting.checked
 	};
-	localStorage.setItem('burnt_settings', JSON.stringify(settings));
+	localStorage.setItem(`burnt_${listtype}_settings`, JSON.stringify(settings));
 }
 
 void(0);
