@@ -1,4 +1,4 @@
-javascript: /*
+javascript: (()=>{/*
 MyAnimeList-Tools
 A CSS Generator and Tag updater
 
@@ -8,10 +8,10 @@ A CSS Generator and Tag updater
 - Further changes 2021+       by Valerio Lyndon
 */
 
-ver = '9.0_prerelease';
-verMod = '2023/Jun/02';
+const ver = '9.0_prerelease';
+const verMod = '2023/Jun/02';
 
-defaultSettings = {
+const defaultSettings = {
 	"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
 	"delay": "3000",
 	"match_template": "/[TYPE]/[ID]/",
@@ -73,6 +73,8 @@ defaultSettings = {
 };
 
 /* handle settings from old versions */
+var settings = defaultSettings;
+
 if(localStorage.getItem('burnt_settings') !== null)
 {
 	localStorage.setItem('burnt_anime_settings', localStorage.getItem('burnt_settings'));
@@ -85,9 +87,6 @@ if(localStorage.getItem('burnt_last_run') !== null)
 	localStorage.setItem('burnt_last_manga_run', localStorage.getItem('burnt_settings'));
 	localStorage.removeItem('burnt_last_run');
 }
-
-var listtype = location.pathname.startsWith('/animelist/') ? 'anime' : 'manga';
-var settings = defaultSettings;
 
 if(localStorage.getItem(`burnt_${listtype}_settings`) !== null)
 {
@@ -120,8 +119,8 @@ if(localStorage.getItem(`burnt_${listtype}_settings`) !== null)
 
 /* TOOL CODE */
 
-modernStyle = (document.getElementById("list_surround")) ? false : true;
-animeManga = window.location.href.replace("https://myanimelist.net/", "").split("/")[0].replace("list", "");
+var listIsModern = (document.getElementById("list_surround")) ? false : true;
+var listtype = window.location.pathname.split('/')[1].substring(0,5);
 
 /* Create GUI */
 
@@ -234,6 +233,17 @@ css(`
 	height: 0;
 	opacity: 0;
 }
+.burnt-field-wrapper {
+	display: inline-block;
+	margin-right: 10px;
+	margin-bottom: 5px;
+	font-weight: 700 !important;
+	text-align: left;
+}
+.burnt-field {
+	width: 100%;
+	font-weight: 400 !important;
+}
 .burnt-textarea {
 	width: 50%;
 }
@@ -289,18 +299,18 @@ $('body').append(gui);
 
 guiL = document.createElement('div');
 guiL.id = 'burnt-sidebar';
-gui.appendChild(guiL);
+gui.append(guiL);
 
 guiR = document.createElement('div');
 guiR.id = 'burnt-workspace';
-gui.appendChild(guiR);
+gui.append(guiR);
 
 guiB = document.createElement('div');
 guiB.id = 'burnt-logs';
-gui.appendChild(guiB);
+gui.append(guiB);
 
 thumbBtn = document.createElement("input");
-guiL.appendChild(thumbBtn);
+guiL.append(thumbBtn);
 thumbBtn.classList.add('burnt-btn');
 thumbBtn.type = "button";
 thumbBtn.value = "Loading...";
@@ -308,7 +318,7 @@ thumbBtn.disabled = 'disabled';
 thumbBtn.onclick = function() { Process(); };
 
 exitBtn = document.createElement("input");
-guiL.appendChild(exitBtn);
+guiL.append(exitBtn);
 exitBtn.classList.add('burnt-btn');
 exitBtn.type = "button";
 exitBtn.value = "Exit";
@@ -322,42 +332,38 @@ exitBtn.onclick = Exit;
 
 statusBar = document.createElement("div");
 statusBar.id = "burnt-status";
-guiL.appendChild(statusBar);
+guiL.append(statusBar);
 
 statusText = document.createElement('span');
 statusText.textContent = 'Setting up...';
 statusBar.style.cssText = '--percent: 20%; --colour: #60ce81;';
-statusBar.appendChild(statusText);
+statusBar.append(statusText);
 
 timeText = document.createElement('span');
 timeText.id = 'burnt-time';
-statusBar.appendChild(timeText);
+statusBar.append(timeText);
 
 function field(value, title, desc) {
 	lbl = document.createElement('label');
 	lbl.textContent = title;
-	lbl.style.display = 'inline-block';
-	lbl.style.marginRight = '10px';
-	lbl.style.marginBottom = '5px';
-	lbl.style.fontWeight = '700';
-	lbl.style.textAlign = 'left';
+	lbl.className = 'burnt-field-wrapper';
+
 	$(lbl).append($('<br />'));
 
 	input = document.createElement('input');
 	input.type = 'text';
-	input.style.width = '100%';
 	input.value = value;
 	input.title = desc;
-	input.style.fontWeight = '400';
+	input.className = 'burnt-field';
 	input.spellcheck = false;
 
-	lbl.appendChild(input);
-	guiL.appendChild(lbl);
+	lbl.append(input);
+	guiL.append(lbl);
 	return input;
 }
 
 function chk(checked, title, className = false, desc = false) {
-	var lbl = document.createElement('label');
+	let lbl = document.createElement('label');
 	lbl.textContent = title;
 	if(desc) {
 		lbl.title = desc;
@@ -366,12 +372,12 @@ function chk(checked, title, className = false, desc = false) {
 		lbl.className = className;
 	}
 
-	var chk = document.createElement("input");
+	let chk = document.createElement("input");
 	chk.type = "checkbox";
 	chk.checked = checked;
 
 	lbl.prepend(chk);
-	guiL.appendChild(lbl);
+	guiL.append(lbl);
 	return chk;
 }
 
@@ -388,9 +394,12 @@ template.parentNode.style.width = "100%";
 $(guiL).append($('<br />'));
 
 function toggleChks(check, selector) {
-	if(check.checked) {
+	if(check.checked)
+	{
 		$(selector).removeClass('burnt-tag-disabled');
-	} else {
+	}
+	else
+	{
 		$(selector).addClass('burnt-tag-disabled');
 	}
 }
@@ -520,7 +529,7 @@ chkAuthorsNotes = chk(settings['checked_notes']['authors'], "Authors", 'burnt-ch
 chkSerializationNotes = chk(settings['checked_notes']['serialization'], "Serialization", 'burnt-chk burnt-notes');
 
 /* HIDE IRRELEVANT */
-if(animeManga === 'anime')
+if(listtype === 'anime')
 {
 	chkPublished.parentNode.style.display = 'none';
 	chkAuthors.parentNode.style.display = 'none';
@@ -704,7 +713,7 @@ $(guiL).append(clearBtn);
 
 textareaL = document.createElement('div');
 textareaL.className = 'burnt-textarea';
-guiR.appendChild(textareaL);
+guiR.append(textareaL);
 
 $(textareaL).append($('<b style="font-weight: bold;">Input</b>'));
 
@@ -771,12 +780,12 @@ existing = document.createElement("textarea");
 existing.title = "Copy previously generated code here. The style for one anime ID must all be on the same line.";
 existing.placeholder = "Copy previously generated code here. The style for one anime ID must all be on the same line.";
 existing.spellcheck = false;
-textareaL.appendChild(existing);
+textareaL.append(existing);
 
 textareaR = document.createElement('div');
 textareaR.className = 'burnt-textarea';
 textareaR.style.paddingLeft = '10px';
-guiR.appendChild(textareaR);
+guiR.append(textareaR);
 
 $(textareaR).append($('<b style="font-weight: bold;">Output</b>'));
 
@@ -792,7 +801,7 @@ result.title = "Newly generated code will be output here.";
 result.placeholder = "Newly generated code will be output here.";
 result.readOnly = "readonly";
 result.spellcheck = false;
-textareaR.appendChild(result);
+textareaR.append(result);
 
 toggleChks(chkTags, '.burnt-tag');
 toggleChks(chkNotes, '.burnt-notes');
@@ -813,12 +822,12 @@ function css(css)
 	newCSS = document.createElement('style');
 	newCSS.className = 'burnt-css';
 	newCSS.textContent = css;
-	document.head.appendChild(newCSS);
+	document.head.append(newCSS);
 	return newCSS;
 }
 
 function round(value, precision) {
-    var multiplier = Math.pow(10, precision || 0);
+    let multiplier = Math.pow(10, precision || 0);
     return Math.round(value * multiplier) / multiplier;
 }
 
@@ -827,7 +836,7 @@ function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 	matchTemplate.value = newMatchTemplate;
 	if(newCss !== false && newCss.trim() !== '')
 	{
-		if(modernStyle)
+		if(listIsModern)
 		{
 			/* Determine theme currently being used */
 
@@ -883,7 +892,7 @@ function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 			/* Update MAL custom CSS */
 
 			styleUrl = `https://myanimelist.net/ownlist/style/theme/${style}`;
-			request = new XMLHttpRequest();
+			let request = new XMLHttpRequest();
 			request.open("get", styleUrl, false);
 			request.send(null);
 			str = request.responseText;
@@ -1069,23 +1078,23 @@ getListInfo();
 
 /* Primary Functions */
 
-newData = [];
+var newData = [];
 var timeout;
 
-i = 0;
+iteration = 0;
 timeThen = performance.now() - delay.value;
 function ProcessNext()
 {
-	if(i < newData.length)
+	if(iteration < newData.length)
 	{
-		thisData = newData[i];
-		id = thisData[`${animeManga}_id`];
+		thisData = newData[iteration];
+		id = thisData[`${listtype}_id`];
 
 		/* set estimated time */
 		timeSince = performance.now() - timeThen;
 		timeThen = performance.now();
 
-		idsRemaining = newData.length - 1 - i;
+		idsRemaining = newData.length - 1 - iteration;
 		seconds = idsRemaining * (timeSince / 1000);
 		if(seconds <= 60)
 		{
@@ -1106,7 +1115,7 @@ function ProcessNext()
 		
 		try
 		{
-			url = `https://myanimelist.net/${animeManga}/${id}`;
+			url = `https://myanimelist.net/${listtype}/${id}`;
 
 			request = new XMLHttpRequest();
 			request.open("get", url, false);
@@ -1168,7 +1177,7 @@ function ProcessNext()
 
 			/* titles */
 
-			title = thisData[`${animeManga}_title`];
+			title = thisData[`${listtype}_title`];
 
 			/* English title */
 			
@@ -1280,7 +1289,7 @@ function ProcessNext()
 			/* date */
 			season = null;
 			year = null;
-			dateStartTxt = ( animeManga == "anime" ) ? 'Aired:</span>' : 'Published:</span>';
+			dateStartTxt = ( listtype == "anime" ) ? 'Aired:</span>' : 'Published:</span>';
 			dateStartIndex = str.indexOf(dateStartTxt) + dateStartTxt.length;
 			if(str.indexOf(dateStartTxt) != -1)
 			{
@@ -1638,7 +1647,7 @@ function ProcessNext()
 				
 				newTagStr = tags.join(", ");
 				
-				if(animeManga === 'anime') {
+				if(listtype === 'anime') {
 					reqUrl = 'https://myanimelist.net/includes/ajax.inc.php?t=22&tags=';
 					amid = 'aid';
 				} else {
@@ -1690,7 +1699,7 @@ function ProcessNext()
 					"csrf_token": csrf
 				};
 
-				if(animeManga === 'anime') {
+				if(listtype === 'anime') {
 					notesRequestDict['anime_id'] = id;
 					notesRequestUrl = 'https://myanimelist.net/ownlist/anime/edit_convert.json';
 				} else {
@@ -1727,7 +1736,7 @@ function ProcessNext()
 			cssLine = template.value
 				.replaceAll('[DEL]', '')
 				.replaceAll('[ID]', id)
-				.replaceAll('[TYPE]', animeManga)
+				.replaceAll('[TYPE]', listtype)
 				.replaceAll('[IMGURL]', imgUrl)
 				.replaceAll('[IMGURLT]', imgUrlt)
 				.replaceAll('[IMGURLV]', imgUrlv)
@@ -1766,10 +1775,10 @@ function ProcessNext()
 			log.error(`${listtype} #${id}: ${e}`);
 		}
 		
-		i++;
+		iteration++;
 		
-		statusText.textContent = `Processed ${i} of ${newData.length}`;
-		percent = i / newData.length * 100;
+		statusText.textContent = `Processed ${iteration} of ${newData.length}`;
+		percent = iteration / newData.length * 100;
 		statusBar.style.cssText = `--percent: ${percent}%`;
 
 		timeText.textContent = `~ ${timeRemaining} left`;
@@ -1811,11 +1820,11 @@ function DoneProcessing()
 		}
 		else if(log.errorCount > 0 && log.warningCount < 1)
 		{
-			alert(`${log.errorCount} error(s) occurred while processing.\n\nOut of ${i} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
+			alert(`${log.errorCount} error(s) occurred while processing.\n\nOut of ${iteration} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
 		}
 		else if(log.errorCount > 0 && log.warningCount > 0)
 		{
-			alert(`${log.errorCount} error(s) and ${log.warningCount} warning(s) occurred while processing.\n\nOut of ${i} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
+			alert(`${log.errorCount} error(s) and ${log.warningCount} warning(s) occurred while processing.\n\nOut of ${iteration} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
 		}
 	};
 }
@@ -1845,13 +1854,13 @@ function Process()
 	for(k = 0; k < data.length; k++)
 	{
 		statusText.textContent = 'Checking your input for matches...';
-		id = data[k][`${animeManga}_id`];
+		id = data[k][`${listtype}_id`];
 		skip = false;
 		oldLines = existing.value.split("\n");
 		oldLinesCount = oldLines.length;
 		for(j = 0; j < oldLinesCount; j++)
 		{
-			match = matchTemplate.value.replace(/\[ID\]/g, id).replace(/\[TYPE\]/g, animeManga);
+			match = matchTemplate.value.replace(/\[ID\]/g, id).replace(/\[TYPE\]/g, listtype);
 			skip = oldLines[j].indexOf(match) !== -1 ? true : false;
 			if(skip)
 			{
@@ -1960,4 +1969,4 @@ function saveSettings()
 	localStorage.setItem(`burnt_${listtype}_settings`, JSON.stringify(settings));
 }
 
-void(0);
+})(); void(0);
