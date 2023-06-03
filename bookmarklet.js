@@ -8,8 +8,8 @@ A CSS Generator and Tag updater
 - Further changes 2021+       by Valerio Lyndon
 */
 
-ver = '8.1';
-verMod = '2023/Jun/01';
+ver = '9.0_prerelease';
+verMod = '2023/Jun/02';
 
 defaultSettings = {
 	"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
@@ -131,32 +131,39 @@ css(`
 	z-index: 99999;
 }
 #burnt-bg {
-	top: 0;
-	left: 0;
-	right: 0;
-	bottom: 0;
+	inset: 0;
 	background: rgba(0,0,0,0.5);
 }
 #burnt-gui {
-	left: 50px;
-	top: 50px;
-	bottom: 50px;
-	right: 50px;
-	display: flex;
-	flex-flow: row nowrap;
+	inset: 50px;
+	display: grid;
+	padding: 10px;
+	gap: 0 10px;
+	grid-template-areas: "sidebar workspace" "logs logs";
+	grid-template-columns: 250px 1fr;
+	grid-template-rows: 1fr auto;
 	background-color: #fff;
 	border-style: solid;
+	border-radius: 6px;
 	box-sizing: border-box;
 	color: #000;
 	font: 12px/1.5 sans-serif;
 	text-align: left;
 }
+#burnt-sidebar {
+	width: 250px;
+	overflow-x: hidden;
+	overflow-y: auto;
+	grid-area: sidebar;
+}
+#burnt-workspace {
+	display: flex;
+	padding: 10px;
+	grid-area: workspace;
+}
 .burnt-overlay {
 	position: fixed;
-	top: 0;
-	left: 0;
-	right: 0;
-	bottom: 0;
+	inset: 0;
 	z-index: 9999;
 	background: rgba(0,0,0,0.5);
 }
@@ -249,6 +256,26 @@ css(`
 	font-family: monospace;
 	word-break: break-all;
 }
+#burnt-logs {
+	box-sizing: initial;
+	grid-area: logs;
+	height: fit-content;
+}
+#burnt-logs:not(:empty) {
+	padding: 5px 10px;
+	max-height: min(15vh, 9em);
+	background: #111;
+	border-radius: 3px;
+	overflow-x: hidden;
+	overflow-y: scroll;
+	line-height: 1.5em;
+}
+#burnt-logs * {
+	color: #fff;
+}
+#burnt-logs b {
+	font-weight: 700;
+}
 `);
 
 gui = document.createElement("div");
@@ -261,24 +288,16 @@ $('body').append(bg);
 $('body').append(gui);
 
 guiL = document.createElement('div');
+guiL.id = 'burnt-sidebar';
 gui.appendChild(guiL);
-guiL.style.cssText = `
-	width: 250px;
-	padding: 10px 0 10px 10px;
-	overflow-x: hidden;
-	overflow-y: auto;
-	flex: 0 0 auto;
-`;
 
 guiR = document.createElement('div');
+guiR.id = 'burnt-workspace';
 gui.appendChild(guiR);
-guiR.style.cssText = `
-	display: flex;
-	width: 90%;
-	padding: 10px;
-	flex: 1 1 auto;
-	flex-flow: row nowrap;
-`;
+
+guiB = document.createElement('div');
+guiB.id = 'burnt-logs';
+gui.appendChild(guiB);
 
 thumbBtn = document.createElement("input");
 guiL.appendChild(thumbBtn);
@@ -375,6 +394,60 @@ function toggleChks(check, selector) {
 		$(selector).addClass('burnt-tag-disabled');
 	}
 }
+
+/* Error Reporting Functions */
+
+class Logger
+{
+	constructor()
+	{
+		this.parentNode = guiB;
+		this.errorCount = 0;
+		this.warningCount = 0;
+	}
+
+	createMsgBox(msg = '', type = 'ERROR')
+	{
+		let errorBox = document.createElement('div');
+		errorBox.className = 'burnt-log-line';
+		errorBox.insertAdjacentHTML('afterbegin', `<b>[${type}]</b> ${msg}`);
+		this.parentNode.append(errorBox);
+	}
+	
+	/* tellUser can be one of: true (show to user), false (only to console), or string (show custom string to user) */
+	error(msg = 'Something happened.', tellUser = true)
+	{
+		this.errorCount++;
+		console.log('[MAL-Tools][ERROR]', msg);
+		if(tellUser)
+		{
+			let userMsg = typeof tellUser == 'string' ? tellUser : msg;
+			this.createMsgBox(userMsg, 'Error');
+		}
+	}
+	
+	warn(msg = 'Something happened.', tellUser = true)
+	{
+		this.warningCount++;
+		console.log('[MAL-Tools][warn]', msg);
+		if(tellUser)
+		{
+			let userMsg = typeof tellUser == 'string' ? tellUser : msg;
+			this.createMsgBox(userMsg, 'Warning');
+		}
+	}
+
+	generic(msg = 'Something happened.', tellUser = false)
+	{
+		console.log('[MAL-Tools][info]', msg);
+		if(tellUser)
+		{
+			let userMsg = typeof tellUser == 'string' ? tellUser : msg;
+			this.createMsgBox(userMsg, 'Info');
+		}
+	}
+}
+var log = new Logger();
 
 /* TAGS */
 
@@ -999,8 +1072,6 @@ getListInfo();
 newData = [];
 var timeout;
 
-errorCount = 0;
-warningCount = 0;
 i = 0;
 timeThen = performance.now() - delay.value;
 function ProcessNext()
@@ -1649,9 +1720,7 @@ function ProcessNext()
 			catch(e)
 			{
 				imgUrl = imgUrlt = imgUrlv = imgUrll = 'none';
-
-				console.log(`warning on ${animeManga} #${id}: no image found`);
-				warningCount++;
+				log.warn(`${listtype} #${id}: no image found`);
 			}
 			
 			/* Generate CSS */
@@ -1694,8 +1763,7 @@ function ProcessNext()
 		}
 		catch(e)
 		{
-			console.log(`error on ${animeManga} #${id}: ${e}`);
-			errorCount++;
+			log.error(`${listtype} #${id}: ${e}`);
 		}
 		
 		i++;
@@ -1722,7 +1790,7 @@ function DoneProcessing()
 	}
 	thumbBtn.value = "Done";
 	thumbBtn.disabled = "disabled";
-	statusText.textContent = `Completed with ${errorCount} errors`;
+	statusText.textContent = `Completed with ${log.errorCount} errors`;
 	timeText.textContent = '';
 	exportBtn.removeAttr('disabled');
 	clearBtn.removeAttr('disabled');
@@ -1736,18 +1804,18 @@ function DoneProcessing()
 			alert("Refesh the page for tag and note updates to show.");
 		}
 		
-		errorPercent = errorCount / i * 100;
-		if(errorCount < 1 && warningCount > 0)
+		errorPercent = log.errorCount / i * 100;
+		if(log.errorCount < 1 && log.warningCount > 0)
 		{
-			alert(`${warningCount} warning(s) occurred while processing.  See your browser's console for details.\n\nIt is likely that all updates were successful. If you notice missing images, try running the tool again.`);
+			alert(`${log.warningCount} warning(s) occurred while processing.\n\nIt is likely that all updates were successful. However, if you notice missing images, try running the tool again.`);
 		}
-		else if(errorCount > 0 && warningCount < 1)
+		else if(log.errorCount > 0 && log.warningCount < 1)
 		{
-			alert(`${errorCount} error(s) occurred while processing. See your browser's console for details.\n\nOut of ${i} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
+			alert(`${log.errorCount} error(s) occurred while processing.\n\nOut of ${i} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
 		}
-		else if(errorCount > 0 && warningCount > 0)
+		else if(log.errorCount > 0 && log.warningCount > 0)
 		{
-			alert(`${errorCount} error(s) and ${warningCount} warning(s) occurred while processing.  See your browser's console for details.\n\nOut of ${i} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
+			alert(`${log.errorCount} error(s) and ${log.warningCount} warning(s) occurred while processing.\n\nOut of ${i} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
 		}
 	};
 }
