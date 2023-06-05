@@ -199,6 +199,7 @@ sandbox.append(css(`
 	--outline: #578dad;
 	--bg: #090909f7;
 	--bg2: #292929;
+	--group-bg: #32323244;
 	--txt: #eee;
 	--btn-bg: #222222f0;
 	--btn-brdr: #4e4e4e;
@@ -212,7 +213,8 @@ sandbox.append(css(`
 	color-scheme: light;
 	--outline: #78BBE2;
 	--bg: #ffffffc8;
-	--bg2: #e6e6e6;
+	--bg2: #c0c0c0;
+	--group-bg: #88888832;
 	--txt: #111;
 	--btn-bg: #d9d9d9f0;
 	--btn-brdr: #767676;
@@ -240,6 +242,10 @@ hr {
 	border: 0;
 	border-radius: 2px;
 	margin: 10px 0 15px;
+}
+
+.spacer {
+	height: 5px;
 }
 
 .paragraph {
@@ -273,8 +279,6 @@ input {
 	display: block;
 	margin-right: 10px;
 	margin-bottom: 5px;
-	font-weight: 700;
-	text-align: left;
 }
 .label--inline {
 	display: inline-block;
@@ -395,6 +399,16 @@ textarea {
 
 /* Options */
 
+.group {
+	padding: 10px;
+	background: var(--group-bg);
+	border-radius: 9px;
+}
+.group-title {
+	display: block;
+	margin: 10px 3px 3px;
+}
+
 #logs {
 	box-sizing: initial;
 	grid-area: logs;
@@ -498,11 +512,11 @@ function field(value, title, desc) {
 	input.spellcheck = false;
 
 	lbl.append(input);
-	sidebar.append(lbl);
+	$(cssGroup).append(lbl);
 	return input;
 }
 
-function chk(checked, title, parent = false, desc = false) {
+function chk(checked, title, parent = sidebar, desc = false) {
 	let lbl = document.createElement('label');
 	lbl.textContent = title;
 	if(desc) {
@@ -515,17 +529,15 @@ function chk(checked, title, parent = false, desc = false) {
 	chk.checked = checked;
 
 	lbl.prepend(chk);
-	if(parent)
-	{
-		gui.querySelector(parent).append(lbl);
-	}
-	else {
-		sidebar.append(lbl);
-	}
+	$(parent).append(lbl);
 	return chk;
 }
 
 /* Options section */
+
+$(sidebar).append($('<hr><b class="group-title">CSS Options</b>'));
+let cssGroup = $('<div class="group"></div>');
+$(sidebar).append(cssGroup);
 
 delay = field(settings['delay'], "Delay", "Delay (ms) between requests to avoid spamming the server.");
 delay.style.width = "50px";
@@ -535,8 +547,6 @@ matchTemplate = field(settings['match_template'], "Match Template", "Line matchi
 matchTemplate.parentNode.classList.add('label--inline');
 
 template = field(settings['css_template'], "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEEN], [TITLEFR], [TITLEES], [TITLEDE], [TITLERAW], [GENRES], [THEMES], [DEMOGRAPHIC], [RANK], [POPULARITY], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
-
-$(sidebar).append($('<br /><b>Options</b><br />'));
 
 function toggleChks(check, selector) {
 	if(check.checked)
@@ -549,114 +559,9 @@ function toggleChks(check, selector) {
 	}
 }
 
-/* CHECK BOXES - TAGS/NOTES */
+chkExisting = chk(settings['check_existing'], "Validate existing images", cssGroup, "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load. Not recommended while adding new anime or updating tags!");
 
-chkTags = chk(settings['update_tags'], "Update Tags");
-
-chkTags.addEventListener('input', () => { toggleChks(chkTags,'.js-tags'); });
-
-$(sidebar).append($('<div class="drawer js-tags"></div>'));
-
-chkEnglish = chk(settings['checked_tags']['english_title'], "English title", '.js-tags');
-chkFrench = chk(settings['checked_tags']['french_title'], "French title", '.js-tags');
-chkSpanish = chk(settings['checked_tags']['spanish_title'], "Spanish title", '.js-tags');
-chkGerman = chk(settings['checked_tags']['german_title'], "German title", '.js-tags');
-chkNative = chk(settings['checked_tags']['native_title'], "Native title", '.js-tags');
-chkSeason = chk(settings['checked_tags']['season'], "Season", '.js-tags');
-chkYear = chk(settings['checked_tags']['year'], "Year", '.js-tags');
-chkGenres = chk(settings['checked_tags']['genres'], "Genres", '.js-tags');
-chkThemes = chk(settings['checked_tags']['themes'], "Themes", '.js-tags');
-chkDemographic = chk(settings['checked_tags']['demographic'], "Demographic", '.js-tags');
-chkScore = chk(settings['checked_tags']['score'], "Score", '.js-tags');
-chkRank = chk(settings['checked_tags']['rank'], "Rank", '.js-tags');
-chkPopularity = chk(settings['checked_tags']['popularity'], "Popularity", '.js-tags');
-/*Anime Only */
-chkStudio = chk(settings['checked_tags']['studio'], "Studio", '.js-tags');
-chkProducers = chk(settings['checked_tags']['producers'], "Producers", '.js-tags');
-chkLicensors = chk(settings['checked_tags']['licensors'], "Licensors", '.js-tags');
-chkAired = chk(settings['checked_tags']['aired'], "Aired", '.js-tags');
-chkRating = chk(settings['checked_tags']['rating'], "Rating", '.js-tags');
-chkDuration = chk(settings['checked_tags']['duration'], "Duration (Episode)", '.js-tags');
-chkTotalDuration = chk(settings['checked_tags']['total_duration'], "Duration (Total)", '.js-tags');
-/*Manga only*/
-chkPublished = chk(settings['checked_tags']['published'], "Published", '.js-tags');
-chkAuthors = chk(settings['checked_tags']['authors'], "Authors", '.js-tags');
-chkSerialization = chk(settings['checked_tags']['serialization'], "Serialization", '.js-tags');
-
-chkNotes = chk(settings['update_notes'], "Update Notes", false, 'Update your comments/notes section with the new information.');
-
-chkNotes.addEventListener('input', () => {
-	if(chkNotes.checked) {
-		alert('Be warned! This setting will *entirely overwrite* your current notes. Do not use if you want to keep your notes.');
-	}
-	toggleChks(chkNotes,'.js-notes');
-});
-
-$(gui).find('.js-tags').append($('<br />'));
-chkClearTags = chk(settings['clear_tags'], "Overwrite current tags", '.js-tags', "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.");
-
-$(sidebar).append($('<div class="drawer js-notes"></div>'));
-
-chkSynopsisNotes = chk(settings['checked_notes']['synopsis'], "Synopsis", '.js-notes');
-chkEnglishNotes = chk(settings['checked_notes']['english_title'], "English title", '.js-notes');
-chkFrenchNotes = chk(settings['checked_notes']['french_title'], "French title", '.js-notes');
-chkSpanishNotes = chk(settings['checked_notes']['spanish_title'], "Spanish title", '.js-notes');
-chkGermanNotes = chk(settings['checked_notes']['german_title'], "German title", '.js-notes');
-chkNativeNotes = chk(settings['checked_notes']['native_title'], "Native title", '.js-notes');
-chkSeasonNotes = chk(settings['checked_notes']['season'], "Season", '.js-notes');
-chkYearNotes = chk(settings['checked_notes']['year'], "Year", '.js-notes');
-chkGenresNotes = chk(settings['checked_notes']['genres'], "Genres", '.js-notes');
-chkThemesNotes = chk(settings['checked_notes']['themes'], "Themes", '.js-notes');
-chkDemographicNotes = chk(settings['checked_notes']['demographic'], "Demographic", '.js-notes');
-chkScoreNotes = chk(settings['checked_notes']['score'], "Score", '.js-notes');
-chkRankNotes = chk(settings['checked_notes']['rank'], "Rank", '.js-notes');
-chkPopularityNotes = chk(settings['checked_notes']['popularity'], "Popularity", '.js-notes');
-/*Anime Only */
-chkStudioNotes = chk(settings['checked_notes']['studio'], "Studio", '.js-notes');
-chkProducersNotes = chk(settings['checked_notes']['producers'], "Producers", '.js-notes');
-chkLicensorsNotes = chk(settings['checked_notes']['licensors'], "Licensors", '.js-notes');
-chkAiredNotes = chk(settings['checked_notes']['aired'], "Aired", '.js-notes');
-chkRatingNotes = chk(settings['checked_notes']['rating'], "Rating", '.js-notes');
-chkDurationNotes = chk(settings['checked_notes']['duration'], "Duration (Episode)", '.js-notes');
-chkTotalDurationNotes = chk(settings['checked_notes']['total_duration'], "Duration (Total)", '.js-notes');
-/*Manga only*/
-chkPublishedNotes = chk(settings['checked_notes']['published'], "Published", '.js-notes');
-chkAuthorsNotes = chk(settings['checked_notes']['authors'], "Authors", '.js-notes');
-chkSerializationNotes = chk(settings['checked_notes']['serialization'], "Serialization", '.js-notes');
-
-/* HIDE IRRELEVANT */
-if(listtype === 'anime')
-{
-	chkPublished.parentNode.style.display = 'none';
-	chkAuthors.parentNode.style.display = 'none';
-	chkSerialization.parentNode.style.display = 'none';
-
-	chkPublishedNotes.parentNode.style.display = 'none';
-	chkAuthorsNotes.parentNode.style.display = 'none';
-	chkSerializationNotes.parentNode.style.display = 'none';
-}
-else
-{
-	chkStudio.parentNode.style.display = 'none';
-	chkProducers.parentNode.style.display = 'none';
-	chkLicensors.parentNode.style.display = 'none';
-	chkAired.parentNode.style.display = 'none';
-	chkRating.parentNode.style.display = 'none';
-	chkDuration.parentNode.style.display = 'none';
-	chkTotalDuration.parentNode.style.display = 'none';
-
-	chkStudioNotes.parentNode.style.display = 'none';
-	chkProducersNotes.parentNode.style.display = 'none';
-	chkLicensorsNotes.parentNode.style.display = 'none';
-	chkAiredNotes.parentNode.style.display = 'none';
-	chkRatingNotes.parentNode.style.display = 'none';
-	chkDurationNotes.parentNode.style.display = 'none';
-	chkTotalDurationNotes.parentNode.style.display = 'none';
-}
-
-chkExisting = chk(settings['check_existing'], "Validate existing images", false, "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load. Not recommended while adding new anime or updating tags!");
-
-$(sidebar).append($('<hr>'));
+$(cssGroup).append($('<div class="spacer"></div>'));
 
 /* Import/Export section */
 
@@ -720,7 +625,7 @@ importBtn.click(function() {
 		overlay.remove();
 	});
 });
-$(sidebar).append(importBtn);
+$(cssGroup).append(importBtn);
 
 exportBtn = $('<input type="button" value="Create Template" class="btn" title="Create a CSS template for others to use.">');
 exportBtn.click(function() {
@@ -729,7 +634,7 @@ exportBtn.click(function() {
 	exportOverlay = $(`
 		<div class="popup popup--small">
 			<p class="paragraph">
-				Use this to create a template. The template and match template are required, but you may leave the CSS Styling field blank if desired.
+				CSS designers can use this to create a template for others to quickly import. The template and match template are required, but you may leave the CSS Styling field blank if desired.
 			</p>
 			
 			<label class="label">
@@ -793,7 +698,123 @@ exportBtn.click(function() {
 		overlay.remove();
 	});
 });
-$(sidebar).append(exportBtn);
+$(cssGroup).append(exportBtn);
+
+/* CHECK BOXES - TAGS/NOTES */
+
+$(sidebar).append($('<b class="group-title">Tag Options</b>'));
+let tagGroup = $('<div class="group"></div>');
+$(sidebar).append(tagGroup);
+
+chkTags = chk(settings['update_tags'], "Update Tags", tagGroup, 'Update your tags with the new information.');
+
+chkTags.addEventListener('input', () => { toggleChks(chkTags,tagDrawer); });
+
+let tagDrawer = $('<div class="drawer"></div>');
+$(tagGroup).append(tagDrawer);
+
+chkEnglish = chk(settings['checked_tags']['english_title'], "English title", tagDrawer);
+chkFrench = chk(settings['checked_tags']['french_title'], "French title", tagDrawer);
+chkSpanish = chk(settings['checked_tags']['spanish_title'], "Spanish title", tagDrawer);
+chkGerman = chk(settings['checked_tags']['german_title'], "German title", tagDrawer);
+chkNative = chk(settings['checked_tags']['native_title'], "Native title", tagDrawer);
+chkSeason = chk(settings['checked_tags']['season'], "Season", tagDrawer);
+chkYear = chk(settings['checked_tags']['year'], "Year", tagDrawer);
+chkGenres = chk(settings['checked_tags']['genres'], "Genres", tagDrawer);
+chkThemes = chk(settings['checked_tags']['themes'], "Themes", tagDrawer);
+chkDemographic = chk(settings['checked_tags']['demographic'], "Demographic", tagDrawer);
+chkScore = chk(settings['checked_tags']['score'], "Score", tagDrawer);
+chkRank = chk(settings['checked_tags']['rank'], "Rank", tagDrawer);
+chkPopularity = chk(settings['checked_tags']['popularity'], "Popularity", tagDrawer);
+/*Anime Only */
+chkStudio = chk(settings['checked_tags']['studio'], "Studio", tagDrawer);
+chkProducers = chk(settings['checked_tags']['producers'], "Producers", tagDrawer);
+chkLicensors = chk(settings['checked_tags']['licensors'], "Licensors", tagDrawer);
+chkAired = chk(settings['checked_tags']['aired'], "Aired", tagDrawer);
+chkRating = chk(settings['checked_tags']['rating'], "Rating", tagDrawer);
+chkDuration = chk(settings['checked_tags']['duration'], "Duration (Episode)", tagDrawer);
+chkTotalDuration = chk(settings['checked_tags']['total_duration'], "Duration (Total)", tagDrawer);
+/*Manga only*/
+chkPublished = chk(settings['checked_tags']['published'], "Published", tagDrawer);
+chkAuthors = chk(settings['checked_tags']['authors'], "Authors", tagDrawer);
+chkSerialization = chk(settings['checked_tags']['serialization'], "Serialization", tagDrawer);
+
+
+$(sidebar).append($('<b class="group-title">Note Options</b>'));
+let noteGroup = $('<div class="group"></div>');
+$(sidebar).append(noteGroup);
+
+chkNotes = chk(settings['update_notes'], "Update Notes", noteGroup, 'Update your comments/notes section with the new information.');
+
+chkNotes.addEventListener('input', () => {
+	if(chkNotes.checked) {
+		alert('Be warned! This setting will *entirely overwrite* your current notes. Do not use if you want to keep your notes.');
+	}
+	toggleChks(chkNotes,notesDrawer);
+});
+
+$(gui).find(tagDrawer).append($('<br />'));
+chkClearTags = chk(settings['clear_tags'], "Overwrite current tags", tagDrawer, "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.");
+
+let notesDrawer = $('<div class="drawer"></div>');
+$(noteGroup).append(notesDrawer);
+
+chkSynopsisNotes = chk(settings['checked_notes']['synopsis'], "Synopsis", notesDrawer);
+chkEnglishNotes = chk(settings['checked_notes']['english_title'], "English title", notesDrawer);
+chkFrenchNotes = chk(settings['checked_notes']['french_title'], "French title", notesDrawer);
+chkSpanishNotes = chk(settings['checked_notes']['spanish_title'], "Spanish title", notesDrawer);
+chkGermanNotes = chk(settings['checked_notes']['german_title'], "German title", notesDrawer);
+chkNativeNotes = chk(settings['checked_notes']['native_title'], "Native title", notesDrawer);
+chkSeasonNotes = chk(settings['checked_notes']['season'], "Season", notesDrawer);
+chkYearNotes = chk(settings['checked_notes']['year'], "Year", notesDrawer);
+chkGenresNotes = chk(settings['checked_notes']['genres'], "Genres", notesDrawer);
+chkThemesNotes = chk(settings['checked_notes']['themes'], "Themes", notesDrawer);
+chkDemographicNotes = chk(settings['checked_notes']['demographic'], "Demographic", notesDrawer);
+chkScoreNotes = chk(settings['checked_notes']['score'], "Score", notesDrawer);
+chkRankNotes = chk(settings['checked_notes']['rank'], "Rank", notesDrawer);
+chkPopularityNotes = chk(settings['checked_notes']['popularity'], "Popularity", notesDrawer);
+/*Anime Only */
+chkStudioNotes = chk(settings['checked_notes']['studio'], "Studio", notesDrawer);
+chkProducersNotes = chk(settings['checked_notes']['producers'], "Producers", notesDrawer);
+chkLicensorsNotes = chk(settings['checked_notes']['licensors'], "Licensors", notesDrawer);
+chkAiredNotes = chk(settings['checked_notes']['aired'], "Aired", notesDrawer);
+chkRatingNotes = chk(settings['checked_notes']['rating'], "Rating", notesDrawer);
+chkDurationNotes = chk(settings['checked_notes']['duration'], "Duration (Episode)", notesDrawer);
+chkTotalDurationNotes = chk(settings['checked_notes']['total_duration'], "Duration (Total)", notesDrawer);
+/*Manga only*/
+chkPublishedNotes = chk(settings['checked_notes']['published'], "Published", notesDrawer);
+chkAuthorsNotes = chk(settings['checked_notes']['authors'], "Authors", notesDrawer);
+chkSerializationNotes = chk(settings['checked_notes']['serialization'], "Serialization", notesDrawer);
+
+/* HIDE IRRELEVANT */
+if(listtype === 'anime')
+{
+	chkPublished.parentNode.style.display = 'none';
+	chkAuthors.parentNode.style.display = 'none';
+	chkSerialization.parentNode.style.display = 'none';
+
+	chkPublishedNotes.parentNode.style.display = 'none';
+	chkAuthorsNotes.parentNode.style.display = 'none';
+	chkSerializationNotes.parentNode.style.display = 'none';
+}
+else
+{
+	chkStudio.parentNode.style.display = 'none';
+	chkProducers.parentNode.style.display = 'none';
+	chkLicensors.parentNode.style.display = 'none';
+	chkAired.parentNode.style.display = 'none';
+	chkRating.parentNode.style.display = 'none';
+	chkDuration.parentNode.style.display = 'none';
+	chkTotalDuration.parentNode.style.display = 'none';
+
+	chkStudioNotes.parentNode.style.display = 'none';
+	chkProducersNotes.parentNode.style.display = 'none';
+	chkLicensorsNotes.parentNode.style.display = 'none';
+	chkAiredNotes.parentNode.style.display = 'none';
+	chkRatingNotes.parentNode.style.display = 'none';
+	chkDurationNotes.parentNode.style.display = 'none';
+	chkTotalDurationNotes.parentNode.style.display = 'none';
+}
 
 $(sidebar).append($('<hr>'));
 
@@ -915,8 +936,8 @@ $(topL).append(autofill);
 
 existing = document.createElement("textarea");
 existing.className = 'in-out__text';
-existing.title = "Copy previously generated code here. The style for one anime ID must all be on the same line.";
-existing.placeholder = "Copy previously generated code here. The style for one anime ID must all be on the same line.";
+existing.title = "Copy previously generated CSS here. The program will use the Match Template to find and skip any duplicate entries.";
+existing.placeholder = "Copy previously generated CSS here. The program will use the Match Template to find and skip any duplicate entries.";
 existing.spellcheck = false;
 textareaL.append(existing);
 
@@ -938,14 +959,14 @@ copyOutput.click(function() {
 
 result = document.createElement("textarea");
 result.className = 'in-out__text';
-result.title = "Newly generated code will be output here.";
-result.placeholder = "Newly generated code will be output here.";
+result.title = "Newly generated CSS will be output here.";
+result.placeholder = "Newly generated CSS will be output here.";
 result.readOnly = "readonly";
 result.spellcheck = false;
 textareaR.append(result);
 
-toggleChks(chkTags, '.js-tags');
-toggleChks(chkNotes, '.js-notes');
+toggleChks(chkTags, tagDrawer);
+toggleChks(chkNotes, notesDrawer);
 
 
 
