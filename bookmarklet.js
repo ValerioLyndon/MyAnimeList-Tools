@@ -9,7 +9,7 @@ A CSS Generator and Tag updater
 */
 
 const ver = '9.0_prerelease';
-const verMod = '2023/Jun/04';
+const verMod = '2023/Jun/05';
 
 const defaultSettings = {
 	"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
@@ -192,6 +192,13 @@ sandbox.append(css(`
 }
 
 
+/* Scrollbars */
+
+* {
+	scrollbar-color: var(--scrollbar-thumb) var(--bg2);
+}
+
+
 /* Colour Scheme */
 
 .dark {
@@ -205,9 +212,10 @@ sandbox.append(css(`
 	--btn-brdr: #4e4e4e;
 	--fld-bg: #18181888;
 	--fld-brdr: #424242;
-	--stat-reg: #3166e0;
-	--stat-ok: #1b833a;
+	--stat-working: #3166e0;
+	--stat-loading: #1b833a;
 	--stat-bad: #f24242;
+	--scroll-thumb: #555;
 }
 .light {
 	color-scheme: light;
@@ -220,9 +228,10 @@ sandbox.append(css(`
 	--btn-brdr: #767676;
 	--fld-bg: #f6f6f688;
 	--fld-brdr: #999;
-	--stat-reg: #4277f2;
-	--stat-ok: #60ce81;
+	--stat-working: #4277f2;
+	--stat-loading: #60ce81;
 	--stat-bad: #f24242;
+	--scroll-thumb: #555;
 }
 
 
@@ -370,7 +379,7 @@ textarea {
 	border-radius: 6px;
 	margin: 5px 10px 10px 0;
 	--percent: 0%;
-	--colour: var(--stat-reg);
+	--colour: var(--stat-working);
 	background-image: linear-gradient(
 		to right,
 		var(--colour) var(--percent),
@@ -417,17 +426,12 @@ textarea {
 #logs:not(:empty) {
 	padding: 5px 10px;
 	max-height: min(15vh, 9em);
-	background: #111;
-	border-radius: 3px;
+	background: var(--bg2);
+	border-radius: 6px;
+	margin-top: 10px;
 	overflow-x: hidden;
-	overflow-y: scroll;
-	line-height: 1.5em;
-}
-#logs * {
-	color: #fff;
-}
-#logs b {
-	font-weight: 700;
+	overflow-y: auto;
+	font: 11px/1.5em monospace;
 }
 
 
@@ -492,7 +496,7 @@ sidebar.append(statusBar);
 
 statusText = document.createElement('span');
 statusText.textContent = 'Setting up...';
-statusBar.style.cssText = '--percent: 20%;';
+statusBar.style.cssText = '--percent: 20%; --colour: var(--stat-loading);';
 statusBar.append(statusText);
 
 timeText = document.createElement('span');
@@ -1205,13 +1209,13 @@ function getListInfo()
 			offset += 300;
 			statusText.textContent = `Fetching list data (${offset} of ?)...`;
 			statusPercent += 10;
-			statusBar.style.cssText = `--percent: ${statusPercent <= 85 ? statusPercent : '85'}%;`;
+			statusBar.style.cssText = `--percent: ${statusPercent <= 85 ? statusPercent : '85'}%; --colour: var(--stat-loading);`;
 			getListInfo();
 		}
 		else
 		{
 			statusText.textContent = `Successfully loaded ${data.length} items.`;
-			statusBar.style.cssText = '--percent: 100%; --colour: var(--stat-ok);';
+			statusBar.style.cssText = '--percent: 100%; --colour: var(--stat-loading);';
 			thumbBtn.value = 'Start';
 			thumbBtn.removeAttribute('disabled');
 		}
