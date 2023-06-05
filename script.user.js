@@ -7,17 +7,13 @@
 // @match        https://myanimelist.net/animelist/*
 // @match        https://myanimelist.net/mangalist/*
 // @grant        none
-// @run-at       document-start
+// @run-at       document-end
 // ==/UserScript==
 
 /*
 - Original code by BurntJello, with changes by Cateinya and Cry5talz.
 - Heavily modified by Valerio Lyndon
 */
-
-if(document.body.getAttribute('data-owner') == 0){
-	throw new Error('MAL Tools will only run on your own list.')
-}
 
 function main() {
 
@@ -106,7 +102,7 @@ if(localStorage.getItem(`burnt_${listtype}_settings`) !== null)
 	try
 	{
 		settings = JSON.parse(localStorage.getItem(`burnt_${listtype}_settings`));
-	
+
 		/* Check for missing settings and fill them in. This prevents errors while maintaining user settings, especially in the case of a user updating from an older version. */
 		for(key in defaultSettings)
 		{
@@ -230,7 +226,7 @@ css(`
 	opacity: 0.7;
 }
 .burnt-btn + .burnt-btn {
-	margin-left: 3px; 
+	margin-left: 3px;
 }
 .burnt-chk {
 	display: block;
@@ -299,7 +295,7 @@ css(`
 #burnt-logs b {
 	font-weight: 700;
 }
-`);
+`, 'burnt-main-css');
 
 gui = document.createElement("div");
 gui.id = "burnt-gui";
@@ -339,7 +335,7 @@ function Exit()
 {
 	$('#burnt-bg').remove();
 	$('#burnt-gui').remove();
-	$('.burnt-css').remove();
+	$('#burnt-main-css').remove();
 }
 exitBtn.onclick = Exit;
 
@@ -435,7 +431,7 @@ class Logger
 		errorBox.insertAdjacentHTML('afterbegin', `<b>[${type}]</b> ${msg}`);
 		this.parentNode.append(errorBox);
 	}
-	
+
 	/* tellUser can be one of: true (show to user), false (only to console), or string (show custom string to user) */
 	error(msg = 'Something happened.', tellUser = true)
 	{
@@ -447,7 +443,7 @@ class Logger
 			this.createMsgBox(userMsg, 'Error');
 		}
 	}
-	
+
 	warn(msg = 'Something happened.', tellUser = true)
 	{
 		this.warningCount++;
@@ -630,7 +626,7 @@ importBtn.click(function() {
 			}
 		}
 	});
-	
+
 	$('#burnt-close').click(function() {
 		importOverlay.remove();
 		overlay.remove();
@@ -646,13 +642,13 @@ exportBtn.click(function() {
 		Use this to create a template. The template and match template are required, but you may leave the CSS Styling field blank if desired.
 		<br />
 		<br />
-		
+
 		<b style="font-weight: bold">Template</b>
 		<input id="burnt-export-template" type="text" spellcheck="false"></input>
-		
+
 		<b style="font-weight: bold">Match Template</b>
 		<input id="burnt-export-match" type="text" spellcheck="false"></input>
-		
+
 		<b style="font-weight: bold">CSS Styling</b>
 		<textarea id="burnt-export-css" type="text" spellcheck="false" style="resize: vertical; height: 150px;"></textarea>
 		<br />
@@ -686,12 +682,12 @@ exportBtn.click(function() {
 				createdTemplate['css'] = css;
 			}
 			$('#burnt-export').val(JSON.stringify(createdTemplate));
-			
+
 			document.querySelector('#burnt-export').select();
 			navigator.clipboard.writeText(document.querySelector('#burnt-export').textContent);
 		}
 	});
-	
+
 	$('#burnt-close').click(function() {
 		exportOverlay.remove();
 		overlay.remove();
@@ -830,15 +826,6 @@ function decodeHtml(html)
 	return txt.value;
 }
 
-function css(css)
-{
-	newCSS = document.createElement('style');
-	newCSS.className = 'burnt-css';
-	newCSS.textContent = css;
-	document.head.append(newCSS);
-	return newCSS;
-}
-
 function round(value, precision) {
     let multiplier = Math.pow(10, precision || 0);
     return Math.round(value * multiplier) / multiplier;
@@ -934,16 +921,16 @@ function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 			}
 
 			/* Send new CSS to MAL */
-			
+
 			csrf = $('meta[name="csrf_token"]').attr('content');
 			boundary = '---------------------------35347544871910269115864526218';
 			bg_attach = $(doc).find('#style_edit_theme_background_image_attachment').find('[selected]').val() || '';
 			bg_vert = $(doc).find('#style_edit_theme_background_image_vertical_position').find('[selected]').val() || '';
 			bg_hori = $(doc).find('#style_edit_theme_background_image_horizontal_position').find('[selected]').val() || '';
 			bg_repeat = $(doc).find('#style_edit_theme_background_image_repeat').find('[selected]').val() || '';
-			
+
 			req2header = `--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[show_cover_image]"\n\n1\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[cover_image]"; filename=""\nContent-Type: application/octet-stream\n\n\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[show_background_image]"\n\n1\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[background_image]"; filename=""\nContent-Type: application/octet-stream\n\n\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[background_image_attachment]"\n\n${bg_attach}\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[background_image_vertical_position]"\n\n${bg_vert}\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[background_image_horizontal_position]"\n\n${bg_hori}\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[background_image_repeat]"\n\n${bg_repeat}\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[css]"\n\n${finalCss}\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[save]"\n\n\n--${boundary}\nContent-Disposition: form-data; name="csrf_token"\n\n${csrf}\n--${boundary}--`;
-			
+
 			request2 = new XMLHttpRequest();
 			request2.open("post", styleUrl, false);
 			request2.setRequestHeader("Content-Type", `multipart/form-data; boundary=${boundary}`);
@@ -952,7 +939,7 @@ function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 		else
 		{
 			oldCss = $('head style[type="text/css"]:first-of-type');
-			
+
 			/* Update MAL custom CSS */
 
 			styleListUrl = 'https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv';
@@ -963,7 +950,7 @@ function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 			doc = new DOMParser().parseFromString(request.responseText, "text/html");
 
 			styleUrls = [];
-			
+
 			/* should produce one-two elements something like this:
 			<a href="?go=stylepref&do=cssadv&id=473785">Style ID#473785</a> */
 			$(doc).find('#dialog a').each(function() {
@@ -1016,9 +1003,9 @@ function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 			}
 
 			/* Send new CSS to MAL */
-			
+
 			csrf = $('meta[name="csrf_token"]').attr('content');
-			
+
 			request3 = new XMLHttpRequest();
 			request3.open("post", styleUrl, false);
 			request3.setRequestHeader("Content-Type", 'application/x-www-form-urlencoded');
@@ -1125,7 +1112,7 @@ function continueProcessing()
 		{
 			timeRemaining = '?';
 		}
-		
+
 		try
 		{
 			url = `https://myanimelist.net/${listtype}/${id}`;
@@ -1135,7 +1122,7 @@ function continueProcessing()
 			request.send(null);
 			str = request.responseText;
 			doc = new DOMParser().parseFromString(request.responseText, "text/html");
-		
+
 			/* get current tags */
 			if(!chkTags.checked || chkClearTags.checked) {
 				tags = [];
@@ -1143,7 +1130,7 @@ function continueProcessing()
 			else if(chkTags.checked)
 			{
 				tags = thisData['tags'].split(',');
-				
+
 				/* remove extra whitespace */
 				for(j = 0; j < tags.length; j++)
 				{
@@ -1152,13 +1139,13 @@ function continueProcessing()
 			}
 
 			/* common functions */
-			
+
 			function removeTagIfExist(match, mode = 0)
 			/* takes input tag and checks if it is already in the tag list.
 			If it is, it removes it. This is so that the new tags added later are not duplicates.
 			It is done this way instead of simply removing the new tag so that the new tags can
 			maintain their order in relation to each other.
-			
+
 			Modes:
 			0 = old tag is exact match,
 			1 = old tag contains match
@@ -1193,7 +1180,7 @@ function continueProcessing()
 			title = thisData[`${listtype}_title`];
 
 			/* English title */
-			
+
 			titleEn = null;
 			if('anime_title_eng' in thisData)
 			{
@@ -1216,7 +1203,7 @@ function continueProcessing()
 				titleFrEndIndex = str.indexOf('</div>', titleFrStartIndex);
 				titleFr = str.substring(titleFrStartIndex, titleFrEndIndex);
 				titleFr = decodeHtml(titleFr);
-				
+
 				titleFr = titleFr.trim().replace(',', '');
 				removeTagIfExist(titleFr);
 			}
@@ -1232,7 +1219,7 @@ function continueProcessing()
 				titleDeEndIndex = str.indexOf('</div>', titleDeStartIndex);
 				titleDe = str.substring(titleDeStartIndex, titleDeEndIndex);
 				titleDe = decodeHtml(titleDe);
-				
+
 				titleDe = titleDe.trim().replace(',', '');
 				removeTagIfExist(titleDe);
 			}
@@ -1248,11 +1235,11 @@ function continueProcessing()
 				titleEsEndIndex = str.indexOf('</div>', titleEsStartIndex);
 				titleEs = str.substring(titleEsStartIndex, titleEsEndIndex);
 				titleEs = decodeHtml(titleEs);
-				
+
 				titleEs = titleEs.trim().replace(',', '');
 				removeTagIfExist(titleEs);
 			}
-			
+
 			/* Native/raw title - may need some correction for titles that aren't originally japanese. */
 
 			titleNative = null;
@@ -1264,13 +1251,13 @@ function continueProcessing()
 				titleNativeEndIndex = str.indexOf("</div>", titleNativeStartIndex);
 				titleNative = str.substring(titleNativeStartIndex, titleNativeEndIndex);
 				titleNative = decodeHtml(titleNative);
-				
+
 				titleNative = titleNative.trim().replace(',', '');
 				removeTagIfExist(titleNative);
 			}
-			
+
 			/* Title synonyms */
-			
+
 			titleSynStartTxt = 'Synonyms:</span>';
 			titleSynStartIndex = str.indexOf(titleSynStartTxt);
 			if(str.indexOf(titleSynStartTxt) != -1)
@@ -1285,7 +1272,7 @@ function continueProcessing()
 					titleSyn = titleSynArr[0].trim();
 				}
 			}
-			
+
 			/* Title fallbacks for when no alternatives found */
 			for (t in [titleEn, titleFr, titleEs, titleDe])
 			{
@@ -1298,7 +1285,7 @@ function continueProcessing()
 					t = title;
 				}
 			}
-			
+
 			/* date */
 			season = null;
 			year = null;
@@ -1344,7 +1331,7 @@ function continueProcessing()
 				publishedTag = "Published: " + dateArr[0].trim().replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].trim().replace(',', '') : "");
 				removeTagIfExist('Published: ', mode = 2);
 			}
-			
+
 			/* studio (anime) */
 			studios = null;
 			studiosStartTxt = "Studios:</span>";
@@ -1354,7 +1341,7 @@ function continueProcessing()
 				studiosStartIndex += studiosStartTxt.length;
 				studiosEndIndex = str.indexOf("</div>", studiosStartIndex);
 				studiosHtml = str.substring(studiosStartIndex, studiosEndIndex);
-				
+
 				studios = studiosHtml.split(",");
 				studiosLength = studios.length;
 				for(j = 0; j < studiosLength; j++)
@@ -1367,7 +1354,7 @@ function continueProcessing()
 					removeTagIfExist(studios[j]);
 				}
 			}
-			
+
 			/* authors (manga) */
 			authors = null;
 			authorsStartTxt = "Authors:</span>";
@@ -1400,7 +1387,7 @@ function continueProcessing()
 				producersStartIndex += producersStartTxt.length;
 				producersEndIndex = str.indexOf("</div>", producersStartIndex);
 				producersHtml = str.substring(producersStartIndex, producersEndIndex);
-	
+
 				producers = producersHtml.split(",");
 				producersLength = producers.length;
 				for(j = 0; j < producersLength; j++)
@@ -1432,7 +1419,7 @@ function continueProcessing()
 				licensorsStartIndex += licensorsStartTxt.length;
 				licensorsEndIndex = str.indexOf("</div>", licensorsStartIndex);
 				licensorsHtml = str.substring(licensorsStartIndex, licensorsEndIndex);
-	
+
 				licensors = licensorsHtml.split(",");
 				licensorsLength = licensors.length;
 				for(j = 0; j < licensorsLength; j++)
@@ -1464,7 +1451,7 @@ function continueProcessing()
 				serializationStartIndex += serializationStartTxt.length;
 				serializationEndIndex = str.indexOf("</div>", serializationStartIndex);
 				serializationHtml = str.substring(serializationStartIndex, serializationEndIndex);
-	
+
 				serializations = serializationHtml.split(",");
 				serializationLength = serializations.length;
 				for(j = 0; j < serializationLength; j++)
@@ -1599,7 +1586,7 @@ function continueProcessing()
 			}
 			rankTag = `Ranked: ${rank}`;
 			removeTagIfExist('Ranked: ', mode = 2);
-			
+
 			/* popularity */
 			popularity = "?";
 			popularityStartTxt = "Popularity:</span>";
@@ -1613,7 +1600,7 @@ function continueProcessing()
 			}
 			popularityTag = `Popularity: ${popularity}`;
 			removeTagIfExist('Popularity: ', mode = 2);
-			
+
 			/* score */
 			score = "?";
 			scoreEle = $(doc).find("[itemprop=\"ratingValue\"]");
@@ -1627,7 +1614,7 @@ function continueProcessing()
 			/* Synopsis (description) */
 			synopsis = $(doc).find("[itemprop=\"description\"]").text().trim();
 			synopsisCss = synopsis.replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").trim();
-			
+
 			/* Update Notes & Tags */
 
 			let csrf = $('meta[name="csrf_token"]').attr('content');
@@ -1657,9 +1644,9 @@ function continueProcessing()
 				if(chkRating.checked) { tags.push(ratingTag); }
 				if(chkDuration.checked) { tags.push(durationTag); }
 				if(chkTotalDuration.checked) { tags.push(totalDurationTag); }
-				
+
 				newTagStr = tags.join(", ");
-				
+
 				if(listtype === 'anime') {
 					reqUrl = 'https://myanimelist.net/includes/ajax.inc.php?t=22&tags=';
 					amid = 'aid';
@@ -1728,13 +1715,13 @@ function continueProcessing()
 				notesRequest.setRequestHeader("X-Requested-With", "XMLHttpRequest");
 				notesRequest.send(notesRequestContent);
 			}
-			
+
 			/* thumbs */
 			try
 			{
 				img = $(doc).find('img[itemprop="image"]')[0];
 				imgUrl = img.getAttribute("data-src") || img.src;
-				
+
 				imgUrlt = imgUrl.replace(".jpg", "t.jpg");
 				imgUrlv = imgUrl.replace(".jpg", "v.jpg");
 				imgUrll = imgUrl.replace(".jpg", "l.jpg");
@@ -1744,7 +1731,7 @@ function continueProcessing()
 				imgUrl = imgUrlt = imgUrlv = imgUrll = 'none';
 				log.warn(`${listtype} #${id}: no image found`);
 			}
-			
+
 			/* Generate CSS */
 			cssLine = template.value
 				.replaceAll('[DEL]', '')
@@ -1779,7 +1766,7 @@ function continueProcessing()
 				.replaceAll('[DURATIONEP]', duration)
 				.replaceAll('[DURATIONTOTAL]', totalDuration)
 				.replaceAll('[DESC]', synopsisCss);
-			
+
 			result.value += cssLine + "\n";
 			result.scrollTop = result.scrollHeight;
 		}
@@ -1787,15 +1774,15 @@ function continueProcessing()
 		{
 			log.error(`${listtype} #${id}: ${e}`);
 		}
-		
+
 		iteration++;
-		
+
 		statusText.textContent = `Processed ${iteration} of ${newData.length}`;
 		percent = iteration / newData.length * 100;
 		statusBar.style.cssText = `--percent: ${percent}%`;
 
 		timeText.textContent = `~ ${timeRemaining} left`;
-		
+
 		timeout = setTimeout(continueProcessing, delay.value);
 	}
 	else
@@ -1825,7 +1812,7 @@ function finishProcessing()
 		{
 			alert("Refesh the page for tag and note updates to show.");
 		}
-		
+
 		errorPercent = log.errorCount / i * 100;
 		if(log.errorCount < 1 && log.warningCount > 0)
 		{
@@ -1861,7 +1848,7 @@ function beginProcessing()
 		clearTimeout(timeout);
 		finishProcessing();
 	};
-	
+
 	result.value += `\/*\nGenerated by MyAnimeList-Tools v${ver}\nhttps://github.com/ValerioLyndon/MyAnimeList-Tools\n\nTemplate=${template.value.replace(/\*\//g, "*[DEL]/")}\nMatchTemplate=${matchTemplate.value}\n*\/\n\n`;
 
 	for(k = 0; k < data.length; k++)
@@ -1983,3 +1970,51 @@ function saveSettings()
 }
 
 }
+
+/* Utility Functions */
+
+function css( css, id = false ){
+	newCSS = document.createElement('style');
+	newCSS.className = 'burnt-css';
+	if( id ){
+		newCSS.id = id;
+	}
+	newCSS.textContent = css;
+	document.head.append(newCSS);
+	return newCSS;
+}
+
+/* Userscript-only Codes */
+
+if( document.body.getAttribute('data-owner') == 1 ){
+	generateUI();
+}
+
+function generateUI( ){
+	let button = $('<a href="javascript:void(0);">Tools</a>')
+		.click(()=>{
+			main();
+		});
+
+	let listIsModern = (document.getElementById("list_surround")) ? false : true;
+	let buttonParent;
+	if( listIsModern ){
+		buttonParent = $('.list-menu-float');
+		button.addClass('icon-menu');
+		button.html(`
+			<svg class="icon burnt-trigger-icon" xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 512 512"><!--! Font Awesome Free 6.4.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2023 Fonticons, Inc. --><path d="M78.6 5C69.1-2.4 55.6-1.5 47 7L7 47c-8.5 8.5-9.4 22-2.1 31.6l80 104c4.5 5.9 11.6 9.4 19 9.4h54.1l109 109c-14.7 29-10 65.4 14.3 89.6l112 112c12.5 12.5 32.8 12.5 45.3 0l64-64c12.5-12.5 12.5-32.8 0-45.3l-112-112c-24.2-24.2-60.6-29-89.6-14.3l-109-109V104c0-7.5-3.5-14.5-9.4-19L78.6 5zM19.9 396.1C7.2 408.8 0 426.1 0 444.1C0 481.6 30.4 512 67.9 512c18 0 35.3-7.2 48-19.9L233.7 374.3c-7.8-20.9-9-43.6-3.6-65.1l-61.7-61.7L19.9 396.1zM512 144c0-10.5-1.1-20.7-3.2-30.5c-2.4-11.2-16.1-14.1-24.2-6l-63.9 63.9c-3 3-7.1 4.7-11.3 4.7H352c-8.8 0-16-7.2-16-16V102.6c0-4.2 1.7-8.3 4.7-11.3l63.9-63.9c8.1-8.1 5.2-21.8-6-24.2C388.7 1.1 378.5 0 368 0C288.5 0 224 64.5 224 144l0 .8 85.3 85.3c36-9.1 75.8 .5 104 28.7L429 274.5c49-23 83-72.8 83-130.5zM56 432a24 24 0 1 1 48 0 24 24 0 1 1 -48 0z"/></svg>
+			<span class="text">Tools</span>
+		`);
+	}
+	else {
+		buttonParent = $('#mal_cs_otherlinks div:last-of-type');
+	}
+	buttonParent.append(button);
+}
+
+css(`
+.burnt-trigger-icon {
+	top: 15px;
+	left: 15px;
+}
+`);

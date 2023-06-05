@@ -1969,4 +1969,9 @@ function saveSettings()
 	localStorage.setItem(`burnt_${listtype}_settings`, JSON.stringify(settings));
 }
 
-};main();void(0);
+};
+
+/* Bookmarklet-only Codes */
+
+main();
+void(0);
