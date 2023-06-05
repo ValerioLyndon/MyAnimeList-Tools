@@ -1,12 +1,25 @@
-javascript: (()=>{/*
-MyAnimeList-Tools
-A CSS Generator and Tag updater
+// ==UserScript==
+// @name         List Tools
+// @namespace    V.L
+// @version      9.0pre
+// @description  Provides tools for managing your list's tags, CSS, and more.
+// @author       Valerio Lyndon
+// @match        https://myanimelist.net/animelist/*
+// @match        https://myanimelist.net/mangalist/*
+// @grant        none
+// @run-at       document-start
+// ==/UserScript==
 
-- Original code   2018/Aug/10 by BurntJello http://burntjello.webs.com
-- Extra features  2019        by Cateinya
-- Fixes           2020/Oct    by Cry5talz 
-- Further changes 2021+       by Valerio Lyndon
+/*
+- Original code by BurntJello, with changes by Cateinya and Cry5talz.
+- Heavily modified by Valerio Lyndon
 */
+
+if(document.body.getAttribute('data-owner') == 0){
+	throw new Error('MAL Tools will only run on your own list.')
+}
+
+function main() {
 
 const ver = '9.0_prerelease';
 const verMod = '2023/Jun/02';
@@ -1969,4 +1982,4 @@ function saveSettings()
 	localStorage.setItem(`burnt_${listtype}_settings`, JSON.stringify(settings));
 }
 
-})(); void(0);
+}

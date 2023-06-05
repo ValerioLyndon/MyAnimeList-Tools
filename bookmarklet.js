@@ -1,4 +1,4 @@
-javascript: (()=>{/*
+javascript:function main(){/*
 MyAnimeList-Tools
 A CSS Generator and Tag updater
 
@@ -1969,4 +1969,4 @@ function saveSettings()
 	localStorage.setItem(`burnt_${listtype}_settings`, JSON.stringify(settings));
 }
 
-})(); void(0);
+};main();void(0);
