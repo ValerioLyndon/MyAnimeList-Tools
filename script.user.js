@@ -328,7 +328,7 @@ thumbBtn.classList.add('burnt-btn');
 thumbBtn.type = "button";
 thumbBtn.value = "Loading...";
 thumbBtn.disabled = 'disabled';
-thumbBtn.onclick = function() { beginProcessing); };
+thumbBtn.onclick = function() { beginProcessing(); };
 
 exitBtn = document.createElement("input");
 guiL.append(exitBtn);
@@ -1842,7 +1842,7 @@ function finishProcessing()
 	};
 }
 
-function beginProcessing)
+function beginProcessing()
 {
 	saveSettings();
 
