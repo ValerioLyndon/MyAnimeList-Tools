@@ -192,65 +192,51 @@ sandbox.append(css(`
 }
 
 
-/* Basic Layout */
+/* Colour Scheme */
 
-.dim-background {
-	inset: 0;
-	background-color: rgba(0,0,0,0.5);
-	backdrop-filter: blur(1.5px);
+.dark {
+	color-scheme: dark;
+	--outline: #578dad;
+	--bg: #090909f7;
+	--bg2: #292929;
+	--txt: #eee;
+	--btn-bg: #222222f0;
+	--btn-brdr: #4e4e4e;
+	--fld-bg: #18181888;
+	--fld-brdr: #424242;
+	--stat-reg: #3166e0;
+	--stat-ok: #1b833a;
+	--stat-bad: #f24242;
 }
-.dim-background,
-.popup {
-	position: fixed;
-	z-index: 99999;
-}
-.popup {
-	inset: 50px;
-	padding: 10px;
-	background-color: #fff;
-	border-radius: 12px;
-	box-shadow: 0 3px 12px rgba(0,0,0,0.7);
-	color: #111;
-	font: 12px/1.5 sans-serif;
-	text-align: left;
-}
-.popup--small {
-	inset: 50%;
-	width: max-content;
-	min-width: 300px;
-	max-width: 50%;
-	height: fit-content;
-	min-height: 100px;
-	max-height: calc(100% - 100px);
-	overflow: auto;
-	transform: translate(-50%,-50%);
-}
-
-
-.main {
-	display: grid;
-	gap: 0 10px;
-	grid-template-areas: "sidebar workspace" "logs logs";
-	grid-template-columns: 250px 1fr;
-	grid-template-rows: 1fr auto;
-}
-.main__sidebar {
-	width: 250px;
-	overflow-x: hidden;
-	overflow-y: auto;
-	grid-area: sidebar;
-}
-.main__workspace {
-	display: flex;
-	grid-area: workspace;
+.light {
+	color-scheme: light;
+	--outline: #78BBE2;
+	--bg: #ffffffc8;
+	--bg2: #e6e6e6;
+	--txt: #111;
+	--btn-bg: #d9d9d9f0;
+	--btn-brdr: #767676;
+	--fld-bg: #f6f6f688;
+	--fld-brdr: #999;
+	--stat-reg: #4277f2;
+	--stat-ok: #60ce81;
+	--stat-bad: #f24242;
 }
 
 
 /* Common Elements */
 
+.popup *:not([type="checkbox"]):focus {
+	outline: 2px solid var(--outline);
+	outline-offset: -2px;
+}
+.popup [type="checkbox"]:focus-visible {
+	outline: 2px solid var(--outline);
+}
+
 hr {
 	height: 4px;
-	background: #e6e6e6;
+	background: var(--bg2);
 	border: 0;
 	border-radius: 2px;
 	margin: 10px 0 15px;
@@ -266,8 +252,9 @@ input {
 
 .btn {
 	padding: 2px 4px;
-	background: #d9d9d9;
-	border: 1px solid #767676;
+	background: var(--btn-bg);
+	border: 1px solid var(--btn-brdr);
+	color: var(--txt);
 	cursor: pointer;
 }
 .btn:disabled {
@@ -296,23 +283,78 @@ input {
 	display: block;
 	width: 100%;
 	padding: 3px;
-	background: #f6f6f6;
-	border: 1px solid #999;
+	background: var(--fld-bg);
+	border: 1px solid var(--fld-brdr);
+	color: var(--txt);
 	font-weight: 400;
 	font-family: monospace;
 }
-
 textarea {
 	display: block;
 	width: 100%;
 	padding: 6px;
-	background: #f6f6f6;
-	border: 1px solid #888;
+	background: var(--fld-bg);
+	border: 1px solid var(--fld-brdr);
 	border-radius: 9px;
 	margin: 0;
 	resize: none;
+	color: var(--txt);
 	font-family: monospace;
 	word-break: break-all;
+}
+
+
+/* Basic Layout */
+
+.dim-background {
+	inset: 0;
+	background-color: rgba(0,0,0,0.5);
+	backdrop-filter: blur(1.5px);
+}
+.dim-background,
+.popup {
+	position: fixed;
+	z-index: 99999;
+}
+.popup {
+	inset: 50px;
+	padding: 10px;
+	background-color: var(--bg);
+	border-radius: 12px;
+	box-shadow: 0 3px 12px rgba(0,0,0,0.7);
+	color: var(--txt);
+	font: 12px/1.5 sans-serif;
+	text-align: left;
+	backdrop-filter: blur(5px);
+}
+.popup--small {
+	inset: 50%;
+	width: max-content;
+	min-width: 300px;
+	max-width: 50%;
+	height: fit-content;
+	min-height: 100px;
+	max-height: calc(100% - 100px);
+	overflow: auto;
+	transform: translate(-50%,-50%);
+}
+
+.main {
+	display: grid;
+	gap: 0 10px;
+	grid-template-areas: "sidebar workspace" "logs logs";
+	grid-template-columns: 250px 1fr;
+	grid-template-rows: 1fr auto;
+}
+.main__sidebar {
+	width: 250px;
+	overflow-x: hidden;
+	overflow-y: auto;
+	grid-area: sidebar;
+}
+.main__workspace {
+	display: flex;
+	grid-area: workspace;
 }
 
 
@@ -320,11 +362,11 @@ textarea {
 
 .status {
 	padding: 2px 6px;
-	background: #e6e6e6;
+	background: var(--bg2);
 	border-radius: 6px;
 	margin: 5px 10px 10px 0;
 	--percent: 0%;
-	--colour: #4277f2;
+	--colour: var(--stat-reg);
 	background-image: linear-gradient(
 		to right,
 		var(--colour) var(--percent),
@@ -373,6 +415,7 @@ textarea {
 #logs b {
 	font-weight: 700;
 }
+
 
 /* Input/Output */
 
@@ -435,7 +478,7 @@ sidebar.append(statusBar);
 
 statusText = document.createElement('span');
 statusText.textContent = 'Setting up...';
-statusBar.style.cssText = '--percent: 20%; --colour: #60ce81;';
+statusBar.style.cssText = '--percent: 20%;';
 statusBar.append(statusText);
 
 timeText = document.createElement('span');
@@ -754,9 +797,31 @@ $(sidebar).append(exportBtn);
 
 $(sidebar).append($('<hr>'));
 
-/* "Copyright" section */
+/* Dark/light mode switch */
 
-$(sidebar).append($(`<div style="font-size: 10px; font-style: italic; margin-bottom: 5px;">MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</div>`));
+let chosenTheme = localStorage.getItem('burnt-theme');
+if(chosenTheme)
+{
+	gui.classList.remove('light', 'dark');
+	gui.classList.add(chosenTheme);
+}
+else if(window.matchMedia('(prefers-color-scheme: light)').matches)
+{
+	gui.classList.add('light');
+}
+else
+{
+	gui.classList.add('dark');
+}
+
+let switchTheme = $('<input class="btn" type="button" value="Switch Theme">')
+.click(()=>{
+	let theme = gui.classList.contains('dark') ? 'light' : 'dark';
+	gui.classList.remove('light', 'dark');
+	gui.classList.add(theme);
+	localStorage.setItem('burnt-theme', theme);
+});
+$(sidebar).append(switchTheme);
 
 /* Settings section */
 
@@ -774,6 +839,10 @@ else
 	clearBtn.attr('disabled', 'disabled');
 }
 $(sidebar).append(clearBtn);
+
+/* "Copyright" section */
+
+$(sidebar).append($(`<br /><div style="font-size: 10px; font-style: italic; margin-bottom: 5px;">MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</div>`));
 
 /* Textareas */
 
@@ -1115,13 +1184,13 @@ function getListInfo()
 			offset += 300;
 			statusText.textContent = `Fetching list data (${offset} of ?)...`;
 			statusPercent += 10;
-			statusBar.style.cssText = `--percent: ${statusPercent <= 85 ? statusPercent : '85'}%; --colour: #60ce81;`;
+			statusBar.style.cssText = `--percent: ${statusPercent <= 85 ? statusPercent : '85'}%;`;
 			getListInfo();
 		}
 		else
 		{
 			statusText.textContent = `Successfully loaded ${data.length} items.`;
-			statusBar.style.cssText = '--percent: 100%; --colour: #60ce81;';
+			statusBar.style.cssText = '--percent: 100%; --colour: var(--stat-ok);';
 			thumbBtn.value = 'Start';
 			thumbBtn.removeAttribute('disabled');
 		}
@@ -1136,7 +1205,7 @@ function getListInfo()
 		{
 			thumbBtn.value = 'Failed';
 			statusText.textContent = `Failed to fetch list info.`;
-			statusBar.style.cssText = '--percent: 100%; --colour: #f24242;';
+			statusBar.style.cssText = '--percent: 100%; --colour: var(--stat-bad);';
 			return;
 		}
 
