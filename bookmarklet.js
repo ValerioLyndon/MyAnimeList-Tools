@@ -502,17 +502,13 @@ thumbBtn.classList.add('btn');
 thumbBtn.type = "button";
 thumbBtn.value = "Loading...";
 thumbBtn.disabled = 'disabled';
-thumbBtn.onclick = function() { beginProcessing(); };
+thumbBtn.onclick = ()=>{ beginProcessing(); };
 
 let exitBtn = document.createElement("input");
 sidebar.append(exitBtn);
 exitBtn.classList.add('btn');
 exitBtn.type = "button";
 exitBtn.value = "Exit";
-function Exit()
-{
-	container.remove();
-}
 exitBtn.onclick = Exit;
 
 statusBar = document.createElement("div");
@@ -618,7 +614,7 @@ $(cssGroup).append($('<div class="spacer"></div>'));
 /* Import/Export section */
 
 importBtn = $('<input type="button" value="Import Template" class="btn" title="Import a CSS template to get started quickly.">');
-importBtn.click(function() {
+importBtn.click(()=>{
 	$(gui).append(overlay);
 
 	importOverlay = $(`
@@ -640,7 +636,7 @@ importBtn.click(function() {
 
 	$(gui).append(importOverlay);
 
-	$(importOverlay).find('#import-btn').click(function() {
+	$(importOverlay).find('#import-btn').click(()=>{
 		value = $('#import-field').val();
 
 		if(value.length < 1)
@@ -672,7 +668,7 @@ importBtn.click(function() {
 		}
 	});
 	
-	$(importOverlay).find('#close').click(function() {
+	$(importOverlay).find('#close').click(()=>{
 		importOverlay.remove();
 		overlay.remove();
 	});
@@ -680,7 +676,7 @@ importBtn.click(function() {
 $(cssGroup).append(importBtn);
 
 exportBtn = $('<input type="button" value="Create Template" class="btn" title="Create a CSS template for others to use.">');
-exportBtn.click(function() {
+exportBtn.click(()=>{
 	$(gui).append(overlay);
 
 	exportOverlay = $(`
@@ -719,7 +715,7 @@ exportBtn.click(function() {
 	$(exportOverlay).find('#export-template').val(template.value);
 	$(exportOverlay).find('#export-match').val(matchTemplate.value);
 
-	$(exportOverlay).find('#export-btn').click(function() {
+	$(exportOverlay).find('#export-btn').click(()=>{
 		newTemplate = $('#export-template').val();
 		newMatchTemplate = $('#export-match').val();
 
@@ -745,7 +741,7 @@ exportBtn.click(function() {
 		}
 	});
 	
-	$(exportOverlay).find('#close').click(function() {
+	$(exportOverlay).find('#close').click(()=>{
 		exportOverlay.remove();
 		overlay.remove();
 	});
@@ -901,7 +897,7 @@ $(sidebar).append(switchTheme);
 clearBtn = $('<input type="button" value="Clear Settings" class="btn" title="Clears any stored settings from previous runs.">');
 if(localStorage.getItem(`burnt_${listtype}_settings`) !== null || localStorage.getItem(`burnt_last_${listtype}_run`) !== null)
 {
-	clearBtn.click(function() {
+	clearBtn.click(()=>{
 		localStorage.removeItem(`burnt_${listtype}_settings`);
 		localStorage.removeItem(`burnt_last_${listtype}_run`);
 		alert('Please exit and restart the tool to complete the clearing of your settings.');
@@ -930,7 +926,7 @@ $(topL).append($('<b>Input</b>'));
 lastRun = $('<input type="button" value="Last Run" class="btn btn-right" title="Fills the input field with the last known output of this tool.">');
 if(localStorage.getItem(`burnt_last_${listtype}_run`) !== null)
 {
-	lastRun.click(function() {
+	lastRun.click(()=>{
 		existing.value = localStorage.getItem(`burnt_last_${listtype}_run`);
 	});
 }
@@ -940,7 +936,7 @@ else {
 $(topL).append(lastRun);
 
 autofill = $('<input type="button" value="Autofill" class="btn btn-right" title="Autofill the template fields based on any previously generated code found in the input.">')
-.click(function() {
+.click(()=>{
 	code = existing.value;
 
 	if(code.length < 1)
@@ -1003,7 +999,7 @@ $(topR).append($('<b>Output</b>'));
 
 copyOutput = $('<input type="button" value="Copy to Clipboard" class="btn btn-right" title="Copies output to clipboard.">');
 $(topR).append(copyOutput);
-copyOutput.click(function() {
+copyOutput.click(()=>{
 	result.select();
 	document.execCommand('copy');
 });
@@ -1166,7 +1162,7 @@ function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 			
 			/* should produce one-two elements something like this:
 			<a href="?go=stylepref&do=cssadv&id=473785">Style ID#473785</a> */
-			$(doc).find('#dialog a').each(function() {
+			$(doc).find('#dialog a').each(()=>{
 				id = this.href.split('&id=')[1];
 				url = `https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv&id=${id}`;
 				styleUrls.push(url);
@@ -1267,7 +1263,7 @@ function getListInfo()
 			thumbBtn.value = 'Start';
 			thumbBtn.removeAttribute('disabled');
 		}
-	}).fail(function()
+	}).fail(()=>
 	{
 		failures++;
 		faildelay += 3000;
@@ -2017,7 +2013,7 @@ function finishProcessing()
 	clearBtn.removeAttr('disabled');
 	exitBtn.disabled = false;
 	exitBtn.value = "Exit";
-	exitBtn.onclick = function()
+	exitBtn.onclick = ()=>
 	{
 		Exit();
 		if(chkTags.checked || chkNotes.checked)
@@ -2053,7 +2049,7 @@ function beginProcessing()
 	autofill.attr('disabled', 'disabled');
 	lastRun.attr('disabled', 'disabled');
 	thumbBtn.value = "Stop";
-	thumbBtn.onclick = function() {
+	thumbBtn.onclick = ()=>{
 		thumbBtn.value = 'Stopping...';
 		thumbBtn.disabled = 'disabled';
 		newData = [];
@@ -2210,6 +2206,11 @@ function saveSettings()
 		"check_existing": chkExisting.checked
 	};
 	localStorage.setItem(`burnt_${listtype}_settings`, JSON.stringify(settings));
+}
+
+function Exit()
+{
+	container.remove();
 }
 
 })(); void(0);
