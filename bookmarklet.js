@@ -195,7 +195,7 @@ sandbox.append(css(`
 /* Scrollbars */
 
 * {
-	scrollbar-color: var(--scrollbar-thumb) var(--bg2);
+	scrollbar-color: var(--scroll-thumb) var(--bg2);
 }
 
 
