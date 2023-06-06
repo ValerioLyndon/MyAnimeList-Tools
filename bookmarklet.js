@@ -435,14 +435,28 @@ textarea {
 }
 
 
+/* Misc */
+
+footer {
+	margin: 5px 0;
+	font-size: 10px;
+	font-style: italic;
+}
+
+
 /* Input/Output */
 
 .in-out {
-	width: 50%;
+	width: calc(50% - 5px);
 }
+.in-out + .in-out {
+	margin-left: auto;
+}
+
 .in-out__top {
 	height: 26px;
 }
+
 .in-out__text {
 	height: calc(100% - 24px);
 }
@@ -867,7 +881,7 @@ $(sidebar).append(clearBtn);
 
 /* "Copyright" section */
 
-$(sidebar).append($(`<br /><div style="font-size: 10px; font-style: italic; margin-bottom: 5px;">MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</div>`));
+$(sidebar).append($(`<footer>MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</footer>`));
 
 /* Textareas */
 
@@ -947,7 +961,6 @@ textareaL.append(existing);
 
 textareaR = document.createElement('div');
 textareaR.className = 'in-out';
-textareaR.style.paddingLeft = '10px';
 workspace.append(textareaR);
 
 topR = $('<div class="in-out__top"></div>');
@@ -1243,11 +1256,11 @@ getListInfo();
 
 /* Primary Functions */
 
+var iteration = 0;
 var newData = [];
+var percent = iteration / newData.length * 100 || 0;
 var timeout;
-
-iteration = 0;
-timeThen = performance.now() - delay.value;
+var timeThen = performance.now() - delay.value;
 function continueProcessing()
 {
 	if(iteration < newData.length)
@@ -1943,7 +1956,6 @@ function continueProcessing()
 		iteration++;
 		
 		statusText.textContent = `Processed ${iteration} of ${newData.length}`;
-		percent = iteration / newData.length * 100;
 		statusBar.style.cssText = `--percent: ${percent}%`;
 
 		timeText.textContent = `~ ${timeRemaining} left`;
