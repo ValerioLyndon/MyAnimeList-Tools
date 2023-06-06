@@ -1,6 +1,5 @@
 javascript: (()=>{/*
 MyAnimeList-Tools
-A CSS Generator and Tag updater
 
 - Original code   2018/Aug/10 by BurntJello http://burntjello.webs.com
 - Extra features  2019        by Cateinya
@@ -8,7 +7,7 @@ A CSS Generator and Tag updater
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '9.0_prerelease';
+const ver = '9.0';
 const verMod = '2023/Jun/05';
 
 var listIsModern = (document.getElementById("list_surround")) ? false : true;

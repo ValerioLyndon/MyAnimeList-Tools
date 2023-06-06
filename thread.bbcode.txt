@@ -1,7 +1,7 @@
 [color=transparent][size=0][Tool] Anime information CSS generator/tag updater — Javascript Bookmarklet[/size][/color][quote]This topic is part of our [b]CSS Tutorials and Add-ons[/b] section: https://myanimelist.net/forum/?topicid=1499059[/quote]
 
-[quote][size=120][b]Latest update is v8.1[/b]
-[b][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v8.1/bookmarklet.js][View Code][/url][/b] — [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases/tag/v8.1]Changelog[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases]Past updates[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases]Planned updates[/url][/size][/quote]
+[quote][size=120][b]Latest update is v9.0[/b]
+[b][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v9.0/bookmarklet.js][View Code][/url][/b] — [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases/tag/v9.0]Changelog[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases]Past updates[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases]Planned updates[/url][/size][/quote]
 
 [quote][img align=right]https://i.imgur.com/X0t9a0X.png[/img][size=150][b]What can it do?[/b][/size]
 
@@ -27,7 +27,7 @@ This allows you to do many things, such as:
 
 This tool comes in the form of a bookmarklet. This is a bookmark that executes code when clicked as opposed to loading a new page.
 [list=1][*]To create the bookmarklet, first open this page containing the code:
-[b][size=120][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v8.1/bookmarklet.js][CODE][/url][/size][/b]
+[b][size=120][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v9.0/bookmarklet.js][CODE][/url][/size][/b]
 Copy everything on that page, and paste it into the URL/location field of a new bookmark. I recommend saving the bookmark to your bookmark toolbar for easy access. See this GIF for an example:
 [spoiler="Image"][img]https://i.imgur.com/MaemlX2.gif[/img][/spoiler]
 [*]To activate the tool, go to your list. Then, click on the bookmark. You should see a popup that looks similar to this:
