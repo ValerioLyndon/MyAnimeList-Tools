@@ -106,18 +106,21 @@ if(localStorage.getItem(`burnt_${listtype}_settings`) !== null)
 		settings = JSON.parse(localStorage.getItem(`burnt_${listtype}_settings`));
 	
 		/* Check for missing settings and fill them in. This prevents errors while maintaining user settings, especially in the case of a user updating from an older version. */
-		for(key in defaultSettings)
+		for(let [key, value] of Object.entries(defaultSettings))
 		{
-			if (!(key in settings))
+			if(!(key in settings))
 			{
 				settings[key] = defaultSettings[key];
 			}
-		}
-		for(key in defaultSettings['checked_tags'])
-		{
-			if (!(key in settings['checked_tags']))
+			if(value instanceof Object)
 			{
-				settings['checked_tags'][key] = defaultSettings['checked_tags'][key];
+				for(let subkey in defaultSettings[key])
+				{
+					if (!(subkey in settings[key]))
+					{
+						settings[key][subkey] = defaultSettings[key][subkey];
+					}
+				}
 			}
 		}
 	}
