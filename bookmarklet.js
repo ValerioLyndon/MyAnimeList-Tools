@@ -11,7 +11,18 @@ A CSS Generator and Tag updater
 const ver = '9.0_prerelease';
 const verMod = '2023/Jun/05';
 
+var listIsModern = (document.getElementById("list_surround")) ? false : true;
+var listtype = window.location.pathname.split('/')[1].substring(0,5);
+
 const defaultSettings = {
+	"select_categories": false,
+	"checked_categories": {
+		"1": false,
+		"2": false,
+		"3": false,
+		"4": false,
+		"6": false
+	},
 	"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
 	"delay": "3000",
 	"match_template": "/[TYPE]/[ID]/",
@@ -40,8 +51,9 @@ const defaultSettings = {
 		"published": false,
 		"rating": false,
 		"duration": false,
-		"totalduration": false
+		"total_duration": false
 	},
+	"update_notes": false,
 	"checked_notes": {
 		"synopsis": false,
 		"english_title": false,
@@ -66,7 +78,6 @@ const defaultSettings = {
 		"published": false,
 		"rating": false,
 		"duration": false,
-		"totalduration": false
 	},
 	"clear_tags": false,
 	"check_existing": false
