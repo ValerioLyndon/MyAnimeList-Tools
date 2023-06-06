@@ -1,6 +1,5 @@
 javascript: (()=>{/*
 MyAnimeList-Tools
-A CSS Generator and Tag updater
 
 - Original code   2018/Aug/10 by BurntJello http://burntjello.webs.com
 - Extra features  2019        by Cateinya
@@ -8,15 +7,25 @@ A CSS Generator and Tag updater
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '9.0_prerelease';
-const verMod = '2023/Jun/02';
+const ver = '9.0';
+const verMod = '2023/Jun/05';
+
+var listIsModern = (document.getElementById("list_surround")) ? false : true;
+var listtype = window.location.pathname.split('/')[1].substring(0,5);
 
 const defaultSettings = {
+	"select_categories": false,
+	"checked_categories": {
+		"1": false,
+		"2": false,
+		"3": false,
+		"4": false,
+		"6": false
+	},
 	"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
 	"delay": "3000",
 	"match_template": "/[TYPE]/[ID]/",
 	"update_tags": false,
-	"update_notes": false,
 	"checked_tags": {
 		"english_title": false,
 		"french_title": false,
@@ -40,8 +49,9 @@ const defaultSettings = {
 		"published": false,
 		"rating": false,
 		"duration": false,
-		"totalduration": false
+		"total_duration": false
 	},
+	"update_notes": false,
 	"checked_notes": {
 		"synopsis": false,
 		"english_title": false,
@@ -66,7 +76,7 @@ const defaultSettings = {
 		"published": false,
 		"rating": false,
 		"duration": false,
-		"totalduration": false
+		"total_duration": false
 	},
 	"clear_tags": false,
 	"check_existing": false
@@ -95,18 +105,21 @@ if(localStorage.getItem(`burnt_${listtype}_settings`) !== null)
 		settings = JSON.parse(localStorage.getItem(`burnt_${listtype}_settings`));
 	
 		/* Check for missing settings and fill them in. This prevents errors while maintaining user settings, especially in the case of a user updating from an older version. */
-		for(key in defaultSettings)
+		for(let [key, value] of Object.entries(defaultSettings))
 		{
-			if (!(key in settings))
+			if(!(key in settings))
 			{
 				settings[key] = defaultSettings[key];
 			}
-		}
-		for(key in defaultSettings['checked_tags'])
-		{
-			if (!(key in settings['checked_tags']))
+			if(value instanceof Object)
 			{
-				settings['checked_tags'][key] = defaultSettings['checked_tags'][key];
+				for(let subkey in defaultSettings[key])
+				{
+					if (!(subkey in settings[key]))
+					{
+						settings[key][subkey] = defaultSettings[key][subkey];
+					}
+				}
 			}
 		}
 	}
@@ -117,300 +130,13 @@ if(localStorage.getItem(`burnt_${listtype}_settings`) !== null)
 	}
 }
 
-/* TOOL CODE */
-
-var listIsModern = (document.getElementById("list_surround")) ? false : true;
-var listtype = window.location.pathname.split('/')[1].substring(0,5);
-
-/* Create GUI */
-
-css(`
-#burnt-bg, #burnt-gui {
-	position: fixed;
-	z-index: 99999;
-}
-#burnt-bg {
-	inset: 0;
-	background: rgba(0,0,0,0.5);
-}
-#burnt-gui {
-	inset: 50px;
-	display: grid;
-	padding: 10px;
-	gap: 0 10px;
-	grid-template-areas: "sidebar workspace" "logs logs";
-	grid-template-columns: 250px 1fr;
-	grid-template-rows: 1fr auto;
-	background-color: #fff;
-	border-style: solid;
-	border-radius: 6px;
-	box-sizing: border-box;
-	color: #000;
-	font: 12px/1.5 sans-serif;
-	text-align: left;
-}
-#burnt-sidebar {
-	width: 250px;
-	overflow-x: hidden;
-	overflow-y: auto;
-	grid-area: sidebar;
-}
-#burnt-workspace {
-	display: flex;
-	padding: 10px;
-	grid-area: workspace;
-}
-.burnt-overlay {
-	position: fixed;
-	inset: 0;
-	z-index: 9999;
-	background: rgba(0,0,0,0.5);
-}
-.burnt-popup {
-	position: fixed;
-	left: 50%;
-	top: 50%;
-	z-index: 9999;
-	min-width: 300px;
-	max-width: calc(100% - 100px);
-	min-height: 100px;
-	max-height: calc(100% - 100px);
-	padding: 10px;
-	background: #fff;
-	overflow: auto;
-	transform: translate(-50%,-50%);
-}
-.burnt-popup input:not([type="button"]),
-.burnt-popup textarea {
-	display: block;
-	width: 100%;
-	max-width: 600px;
-	margin-bottom: 6px;
-}
-#burnt-status {
-	background: #e6e6e6;
-	padding: 2px 6px;
-	margin: 5px 0 10px;
-	--percent: 0%;
-	--colour: #4277f2;
-	background-image: linear-gradient(
-			to right,
-			var(--colour) var(--percent),
-			transparent var(--percent)
-		);
-}
-#burnt-time {
-	float: right;
-}
-#burnt-gui * {
-	box-sizing: inherit;
-	color: #000;
-	font: inherit;
-}
-#burnt-gui hr {
-	height: 4px;
-	background: #e6e6e6;
-	border: 0;
-	margin: 10px 0 15px;
-}
-#burnt-gui *:disabled {
-	opacity: 0.7;
-}
-.burnt-btn + .burnt-btn {
-	margin-left: 3px; 
-}
-.burnt-chk {
-	display: block;
-}
-.burnt-tag,
-.burnt-notes {
-	margin-left: 10px;
-}
-.burnt-tag-disabled,
-.burnt-notes-disabled {
-	opacity: 0.5;
-	pointer-events: none;
-	height: 0;
-	opacity: 0;
-}
-.burnt-field-wrapper {
-	display: inline-block;
-	margin-right: 10px;
-	margin-bottom: 5px;
-	font-weight: 700 !important;
-	text-align: left;
-}
-.burnt-field {
-	width: 100%;
-	font-weight: 400 !important;
-}
-.burnt-textarea {
-	width: 50%;
-}
-.burnt-textarea b {
-	display: inline-block;
-	height: 24px;
-}
-.burnt-textarea-btn {
-	height: 20px;
-	padding: 0 2px;
-	margin-left: 3px;
-	float: right;
-}
-#burnt-gui textarea {
-	display: block;
-	width: 100%;
-	height: calc(100% - 24px);
-	margin: 0;
-	resize: none;
-	font-family: monospace;
-	word-break: break-all;
-}
-#burnt-logs {
-	box-sizing: initial;
-	grid-area: logs;
-	height: fit-content;
-}
-#burnt-logs:not(:empty) {
-	padding: 5px 10px;
-	max-height: min(15vh, 9em);
-	background: #111;
-	border-radius: 3px;
-	overflow-x: hidden;
-	overflow-y: scroll;
-	line-height: 1.5em;
-}
-#burnt-logs * {
-	color: #fff;
-}
-#burnt-logs b {
-	font-weight: 700;
-}
-`);
-
-gui = document.createElement("div");
-gui.id = "burnt-gui";
-
-bg = $('<div id="burnt-bg""></div>');
-overlay = $('<div class="burnt-overlay"></div>');
-
-$('body').append(bg);
-$('body').append(gui);
-
-guiL = document.createElement('div');
-guiL.id = 'burnt-sidebar';
-gui.append(guiL);
-
-guiR = document.createElement('div');
-guiR.id = 'burnt-workspace';
-gui.append(guiR);
-
-guiB = document.createElement('div');
-guiB.id = 'burnt-logs';
-gui.append(guiB);
-
-thumbBtn = document.createElement("input");
-guiL.append(thumbBtn);
-thumbBtn.classList.add('burnt-btn');
-thumbBtn.type = "button";
-thumbBtn.value = "Loading...";
-thumbBtn.disabled = 'disabled';
-thumbBtn.onclick = function() { beginProcessing(); };
-
-exitBtn = document.createElement("input");
-guiL.append(exitBtn);
-exitBtn.classList.add('burnt-btn');
-exitBtn.type = "button";
-exitBtn.value = "Exit";
-function Exit()
-{
-	$('#burnt-bg').remove();
-	$('#burnt-gui').remove();
-	$('.burnt-css').remove();
-}
-exitBtn.onclick = Exit;
-
-statusBar = document.createElement("div");
-statusBar.id = "burnt-status";
-guiL.append(statusBar);
-
-statusText = document.createElement('span');
-statusText.textContent = 'Setting up...';
-statusBar.style.cssText = '--percent: 20%; --colour: #60ce81;';
-statusBar.append(statusText);
-
-timeText = document.createElement('span');
-timeText.id = 'burnt-time';
-statusBar.append(timeText);
-
-function field(value, title, desc) {
-	lbl = document.createElement('label');
-	lbl.textContent = title;
-	lbl.className = 'burnt-field-wrapper';
-
-	$(lbl).append($('<br />'));
-
-	input = document.createElement('input');
-	input.type = 'text';
-	input.value = value;
-	input.title = desc;
-	input.className = 'burnt-field';
-	input.spellcheck = false;
-
-	lbl.append(input);
-	guiL.append(lbl);
-	return input;
-}
-
-function chk(checked, title, className = false, desc = false) {
-	let lbl = document.createElement('label');
-	lbl.textContent = title;
-	if(desc) {
-		lbl.title = desc;
-	}
-	if(className) {
-		lbl.className = className;
-	}
-
-	let chk = document.createElement("input");
-	chk.type = "checkbox";
-	chk.checked = checked;
-
-	lbl.prepend(chk);
-	guiL.append(lbl);
-	return chk;
-}
-
-/* Options section */
-
-delay = field(settings['delay'], "Delay", "Delay (ms) between requests to avoid spamming the server.");
-delay.style.width = "50px";
-
-matchTemplate = field(settings['match_template'], "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
-
-template = field(settings['css_template'], "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEEN], [TITLEFR], [TITLEES], [TITLEDE], [TITLERAW], [GENRES], [THEMES], [DEMOGRAPHIC], [RANK], [POPULARITY], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
-template.parentNode.style.width = "100%";
-
-$(guiL).append($('<br />'));
-
-function toggleChks(check, selector) {
-	if(check.checked)
-	{
-		$(selector).removeClass('burnt-tag-disabled');
-	}
-	else
-	{
-		$(selector).addClass('burnt-tag-disabled');
-	}
-}
-
-/* Error Reporting Functions */
+/* GENERIC FUNCTIONS */
 
 class Logger
 {
 	constructor()
 	{
-		this.parentNode = guiB;
+		this.parent = null;
 		this.errorCount = 0;
 		this.warningCount = 0;
 	}
@@ -418,9 +144,9 @@ class Logger
 	createMsgBox(msg = '', type = 'ERROR')
 	{
 		let errorBox = document.createElement('div');
-		errorBox.className = 'burnt-log-line';
+		errorBox.className = 'log-line';
 		errorBox.insertAdjacentHTML('afterbegin', `<b>[${type}]</b> ${msg}`);
-		this.parentNode.append(errorBox);
+		this.parent.append(errorBox);
 	}
 	
 	/* tellUser can be one of: true (show to user), false (only to console), or string (show custom string to user) */
@@ -458,75 +184,654 @@ class Logger
 }
 var log = new Logger();
 
-/* TAGS */
+/* TOOL CODE */
 
-chkTags = chk(settings['update_tags'], "Update Tags", 'burnt-chk burnt-tagtoggle');
+/* Create GUI */
 
-chkTags.addEventListener('input', () => { toggleChks(chkTags,'.burnt-tag'); });
+let container = document.createElement('div');
+let sandbox = container.attachShadow({mode: 'open'});
+document.body.append(container);
 
-chkEnglish = chk(settings['checked_tags']['english_title'], "English title", 'burnt-chk burnt-tag');
-chkFrench = chk(settings['checked_tags']['french_title'], "French title", 'burnt-chk burnt-tag');
-chkSpanish = chk(settings['checked_tags']['spanish_title'], "Spanish title", 'burnt-chk burnt-tag');
-chkGerman = chk(settings['checked_tags']['german_title'], "German title", 'burnt-chk burnt-tag');
-chkNative = chk(settings['checked_tags']['native_title'], "Native title", 'burnt-chk burnt-tag');
-chkSeason = chk(settings['checked_tags']['season'], "Season", 'burnt-chk burnt-tag');
-chkYear = chk(settings['checked_tags']['year'], "Year", 'burnt-chk burnt-tag');
-chkGenres = chk(settings['checked_tags']['genres'], "Genres", 'burnt-chk burnt-tag');
-chkThemes = chk(settings['checked_tags']['themes'], "Themes", 'burnt-chk burnt-tag');
-chkDemographic = chk(settings['checked_tags']['demographic'], "Demographic", 'burnt-chk burnt-tag');
-chkScore = chk(settings['checked_tags']['score'], "Score", 'burnt-chk burnt-tag');
-chkRank = chk(settings['checked_tags']['rank'], "Rank", 'burnt-chk burnt-tag');
-chkPopularity = chk(settings['checked_tags']['popularity'], "Popularity", 'burnt-chk burnt-tag');
+sandbox.append(css(`
+/* Box Sizing */
+
+*, *::before, *::after {
+	box-sizing: inherit;
+} .popup {
+	box-sizing: border-box;
+}
+
+
+/* Scrollbars */
+
+* {
+	scrollbar-color: var(--scroll-thumb) var(--bg2);
+}
+
+
+/* Colour Scheme */
+
+.dark {
+	color-scheme: dark;
+	--outline: #578dad;
+	--bg: #090909f7;
+	--bg2: #292929;
+	--group-bg: #32323244;
+	--txt: #eee;
+	--btn-bg: #222222f0;
+	--btn-brdr: #4e4e4e;
+	--fld-bg: #18181888;
+	--fld-brdr: #424242;
+	--stat-working: #3166e0;
+	--stat-loading: #1b833a;
+	--stat-bad: #f24242;
+	--scroll-thumb: #555;
+}
+.light {
+	color-scheme: light;
+	--outline: #78BBE2;
+	--bg: #ffffffc8;
+	--bg2: #c0c0c0;
+	--group-bg: #88888832;
+	--txt: #111;
+	--btn-bg: #d9d9d9f0;
+	--btn-brdr: #767676;
+	--fld-bg: #f6f6f688;
+	--fld-brdr: #999;
+	--stat-working: #4277f2;
+	--stat-loading: #60ce81;
+	--stat-bad: #f24242;
+	--scroll-thumb: #555;
+}
+
+
+/* Common Elements */
+
+.popup *:not([type="checkbox"]):focus {
+	outline: 2px solid var(--outline);
+	outline-offset: -2px;
+}
+.popup [type="checkbox"]:focus-visible {
+	outline: 2px solid var(--outline);
+}
+
+hr {
+	height: 4px;
+	background: var(--bg2);
+	border: 0;
+	border-radius: 2px;
+	margin: 10px 10px 15px 0;
+}
+
+.spacer {
+	height: 5px;
+}
+
+.paragraph {
+	margin: 5px 0 10px;
+}
+
+input {
+	border-radius: 6px;
+}
+
+.btn {
+	padding: 2px 4px;
+	background: var(--btn-bg);
+	border: 1px solid var(--btn-brdr);
+	color: var(--txt);
+	cursor: pointer;
+}
+.btn:disabled {
+	opacity: 0.7;
+	cursor: not-allowed;
+}
+.btn + .btn {
+	margin-left: 3px;
+}
+.btn-right {
+	margin-left: 3px;
+	float: right;
+}
+
+.label {
+	display: block;
+	margin-right: 10px;
+	margin-bottom: 5px;
+}
+.label--inline {
+	display: inline-block;
+}
+.field {
+	display: block;
+	width: 100%;
+	padding: 3px;
+	background: var(--fld-bg);
+	border: 1px solid var(--fld-brdr);
+	color: var(--txt);
+	font-weight: 400;
+	font-family: monospace;
+}
+textarea {
+	display: block;
+	width: 100%;
+	padding: 6px;
+	background: var(--fld-bg);
+	border: 1px solid var(--fld-brdr);
+	border-radius: 9px;
+	margin: 0;
+	resize: none;
+	color: var(--txt);
+	font-family: monospace;
+	word-break: break-all;
+}
+
+
+/* Basic Layout */
+
+.dim-background {
+	inset: 0;
+	background-color: rgba(0,0,0,0.5);
+	backdrop-filter: blur(1.5px);
+}
+.dim-background,
+.popup {
+	position: fixed;
+	z-index: 99999;
+}
+.popup {
+	inset: 50px;
+	padding: 10px;
+	background-color: var(--bg);
+	border-radius: 12px;
+	box-shadow: 0 3px 12px rgba(0,0,0,0.7);
+	color: var(--txt);
+	font: 12px/1.5 sans-serif;
+	text-align: left;
+	backdrop-filter: blur(5px);
+}
+.popup--small {
+	inset: 50%;
+	width: max-content;
+	min-width: 300px;
+	max-width: 50%;
+	height: fit-content;
+	min-height: 100px;
+	max-height: calc(100% - 100px);
+	overflow: auto;
+	transform: translate(-50%,-50%);
+}
+
+.main {
+	display: grid;
+	grid-template-areas: "sidebar workspace" "logs logs";
+	grid-template-columns: 250px 1fr;
+	grid-template-rows: 1fr auto;
+}
+.main__sidebar {
+	width: 250px;
+	overflow-x: hidden;
+	overflow-y: auto;
+	grid-area: sidebar;
+}
+.main__workspace {
+	display: flex;
+	grid-area: workspace;
+}
+
+
+/* Status */
+
+.status {
+	padding: 2px 6px;
+	background: var(--bg2);
+	border-radius: 6px;
+	margin: 5px 10px 10px 0;
+	--percent: 0%;
+	--colour: var(--stat-working);
+	background-image: linear-gradient(
+		to right,
+		var(--colour) var(--percent),
+		transparent var(--percent)
+	);
+}
+
+.status__time {
+	float: right;
+}
+
+
+/* Checkboxes */
+
+.drawer {
+	padding-left: 10px;
+}
+.drawer.is-closed {
+	display: none;
+}
+
+.chk {
+	display: block;
+}
+
+
+/* Options */
+
+.group {
+	padding: 10px;
+	margin-right: 10px;
+	background: var(--group-bg);
+	border-radius: 9px;
+}
+.group-title {
+	display: block;
+	margin: 10px 3px 3px;
+}
+
+#logs {
+	box-sizing: initial;
+	grid-area: logs;
+	height: fit-content;
+}
+#logs:not(:empty) {
+	padding: 5px 10px;
+	max-height: min(15vh, 9em);
+	background: var(--bg2);
+	border-radius: 6px;
+	margin-top: 10px;
+	overflow-x: hidden;
+	overflow-y: auto;
+	font: 11px/1.5em monospace;
+}
+
+
+/* Misc */
+
+footer {
+	margin: 5px 0;
+	font-size: 10px;
+	font-style: italic;
+}
+
+
+/* Input/Output */
+
+.in-out {
+	width: calc(50% - 5px);
+}
+.in-out + .in-out {
+	margin-left: auto;
+}
+
+.in-out__top {
+	height: 26px;
+}
+
+.in-out__text {
+	height: calc(100% - 24px);
+}
+`));
+
+let gui = document.createElement("main");
+gui.className = 'popup main';
+
+let bg = document.createElement('div');
+bg.className = 'dim-background';
+let overlay = bg.cloneNode(true);
+
+sandbox.append(bg);
+sandbox.append(gui);
+
+let sidebar = document.createElement('div');
+sidebar.className = 'main__sidebar';
+gui.append(sidebar);
+
+let workspace = document.createElement('div');
+workspace.className = 'main__workspace';
+gui.append(workspace);
+
+let guiB = document.createElement('div');
+guiB.id = 'logs';
+gui.append(guiB);
+log.parent = guiB;
+
+let thumbBtn = document.createElement("input");
+sidebar.append(thumbBtn);
+thumbBtn.classList.add('btn');
+thumbBtn.type = "button";
+thumbBtn.value = "Loading...";
+thumbBtn.disabled = 'disabled';
+thumbBtn.onclick = ()=>{ beginProcessing(); };
+
+let exitBtn = document.createElement("input");
+sidebar.append(exitBtn);
+exitBtn.classList.add('btn');
+exitBtn.type = "button";
+exitBtn.value = "Exit";
+exitBtn.onclick = Exit;
+
+statusBar = document.createElement("div");
+statusBar.className = "status";
+sidebar.append(statusBar);
+
+statusText = document.createElement('span');
+statusText.textContent = 'Setting up...';
+statusBar.style.cssText = '--percent: 20%; --colour: var(--stat-loading);';
+statusBar.append(statusText);
+
+timeText = document.createElement('span');
+timeText.className = 'status__time';
+statusBar.append(timeText);
+
+function field(value, title, desc) {
+	lbl = document.createElement('label');
+	lbl.textContent = title;
+	lbl.className = 'label';
+
+	input = document.createElement('input');
+	input.type = 'text';
+	input.value = value;
+	input.title = desc;
+	input.className = 'field';
+	input.spellcheck = false;
+
+	lbl.append(input);
+	$(cssGroup).append(lbl);
+	return input;
+}
+
+function chk(setting, title, parent = sidebar, desc = false) {
+	let lbl = document.createElement('label');
+	lbl.textContent = title;
+	if(desc) {
+		lbl.title = desc;
+	}
+	lbl.className = 'chk';
+
+	let chk = document.createElement("input");
+	chk.type = "checkbox";
+	chk.checked = setting;
+
+	lbl.prepend(chk);
+	$(parent).append(lbl);
+	return chk;
+}
+
+
+/* Options section */
+
+$(sidebar).append($('<hr><b class="group-title">Global Options</b>'));
+let globalGroup = $('<div class="group"></div>');
+$(sidebar).append(globalGroup);
+
+chkCategory = chk(settings['select_categories'], "Update only specific categories.", globalGroup, 'Want to only update entries in certain categories instead of everything at once?');
+chkCategory.addEventListener('input', () => { toggleChks(chkCategory, categoryDrawer); });
+
+let categoryDrawer = $('<div class="drawer"></div>');
+$(globalGroup).append(categoryDrawer);
+
+let watchOrRead = listtype == 'anime' ? "Watching" : "Reading";
+let categoryChks = {
+	"1": chk(settings['checked_categories']['1'], watchOrRead, categoryDrawer),
+	"2": chk(settings['checked_categories']['2'], "Completed", categoryDrawer),
+	"3": chk(settings['checked_categories']['3'], "On Hold", categoryDrawer),
+	"4": chk(settings['checked_categories']['4'], "Dropped", categoryDrawer),
+	"6": chk(settings['checked_categories']['6'], "Planned", categoryDrawer)
+};
+
+
+/* CSS Options */
+
+$(sidebar).append($('<hr><b class="group-title">CSS Options</b>'));
+let cssGroup = $('<div class="group"></div>');
+$(sidebar).append(cssGroup);
+
+delay = field(settings['delay'], "Delay", "Delay (ms) between requests to avoid spamming the server.");
+delay.style.width = "50px";
+delay.parentNode.classList.add('label--inline');
+
+matchTemplate = field(settings['match_template'], "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
+matchTemplate.parentNode.classList.add('label--inline');
+
+template = field(settings['css_template'], "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEEN], [TITLEFR], [TITLEES], [TITLEDE], [TITLERAW], [GENRES], [THEMES], [DEMOGRAPHIC], [RANK], [POPULARITY], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
+
+function toggleChks(checkbox, drawerSelector) {
+	if(checkbox.checked)
+	{
+		$(gui).find(drawerSelector).removeClass('is-closed');
+	}
+	else
+	{
+		$(gui).find(drawerSelector).addClass('is-closed');
+	}
+}
+
+chkExisting = chk(settings['check_existing'], "Validate existing images", cssGroup, "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load. Not recommended while adding new anime or updating tags!");
+
+$(cssGroup).append($('<div class="spacer"></div>'));
+
+/* Import/Export section */
+
+importBtn = $('<input type="button" value="Import Template" class="btn" title="Import a CSS template to get started quickly.">');
+importBtn.click(()=>{
+	$(gui).append(overlay);
+
+	importOverlay = $(`
+		<div class="popup popup--small">
+			<p class="paragraph">
+				Input a template here. This will update the tool settings and may add some additional code to your MAL Custom CSS. You may wish to backup your Custom CSS before doing this.
+			</p>
+
+			<label class="label">
+				<input class="field" id="import-field" type="text" spellcheck="false"></input>
+			</label>
+
+			<br />
+
+			<input id="import-btn" type="button" value="Import" class="btn">
+			<input id="close" type="button" value="Close" class="btn">
+		</div>
+	`);
+
+	$(gui).append(importOverlay);
+
+	$(importOverlay).find('#import-btn').click(()=>{
+		value = $('#import-field').val();
+
+		if(value.length < 1)
+		{
+			alert('Nothing detected in import field.');
+		}
+		else
+		{
+			try
+			{
+				importedTemplate = JSON.parse(value);
+
+				if(!("template" in importedTemplate) || !("matchtemplate" in importedTemplate))
+				{
+					alert(`Import failed due to incorrect syntax or missing information.`);
+				}
+				else
+				{
+					let cssToImport = 'css' in importedTemplate ? importedTemplate['css'] : false;
+					setTemplate(importedTemplate['template'], importedTemplate['matchtemplate'], cssToImport);
+					importOverlay.remove();
+					overlay.remove();
+				}
+			}
+			catch(e)
+			{
+				alert(`Import failed. If you are using an official template, report this problem to the developer with the following information.\n\nError message for reference:\n${e}\n\nValue for reference:\n${value}`);
+			}
+		}
+	});
+	
+	$(importOverlay).find('#close').click(()=>{
+		importOverlay.remove();
+		overlay.remove();
+	});
+});
+$(cssGroup).append(importBtn);
+
+exportBtn = $('<input type="button" value="Create Template" class="btn" title="Create a CSS template for others to use.">');
+exportBtn.click(()=>{
+	$(gui).append(overlay);
+
+	exportOverlay = $(`
+		<div class="popup popup--small">
+			<p class="paragraph">
+				CSS designers can use this to create a template for others to quickly import. The template and match template are required, but you may leave the CSS Styling field blank if desired.
+			</p>
+			
+			<label class="label">
+				Template
+				<input class="field" id="export-template" type="text" spellcheck="false"></input>
+			</label>
+			
+			<label class="label">
+				Match Template
+				<input class="field" id="export-match" type="text" spellcheck="false"></input>
+			</label>
+			
+			<label class="label">
+				CSS Styling
+				<textarea class="field" id="export-css" type="text" spellcheck="false" style="resize: vertical; height: 150px;"></textarea>
+			</label>
+			
+			<label class="label">
+				<input class="field" id="export" type="text" placeholder="Template will be generated here and copied to your clipboard." readonly="readonly">
+			</label>
+
+			<br />
+
+			<input class="btn" id="export-btn" type="button" value="Generate Template" title="Generates text and copies to your clipboard.">
+			<input class="btn" id="close" type="button" value="Close">
+		</div>
+	`);
+	$(gui).append(exportOverlay);
+
+	$(exportOverlay).find('#export-template').val(template.value);
+	$(exportOverlay).find('#export-match').val(matchTemplate.value);
+
+	$(exportOverlay).find('#export-btn').click(()=>{
+		newTemplate = $('#export-template').val();
+		newMatchTemplate = $('#export-match').val();
+
+		if(newTemplate.length < 1 || newMatchTemplate < 1)
+		{
+			alert('Please fill out both the Template and Match Template fields.');
+		}
+		else
+		{
+			createdTemplate = {
+				"template": newTemplate,
+				"matchtemplate": newMatchTemplate
+			};
+			let css = $('#export-css').val();
+			if(css.trim().length > 0)
+			{
+				createdTemplate['css'] = css;
+			}
+			$('#export').val(JSON.stringify(createdTemplate));
+			
+			document.querySelector('#export').select();
+			navigator.clipboard.writeText(document.querySelector('#export').textContent);
+		}
+	});
+	
+	$(exportOverlay).find('#close').click(()=>{
+		exportOverlay.remove();
+		overlay.remove();
+	});
+});
+$(cssGroup).append(exportBtn);
+
+/* CHECK BOXES - TAGS/NOTES */
+
+$(sidebar).append($('<b class="group-title">Tag Options</b>'));
+let tagGroup = $('<div class="group"></div>');
+$(sidebar).append(tagGroup);
+
+chkTags = chk(settings['update_tags'], "Update Tags", tagGroup, 'Update your tags with the new information.');
+
+chkTags.addEventListener('input', () => { toggleChks(chkTags,tagDrawer); });
+
+let tagDrawer = $('<div class="drawer"></div>');
+$(tagGroup).append(tagDrawer);
+
+chkEnglish = chk(settings['checked_tags']['english_title'], "English title", tagDrawer);
+chkFrench = chk(settings['checked_tags']['french_title'], "French title", tagDrawer);
+chkSpanish = chk(settings['checked_tags']['spanish_title'], "Spanish title", tagDrawer);
+chkGerman = chk(settings['checked_tags']['german_title'], "German title", tagDrawer);
+chkNative = chk(settings['checked_tags']['native_title'], "Native title", tagDrawer);
+chkSeason = chk(settings['checked_tags']['season'], "Season", tagDrawer);
+chkYear = chk(settings['checked_tags']['year'], "Year", tagDrawer);
+chkGenres = chk(settings['checked_tags']['genres'], "Genres", tagDrawer);
+chkThemes = chk(settings['checked_tags']['themes'], "Themes", tagDrawer);
+chkDemographic = chk(settings['checked_tags']['demographic'], "Demographic", tagDrawer);
+chkScore = chk(settings['checked_tags']['score'], "Score", tagDrawer);
+chkRank = chk(settings['checked_tags']['rank'], "Rank", tagDrawer);
+chkPopularity = chk(settings['checked_tags']['popularity'], "Popularity", tagDrawer);
 /*Anime Only */
-chkStudio = chk(settings['checked_tags']['studio'], "Studio", 'burnt-chk burnt-tag');
-chkProducers = chk(settings['checked_tags']['producers'], "Producers", 'burnt-chk burnt-tag');
-chkLicensors = chk(settings['checked_tags']['licensors'], "Licensors", 'burnt-chk burnt-tag');
-chkAired = chk(settings['checked_tags']['aired'], "Aired", 'burnt-chk burnt-tag');
-chkRating = chk(settings['checked_tags']['rating'], "Rating", 'burnt-chk burnt-tag');
-chkDuration = chk(settings['checked_tags']['duration'], "Duration (Episode)", 'burnt-chk burnt-tag');
-chkTotalDuration = chk(settings['checked_tags']['total_duration'], "Duration (Total)", 'burnt-chk burnt-tag');
+chkStudio = chk(settings['checked_tags']['studio'], "Studio", tagDrawer);
+chkProducers = chk(settings['checked_tags']['producers'], "Producers", tagDrawer);
+chkLicensors = chk(settings['checked_tags']['licensors'], "Licensors", tagDrawer);
+chkAired = chk(settings['checked_tags']['aired'], "Aired", tagDrawer);
+chkRating = chk(settings['checked_tags']['rating'], "Rating", tagDrawer);
+chkDuration = chk(settings['checked_tags']['duration'], "Duration (Episode)", tagDrawer);
+chkTotalDuration = chk(settings['checked_tags']['total_duration'], "Duration (Total)", tagDrawer);
 /*Manga only*/
-chkPublished = chk(settings['checked_tags']['published'], "Published", 'burnt-chk burnt-tag');
-chkAuthors = chk(settings['checked_tags']['authors'], "Authors", 'burnt-chk burnt-tag');
-chkSerialization = chk(settings['checked_tags']['serialization'], "Serialization", 'burnt-chk burnt-tag');
+chkPublished = chk(settings['checked_tags']['published'], "Published", tagDrawer);
+chkAuthors = chk(settings['checked_tags']['authors'], "Authors", tagDrawer);
+chkSerialization = chk(settings['checked_tags']['serialization'], "Serialization", tagDrawer);
 
-/* NOTES */
 
-chkNotes = chk(settings['update_notes'], "Update Notes", 'burnt-chk', 'Update your comments/notes section with the new information.');
+$(sidebar).append($('<b class="group-title">Note Options</b>'));
+let noteGroup = $('<div class="group"></div>');
+$(sidebar).append(noteGroup);
+
+chkNotes = chk(settings['update_notes'], "Update Notes", noteGroup, 'Update your comments/notes section with the new information.');
 
 chkNotes.addEventListener('input', () => {
 	if(chkNotes.checked) {
 		alert('Be warned! This setting will *entirely overwrite* your current notes. Do not use if you want to keep your notes.');
 	}
-	toggleChks(chkNotes,'.burnt-notes');
+	toggleChks(chkNotes,notesDrawer);
 });
 
-chkSynopsisNotes = chk(settings['checked_notes']['synopsis'], "Synopsis", 'burnt-chk burnt-notes');
-chkEnglishNotes = chk(settings['checked_notes']['english_title'], "English title", 'burnt-chk burnt-notes');
-chkFrenchNotes = chk(settings['checked_notes']['french_title'], "French title", 'burnt-chk burnt-notes');
-chkSpanishNotes = chk(settings['checked_notes']['spanish_title'], "Spanish title", 'burnt-chk burnt-notes');
-chkGermanNotes = chk(settings['checked_notes']['german_title'], "German title", 'burnt-chk burnt-notes');
-chkNativeNotes = chk(settings['checked_notes']['native_title'], "Native title", 'burnt-chk burnt-notes');
-chkSeasonNotes = chk(settings['checked_notes']['season'], "Season", 'burnt-chk burnt-notes');
-chkYearNotes = chk(settings['checked_notes']['year'], "Year", 'burnt-chk burnt-notes');
-chkGenresNotes = chk(settings['checked_notes']['genres'], "Genres", 'burnt-chk burnt-notes');
-chkThemesNotes = chk(settings['checked_notes']['themes'], "Themes", 'burnt-chk burnt-notes');
-chkDemographicNotes = chk(settings['checked_notes']['demographic'], "Demographic", 'burnt-chk burnt-notes');
-chkScoreNotes = chk(settings['checked_notes']['score'], "Score", 'burnt-chk burnt-notes');
-chkRankNotes = chk(settings['checked_notes']['rank'], "Rank", 'burnt-chk burnt-notes');
-chkPopularityNotes = chk(settings['checked_notes']['popularity'], "Popularity", 'burnt-chk burnt-notes');
+$(gui).find(tagDrawer).append($('<br />'));
+chkClearTags = chk(settings['clear_tags'], "Overwrite current tags", tagDrawer, "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.");
+
+let notesDrawer = $('<div class="drawer"></div>');
+$(noteGroup).append(notesDrawer);
+
+chkSynopsisNotes = chk(settings['checked_notes']['synopsis'], "Synopsis", notesDrawer);
+chkEnglishNotes = chk(settings['checked_notes']['english_title'], "English title", notesDrawer);
+chkFrenchNotes = chk(settings['checked_notes']['french_title'], "French title", notesDrawer);
+chkSpanishNotes = chk(settings['checked_notes']['spanish_title'], "Spanish title", notesDrawer);
+chkGermanNotes = chk(settings['checked_notes']['german_title'], "German title", notesDrawer);
+chkNativeNotes = chk(settings['checked_notes']['native_title'], "Native title", notesDrawer);
+chkSeasonNotes = chk(settings['checked_notes']['season'], "Season", notesDrawer);
+chkYearNotes = chk(settings['checked_notes']['year'], "Year", notesDrawer);
+chkGenresNotes = chk(settings['checked_notes']['genres'], "Genres", notesDrawer);
+chkThemesNotes = chk(settings['checked_notes']['themes'], "Themes", notesDrawer);
+chkDemographicNotes = chk(settings['checked_notes']['demographic'], "Demographic", notesDrawer);
+chkScoreNotes = chk(settings['checked_notes']['score'], "Score", notesDrawer);
+chkRankNotes = chk(settings['checked_notes']['rank'], "Rank", notesDrawer);
+chkPopularityNotes = chk(settings['checked_notes']['popularity'], "Popularity", notesDrawer);
 /*Anime Only */
-chkStudioNotes = chk(settings['checked_notes']['studio'], "Studio", 'burnt-chk burnt-notes');
-chkProducersNotes = chk(settings['checked_notes']['producers'], "Producers", 'burnt-chk burnt-notes');
-chkLicensorsNotes = chk(settings['checked_notes']['licensors'], "Licensors", 'burnt-chk burnt-notes');
-chkAiredNotes = chk(settings['checked_notes']['aired'], "Aired", 'burnt-chk burnt-notes');
-chkRatingNotes = chk(settings['checked_notes']['rating'], "Rating", 'burnt-chk burnt-notes');
-chkDurationNotes = chk(settings['checked_notes']['duration'], "Duration (Episode)", 'burnt-chk burnt-notes');
-chkTotalDurationNotes = chk(settings['checked_notes']['total_duration'], "Duration (Total)", 'burnt-chk burnt-notes');
+chkStudioNotes = chk(settings['checked_notes']['studio'], "Studio", notesDrawer);
+chkProducersNotes = chk(settings['checked_notes']['producers'], "Producers", notesDrawer);
+chkLicensorsNotes = chk(settings['checked_notes']['licensors'], "Licensors", notesDrawer);
+chkAiredNotes = chk(settings['checked_notes']['aired'], "Aired", notesDrawer);
+chkRatingNotes = chk(settings['checked_notes']['rating'], "Rating", notesDrawer);
+chkDurationNotes = chk(settings['checked_notes']['duration'], "Duration (Episode)", notesDrawer);
+chkTotalDurationNotes = chk(settings['checked_notes']['total_duration'], "Duration (Total)", notesDrawer);
 /*Manga only*/
-chkPublishedNotes = chk(settings['checked_notes']['published'], "Published", 'burnt-chk burnt-notes');
-chkAuthorsNotes = chk(settings['checked_notes']['authors'], "Authors", 'burnt-chk burnt-notes');
-chkSerializationNotes = chk(settings['checked_notes']['serialization'], "Serialization", 'burnt-chk burnt-notes');
+chkPublishedNotes = chk(settings['checked_notes']['published'], "Published", notesDrawer);
+chkAuthorsNotes = chk(settings['checked_notes']['authors'], "Authors", notesDrawer);
+chkSerializationNotes = chk(settings['checked_notes']['serialization'], "Serialization", notesDrawer);
 
 /* HIDE IRRELEVANT */
 if(listtype === 'anime')
@@ -558,148 +863,40 @@ else
 	chkTotalDurationNotes.parentNode.style.display = 'none';
 }
 
-$(guiL).append($('<br />'));
+$(sidebar).append($('<hr>'));
 
-chkClearTags = chk(settings['clear_tags'], "Overwrite current tags", 'burnt-chk burnt-tag', "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.");
+/* Dark/light mode switch */
 
-$(guiL).append($('<br />'));
+let chosenTheme = localStorage.getItem('burnt-theme');
+if(chosenTheme)
+{
+	gui.classList.remove('light', 'dark');
+	gui.classList.add(chosenTheme);
+}
+else if(window.matchMedia('(prefers-color-scheme: light)').matches)
+{
+	gui.classList.add('light');
+}
+else
+{
+	gui.classList.add('dark');
+}
 
-chkExisting = chk(settings['check_existing'], "Validate existing images", 'burnt-chk', "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load. Not recommended while adding new anime or updating tags!");
-
-$(guiL).append($('<hr>'));
-
-/* Import/Export section */
-
-importBtn = $('<input type="button" value="Import Template" class="burnt-btn" title="Import a CSS template to get started quickly.">');
-importBtn.click(function() {
-	$(gui).append(overlay);
-
-	importOverlay = $(`<div class="burnt-popup">
-		Input a template here. This will update the tool settings and may add some additional code to your MAL Custom CSS. You may wish to backup your Custom CSS before doing this.
-		<br />
-		<br />
-		<input id="burnt-import-field" type="text" spellcheck="false"></input>
-		<br />
-		<input id="burnt-import-btn" type="button" value="Import" class="burnt-btn">
-		<input id="burnt-close" type="button" value="Close" class="burnt-btn">
-	</div>`);
-
-	$(gui).append(importOverlay);
-
-	$('#burnt-import-btn').click(function() {
-		value = $('#burnt-import-field').val();
-
-		if(value.length < 1)
-		{
-			alert('Nothing detected in import field.');
-		}
-		else
-		{
-			try
-			{
-				importedTemplate = JSON.parse(value);
-
-				if(!("template" in importedTemplate) || !("matchtemplate" in importedTemplate))
-				{
-					alert(`Import failed due to incorrect syntax or missing information.`);
-				}
-				else
-				{
-					let cssToImport = 'css' in importedTemplate ? importedTemplate['css'] : false;
-					setTemplate(importedTemplate['template'], importedTemplate['matchtemplate'], cssToImport)
-					.then(()=>{
-						importOverlay.remove();
-						overlay.remove();
-					});
-				}
-			}
-			catch(e)
-			{
-				alert(`Import failed. If you are using an official template, report this problem to the developer with the following information.\n\nError message for reference:\n${e}\n\nValue for reference:\n${value}`);
-			}
-		}
-	});
-	
-	$('#burnt-close').click(function() {
-		importOverlay.remove();
-		overlay.remove();
-	});
+let switchTheme = $('<input class="btn" type="button" value="Switch Theme">')
+.click(()=>{
+	let theme = gui.classList.contains('dark') ? 'light' : 'dark';
+	gui.classList.remove('light', 'dark');
+	gui.classList.add(theme);
+	localStorage.setItem('burnt-theme', theme);
 });
-$(guiL).append(importBtn);
-
-exportBtn = $('<input type="button" value="Create Template" class="burnt-btn" title="Create a CSS template for others to use.">');
-exportBtn.click(function() {
-	$(gui).append(overlay);
-
-	exportOverlay = $(`<div class="burnt-popup">
-		Use this to create a template. The template and match template are required, but you may leave the CSS Styling field blank if desired.
-		<br />
-		<br />
-		
-		<b style="font-weight: bold">Template</b>
-		<input id="burnt-export-template" type="text" spellcheck="false"></input>
-		
-		<b style="font-weight: bold">Match Template</b>
-		<input id="burnt-export-match" type="text" spellcheck="false"></input>
-		
-		<b style="font-weight: bold">CSS Styling</b>
-		<textarea id="burnt-export-css" type="text" spellcheck="false" style="resize: vertical; height: 150px;"></textarea>
-		<br />
-		<input id="burnt-export" type="text" placeholder="Template will be generated here and copied to your clipboard." readonly="readonly">
-		<br />
-		<input id="burnt-export-btn" type="button" value="Generate Template" class="burnt-btn" title="Generates text and copies to your clipboard.">
-		<input id="burnt-close" type="button" value="Close" class="burnt-btn">
-	</div>`);
-	$(gui).append(exportOverlay);
-
-	$('#burnt-export-template').val(template.value);
-	$('#burnt-export-match').val(matchTemplate.value);
-
-	$('#burnt-export-btn').click(function() {
-		newTemplate = $('#burnt-export-template').val();
-		newMatchTemplate = $('#burnt-export-match').val();
-
-		if(newTemplate.length < 1 || newMatchTemplate < 1)
-		{
-			alert('Please fill out both the Template and Match Template fields.');
-		}
-		else
-		{
-			createdTemplate = {
-				"template": newTemplate,
-				"matchtemplate": newMatchTemplate
-			};
-			let css = $('#burnt-export-css').val();
-			if(css.trim().length > 0)
-			{
-				createdTemplate['css'] = css;
-			}
-			$('#burnt-export').val(JSON.stringify(createdTemplate));
-			
-			document.querySelector('#burnt-export').select();
-			navigator.clipboard.writeText(document.querySelector('#burnt-export').textContent);
-		}
-	});
-	
-	$('#burnt-close').click(function() {
-		exportOverlay.remove();
-		overlay.remove();
-	});
-});
-$(guiL).append(exportBtn);
-
-$(guiL).append($('<hr>'));
-
-/* "Copyright" section */
-
-$(guiL).append($(`<div style="font-size: 10px; font-style: italic; margin-bottom: 5px;">MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</div>`));
+$(sidebar).append(switchTheme);
 
 /* Settings section */
 
-clearBtn = $('<input type="button" value="Clear Settings" class="burnt-btn" title="Clears any stored settings from previous runs.">');
+clearBtn = $('<input type="button" value="Clear Settings" class="btn" title="Clears any stored settings from previous runs.">');
 if(localStorage.getItem(`burnt_${listtype}_settings`) !== null || localStorage.getItem(`burnt_last_${listtype}_run`) !== null)
 {
-	clearBtn.click(function() {
+	clearBtn.click(()=>{
 		localStorage.removeItem(`burnt_${listtype}_settings`);
 		localStorage.removeItem(`burnt_last_${listtype}_run`);
 		alert('Please exit and restart the tool to complete the clearing of your settings.');
@@ -709,31 +906,36 @@ else
 {
 	clearBtn.attr('disabled', 'disabled');
 }
-$(guiL).append(clearBtn);
+$(sidebar).append(clearBtn);
+
+/* "Copyright" section */
+
+$(sidebar).append($(`<footer>MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</footer>`));
 
 /* Textareas */
 
 textareaL = document.createElement('div');
-textareaL.className = 'burnt-textarea';
-guiR.append(textareaL);
+textareaL.className = 'in-out';
+workspace.append(textareaL);
 
-$(textareaL).append($('<b style="font-weight: bold;">Input</b>'));
+topL = $('<div class="in-out__top"></div>');
+$(textareaL).append(topL);
+$(topL).append($('<b>Input</b>'));
 
-lastRun = $('<input type="button" value="Last Run" class="burnt-btn burnt-textarea-btn" title="Fills the input field with the last known output of this tool.">');
-$(textareaL).append(lastRun);
+lastRun = $('<input type="button" value="Last Run" class="btn btn-right" title="Fills the input field with the last known output of this tool.">');
 if(localStorage.getItem(`burnt_last_${listtype}_run`) !== null)
 {
-	lastRun.click(function() {
+	lastRun.click(()=>{
 		existing.value = localStorage.getItem(`burnt_last_${listtype}_run`);
 	});
 }
 else {
 	lastRun.attr('disabled', 'disabled');
 }
+$(topL).append(lastRun);
 
-autofill = $('<input type="button" value="Autofill" class="burnt-btn burnt-textarea-btn" title="Autofill the template fields based on any previously generated code found in the input.">');
-$(textareaL).append(autofill);
-autofill.click(function() {
+autofill = $('<input type="button" value="Autofill" class="btn btn-right" title="Autofill the template fields based on any previously generated code found in the input.">')
+.click(()=>{
 	code = existing.value;
 
 	if(code.length < 1)
@@ -777,36 +979,41 @@ autofill.click(function() {
 		return;
 	}
 });
+$(topL).append(autofill);
 
 existing = document.createElement("textarea");
-existing.title = "Copy previously generated code here. The style for one anime ID must all be on the same line.";
-existing.placeholder = "Copy previously generated code here. The style for one anime ID must all be on the same line.";
+existing.className = 'in-out__text';
+existing.title = "Copy previously generated CSS here. The program will use the Match Template to find and skip any duplicate entries.";
+existing.placeholder = "Copy previously generated CSS here. The program will use the Match Template to find and skip any duplicate entries.";
 existing.spellcheck = false;
 textareaL.append(existing);
 
 textareaR = document.createElement('div');
-textareaR.className = 'burnt-textarea';
-textareaR.style.paddingLeft = '10px';
-guiR.append(textareaR);
+textareaR.className = 'in-out';
+workspace.append(textareaR);
 
-$(textareaR).append($('<b style="font-weight: bold;">Output</b>'));
+topR = $('<div class="in-out__top"></div>');
+$(textareaR).append(topR);
+$(topR).append($('<b>Output</b>'));
 
-copyOutput = $('<input type="button" value="Copy to Clipboard" class="burnt-btn burnt-textarea-btn" title="Copies output to clipboard.">');
-$(textareaR).append(copyOutput);
-copyOutput.click(function() {
+copyOutput = $('<input type="button" value="Copy to Clipboard" class="btn btn-right" title="Copies output to clipboard.">');
+$(topR).append(copyOutput);
+copyOutput.click(()=>{
 	result.select();
 	document.execCommand('copy');
 });
 
 result = document.createElement("textarea");
-result.title = "Newly generated code will be output here.";
-result.placeholder = "Newly generated code will be output here.";
+result.className = 'in-out__text';
+result.title = "Newly generated CSS will be output here.";
+result.placeholder = "Newly generated CSS will be output here.";
 result.readOnly = "readonly";
 result.spellcheck = false;
 textareaR.append(result);
 
-toggleChks(chkTags, '.burnt-tag');
-toggleChks(chkNotes, '.burnt-notes');
+toggleChks(chkCategory, categoryDrawer);
+toggleChks(chkTags, tagDrawer);
+toggleChks(chkNotes, notesDrawer);
 
 
 
@@ -822,9 +1029,8 @@ function decodeHtml(html)
 function css(css)
 {
 	newCSS = document.createElement('style');
-	newCSS.className = 'burnt-css';
+	newCSS.className = 'css';
 	newCSS.textContent = css;
-	document.head.append(newCSS);
 	return newCSS;
 }
 
@@ -955,7 +1161,7 @@ async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 			
 			/* should produce one-two elements something like this:
 			<a href="?go=stylepref&do=cssadv&id=473785">Style ID#473785</a> */
-			$(doc).find('#dialog a').each(function() {
+			$(doc).find('#dialog a').each(()=>{
 				id = this.href.split('&id=')[1];
 				url = `https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv&id=${id}`;
 				styleUrls.push(url);
@@ -1046,17 +1252,17 @@ function getListInfo()
 			offset += 300;
 			statusText.textContent = `Fetching list data (${offset} of ?)...`;
 			statusPercent += 10;
-			statusBar.style.cssText = `--percent: ${statusPercent <= 85 ? statusPercent : '85'}%; --colour: #60ce81;`;
+			statusBar.style.cssText = `--percent: ${statusPercent <= 85 ? statusPercent : '85'}%; --colour: var(--stat-loading);`;
 			getListInfo();
 		}
 		else
 		{
 			statusText.textContent = `Successfully loaded ${data.length} items.`;
-			statusBar.style.cssText = '--percent: 100%; --colour: #60ce81;';
+			statusBar.style.cssText = '--percent: 100%; --colour: var(--stat-loading);';
 			thumbBtn.value = 'Start';
 			thumbBtn.removeAttribute('disabled');
 		}
-	}).fail(function()
+	}).fail(()=>
 	{
 		failures++;
 		faildelay += 3000;
@@ -1067,7 +1273,7 @@ function getListInfo()
 		{
 			thumbBtn.value = 'Failed';
 			statusText.textContent = `Failed to fetch list info.`;
-			statusBar.style.cssText = '--percent: 100%; --colour: #f24242;';
+			statusBar.style.cssText = '--percent: 100%; --colour: var(--stat-bad);';
 			return;
 		}
 
@@ -1080,11 +1286,11 @@ getListInfo();
 
 /* Primary Functions */
 
+var iteration = 0;
 var newData = [];
+var percent = iteration / newData.length * 100 || 0;
 var timeout;
-
-iteration = 0;
-timeThen = performance.now() - delay.value;
+var timeThen = performance.now() - delay.value;
 async function processItem()
 {
 	if(iteration < newData.length)
@@ -1804,7 +2010,6 @@ function continueProcessing()
 	iteration++;
 	
 	statusText.textContent = `Processed ${iteration} of ${newData.length}`;
-	percent = iteration / newData.length * 100;
 	statusBar.style.cssText = `--percent: ${percent}%`;
 
 	timeText.textContent = `~ ${timeRemaining} left`;
@@ -1826,7 +2031,7 @@ function finishProcessing()
 	clearBtn.removeAttr('disabled');
 	exitBtn.disabled = false;
 	exitBtn.value = "Exit";
-	exitBtn.onclick = function()
+	exitBtn.onclick = ()=>
 	{
 		Exit();
 		if(chkTags.checked || chkNotes.checked)
@@ -1854,7 +2059,7 @@ function beginProcessing()
 {
 	saveSettings();
 
-	imageLoadDelay = 0;
+	let imageLoadDelay = 0;
 	exitBtn.disabled = "disabled";
 	importBtn.attr('disabled', 'disabled');
 	exportBtn.attr('disabled', 'disabled');
@@ -1862,26 +2067,35 @@ function beginProcessing()
 	autofill.attr('disabled', 'disabled');
 	lastRun.attr('disabled', 'disabled');
 	thumbBtn.value = "Stop";
-	thumbBtn.onclick = function() {
+	thumbBtn.onclick = ()=>{
 		thumbBtn.value = 'Stopping...';
 		thumbBtn.disabled = 'disabled';
 		newData = [];
 		clearTimeout(timeout);
 		finishProcessing();
 	};
+	let categories = [];
+	for([categoryId, chk] of Object.entries(categoryChks))
+	{
+		if(chk.checked)
+		{
+			categories.push(parseInt(categoryId));
+		}
+	}
 	
 	result.value += `\/*\nGenerated by MyAnimeList-Tools v${ver}\nhttps://github.com/ValerioLyndon/MyAnimeList-Tools\n\nTemplate=${template.value.replace(/\*\//g, "*[DEL]/")}\nMatchTemplate=${matchTemplate.value}\n*\/\n\n`;
 
-	for(k = 0; k < data.length; k++)
+	for(let k = 0; k < data.length; k++)
 	{
 		statusText.textContent = 'Checking your input for matches...';
-		id = data[k][`${listtype}_id`];
-		skip = false;
+		let id = data[k][`${listtype}_id`];
+		let skip;
+		/* Check old CSS for any existing lines and set "skip" var to true if found. */
 		oldLines = existing.value.split("\n");
 		oldLinesCount = oldLines.length;
-		for(j = 0; j < oldLinesCount; j++)
+		for(let j = 0; j < oldLinesCount; j++)
 		{
-			match = matchTemplate.value.replace(/\[ID\]/g, id).replace(/\[TYPE\]/g, listtype);
+			let match = matchTemplate.value.replaceAll(/\[ID\]/g, id).replaceAll(/\[TYPE\]/g, listtype);
 			skip = oldLines[j].indexOf(match) !== -1 ? true : false;
 			if(skip)
 			{
@@ -1894,10 +2108,14 @@ function beginProcessing()
 			if(chkExisting.checked)
 			{
 				imageLoadDelay = 5000;
-				urlStart = oldLines[j].indexOf("http");
-				urlEnd = oldLines[j].indexOf(".jpg", urlStart);
-				imgUrl = oldLines[j].substring(urlStart, urlEnd + 4);
-				tempImg = document.createElement("img");
+				let urlStart = oldLines[j].indexOf("http");
+				let urlEnd = oldLines[j].indexOf(".jpg", urlStart);
+				if(urlEnd === -1)
+				{
+					urlEnd = oldLines[j].indexOf(".webp", urlStart);
+				}
+				let imgUrl = oldLines[j].substring(urlStart, urlEnd + 4);
+				let tempImg = document.createElement("img");
 				tempImg.oldLine = oldLines[j];
 				tempImg.animeId = id;
 				tempImg.data = data[k];
@@ -1916,9 +2134,19 @@ function beginProcessing()
 				result.value += oldLines[j] + "\n";
 			}
 		}
+		else if(chkCategory.checked)
+		{
+			for(let categoryId of categories)
+			{
+				if(data[k]['status'] == categoryId)
+				{
+					newData.push(data[k]);
+				}
+			}
+		}
 		else
 		{
-			newData.push(data[k])
+			newData.push(data[k]);
 		}
 	}
 
@@ -1928,6 +2156,14 @@ function beginProcessing()
 function saveSettings()
 {
 	settings = {
+		"select_categories": chkCategory.checked,
+		"checked_categories": {
+			"1": categoryChks["1"].checked,
+			"2": categoryChks["2"].checked,
+			"3": categoryChks["3"].checked,
+			"4": categoryChks["4"].checked,
+			"6": categoryChks["6"].checked
+		},
 		"css_template": template.value,
 		"delay": delay.value,
 		"match_template": matchTemplate.value,
@@ -1988,6 +2224,11 @@ function saveSettings()
 		"check_existing": chkExisting.checked
 	};
 	localStorage.setItem(`burnt_${listtype}_settings`, JSON.stringify(settings));
+}
+
+function Exit()
+{
+	container.remove();
 }
 
 })(); void(0);
