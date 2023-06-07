@@ -25,6 +25,7 @@ const defaultSettings = {
 	"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
 	"delay": "3000",
 	"match_template": "/[TYPE]/[ID]/",
+	"check_existing": false,
 	"update_tags": false,
 	"checked_tags": {
 		"english_title": false,
@@ -51,6 +52,7 @@ const defaultSettings = {
 		"duration": false,
 		"total_duration": false
 	},
+	"clear_tags": false,
 	"update_notes": false,
 	"checked_notes": {
 		"synopsis": false,
@@ -77,9 +79,7 @@ const defaultSettings = {
 		"rating": false,
 		"duration": false,
 		"total_duration": false
-	},
-	"clear_tags": false,
-	"check_existing": false
+	}
 };
 
 /* handle settings from old versions */
@@ -2118,8 +2118,14 @@ function beginProcessing()
 		}
 		else if(chkCategory.checked)
 		{
+			let rewatchKey = listtype === 'anime' ? 'is_rewatching' : 'is_rewatching';
 			for(let categoryId of categories)
 			{
+				/* if rewatching then set status to watching, since this is how it appears to the user */
+				if(data[k][rewatchKey] === 1)
+				{
+					data[k]['status'] = 1;
+				}
 				if(data[k]['status'] == categoryId)
 				{
 					newData.push(data[k]);
