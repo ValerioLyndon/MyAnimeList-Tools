@@ -7,8 +7,8 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '9.0';
-const verMod = '2023/Jun/05';
+const ver = '9.1_pre';
+const verMod = '2023/Jun/06';
 
 var listIsModern = (document.getElementById("list_surround")) ? false : true;
 var listtype = window.location.pathname.split('/')[1].substring(0,5);
@@ -636,7 +636,7 @@ importBtn.click(()=>{
 	$(gui).append(importOverlay);
 
 	$(importOverlay).find('#import-btn').click(()=>{
-		value = $('#import-field').val();
+		value = $(importOverlay).find('#import-field').val();
 
 		if(value.length < 1)
 		{
@@ -715,8 +715,8 @@ exportBtn.click(()=>{
 	$(exportOverlay).find('#export-match').val(matchTemplate.value);
 
 	$(exportOverlay).find('#export-btn').click(()=>{
-		newTemplate = $('#export-template').val();
-		newMatchTemplate = $('#export-match').val();
+		let newTemplate = $(exportOverlay).find('#export-template').val();
+		newMatchTemplate = $(exportOverlay).find('#export-match').val();
 
 		if(newTemplate.length < 1 || newMatchTemplate < 1)
 		{
@@ -724,19 +724,20 @@ exportBtn.click(()=>{
 		}
 		else
 		{
-			createdTemplate = {
+			let createdTemplate = {
 				"template": newTemplate,
 				"matchtemplate": newMatchTemplate
 			};
-			let css = $('#export-css').val();
+			let css = $(exportOverlay).find('#export-css').val();
 			if(css.trim().length > 0)
 			{
 				createdTemplate['css'] = css;
 			}
-			$('#export').val(JSON.stringify(createdTemplate));
+			let exportField = $(exportOverlay).find('#export');
+			exportField.val(JSON.stringify(createdTemplate));
 			
-			document.querySelector('#export').select();
-			navigator.clipboard.writeText(document.querySelector('#export').textContent);
+			exportField.trigger('select');
+			navigator.clipboard.writeText(exportField.text());
 		}
 	});
 	
@@ -1161,8 +1162,8 @@ function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 			
 			/* should produce one-two elements something like this:
 			<a href="?go=stylepref&do=cssadv&id=473785">Style ID#473785</a> */
-			$(doc).find('#dialog a').each(()=>{
-				id = this.href.split('&id=')[1];
+			$(doc).find('#dialog a').each((i, ele)=>{
+				id = ele.href.split('&id=')[1];
 				url = `https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv&id=${id}`;
 				styleUrls.push(url);
 			});
