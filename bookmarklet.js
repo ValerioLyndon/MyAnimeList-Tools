@@ -7,7 +7,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '9.1_pre';
+const ver = '9.1';
 const verMod = '2023/Jun/06';
 
 var listIsModern = (document.getElementById("list_surround")) ? false : true;
