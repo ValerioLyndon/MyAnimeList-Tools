@@ -716,7 +716,7 @@ exportBtn.click(()=>{
 
 	$(exportOverlay).find('#export-btn').click(()=>{
 		let newTemplate = $(exportOverlay).find('#export-template').val();
-		newMatchTemplate = $(exportOverlay).find('#export-match').val();
+		let newMatchTemplate = $(exportOverlay).find('#export-match').val();
 
 		if(newTemplate.length < 1 || newMatchTemplate < 1)
 		{
@@ -1101,15 +1101,27 @@ async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 			/* Update MAL custom CSS */
 
 			styleUrl = `https://myanimelist.net/ownlist/style/theme/${style}`;
-			let request = new XMLHttpRequest();
-			request.open("get", styleUrl, false);
-			request.send(null);
-			str = request.responseText;
-			doc = new DOMParser().parseFromString(request.responseText, "text/html");
+			
+			let str = await fetch(styleUrl)
+			.then(response => {
+				if(!response.ok)
+				{
+					throw new Error(`Failed to fetch modern list CSS.`);
+				}
+				return response.text();
+			})
+			.then(html => {
+				return html;
+			})
+			.catch(error => {
+				log.error(error);
+				return false;
+			});
+			let doc = new DOMParser().parseFromString(str, "text/html");
 
 			customCss = $(doc).find('pre#custom-css').text();
 
-			/* Temporarily update the pages CSS to make sure no page reload is required */
+			/* Temporarily update the page's CSS to make sure no page reload is required */
 			$('head').append($(`<style>${newCss}</style>`));
 
 			/* Remove any previously added myanimelist-tools CSS */
@@ -1132,18 +1144,39 @@ async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 			/* Send new CSS to MAL */
 			
 			csrf = $('meta[name="csrf_token"]').attr('content');
-			boundary = '---------------------------35347544871910269115864526218';
 			bg_attach = $(doc).find('#style_edit_theme_background_image_attachment').find('[selected]').val() || '';
 			bg_vert = $(doc).find('#style_edit_theme_background_image_vertical_position').find('[selected]').val() || '';
 			bg_hori = $(doc).find('#style_edit_theme_background_image_horizontal_position').find('[selected]').val() || '';
 			bg_repeat = $(doc).find('#style_edit_theme_background_image_repeat').find('[selected]').val() || '';
 			
-			req2header = `--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[show_cover_image]"\n\n1\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[cover_image]"; filename=""\nContent-Type: application/octet-stream\n\n\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[show_background_image]"\n\n1\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[background_image]"; filename=""\nContent-Type: application/octet-stream\n\n\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[background_image_attachment]"\n\n${bg_attach}\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[background_image_vertical_position]"\n\n${bg_vert}\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[background_image_horizontal_position]"\n\n${bg_hori}\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[background_image_repeat]"\n\n${bg_repeat}\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[css]"\n\n${finalCss}\n--${boundary}\nContent-Disposition: form-data; name="style_edit_theme[save]"\n\n\n--${boundary}\nContent-Disposition: form-data; name="csrf_token"\n\n${csrf}\n--${boundary}--`;
+			let formData = new FormData();
+			formData.append("style_edit_theme[show_cover_image]", "1");
+			formData.append("style_edit_theme[cover_image]", new File([], ""));
+			formData.append("style_edit_theme[show_background_image]", "1");
+			formData.append("style_edit_theme[background_image]", new File([], ""));
+			formData.append("style_edit_theme[background_image_attachment]", bg_attach);
+			formData.append("style_edit_theme[background_image_vertical_position]", bg_vert);
+			formData.append("style_edit_theme[background_image_horizontal_position]", bg_hori);
+			formData.append("style_edit_theme[background_image_repeat]", bg_repeat);
+			formData.append("style_edit_theme[css]", finalCss);
+			formData.append("style_edit_theme[save]", "");
+			formData.append("csrf_token", csrf);
 			
-			request2 = new XMLHttpRequest();
-			request2.open("post", styleUrl, false);
-			request2.setRequestHeader("Content-Type", `multipart/form-data; boundary=${boundary}`);
-			request2.send(req2header);
+			await fetch(styleUrl, {
+				method: "POST",
+				body: formData
+			})
+			.then(response => {
+				if(!response.ok)
+				{
+					throw new Error(`Failed to send modern CSS update request.`);
+				}
+				return true;
+			})
+			.catch(error => {
+				log.error(error);
+				return false;
+			});
 		}
 		else
 		{
@@ -1151,21 +1184,31 @@ async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 			
 			/* Update MAL custom CSS */
 
-			styleListUrl = 'https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv';
-			request = new XMLHttpRequest();
-			request.open("get", styleListUrl, false);
-			request.send(null);
-			str = request.responseText;
-			doc = new DOMParser().parseFromString(request.responseText, "text/html");
+			let styleListsStr = await fetch('https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv')
+			.then(response => {
+				if(!response.ok)
+				{
+					throw new Error(`Failed to fetch classic list styles.`);
+				}
+				return response.text();
+			})
+			.then(html => {
+				return html;
+			})
+			.catch(error => {
+				log.error(error);
+				return false;
+			});
+			let styleListsDoc = new DOMParser().parseFromString(styleListsStr, "text/html");
 
-			styleUrls = [];
+			let styleUrl;
+			let styleUrls = [];
 			
 			/* should produce one-two elements something like this:
 			<a href="?go=stylepref&do=cssadv&id=473785">Style ID#473785</a> */
-			$(doc).find('#dialog a').each((i, ele)=>{
-				id = ele.href.split('&id=')[1];
-				url = `https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv&id=${id}`;
-				styleUrls.push(url);
+			$(styleListsDoc).find('#dialog a').each((i, ele)=>{
+				let styleId = ele.href.split('&id=')[1];
+				styleUrls.push(`https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv&id=${styleId}`);
 			});
 
 			if(styleUrls.length < 1)
@@ -1174,19 +1217,30 @@ async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 				return false;
 			}
 
-			for(i = 0; i < styleUrls.length; i++)
+			for(let url of styleUrls)
 			{
-				styleUrl = styleUrls[i];
-				request2 = new XMLHttpRequest();
-				request2.open("get", styleUrl, false);
-				request2.send(null);
-				str2 = request2.responseText;
-				doc2 = new DOMParser().parseFromString(request2.responseText, "text/html");
+				let str = await fetch(url)
+				.then(response => {
+					if(!response.ok)
+					{
+						throw new Error(`Failed to get fetch classic list CSS.`);
+					}
+					return response.text();
+				})
+				.then(html => {
+					return html;
+				})
+				.catch(error => {
+					log.error(error);
+					return false;
+				});
+				let doc = new DOMParser().parseFromString(str, "text/html");
 
-				customCss = $(doc2).find('textarea[name="cssText"]').text();
+				customCss = $(doc).find('textarea[name="cssText"]').text();
 
 				if(customCss.trim() == oldCss.text().trim())
 				{
+					styleUrl = url;
 					break;
 				}
 			}
@@ -1214,11 +1268,27 @@ async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 			/* Send new CSS to MAL */
 			
 			csrf = $('meta[name="csrf_token"]').attr('content');
+
+			let formData = new FormData();
+			formData.append("cssText", finalCss);
+			formData.append("subForm", "Update+CSS");
+			formData.append("csrf_token", csrf);
 			
-			request3 = new XMLHttpRequest();
-			request3.open("post", styleUrl, false);
-			request3.setRequestHeader("Content-Type", 'application/x-www-form-urlencoded');
-			request3.send(`cssText=${encodeURIComponent(finalCss)}&subForm=Update+CSS&csrf_token=${csrf}`);
+			await fetch(styleUrl, {
+				method: "POST",
+				body: formData
+			})
+			.then(response => {
+				if(!response.ok)
+				{
+					throw new Error(`Failed to send classic CSS update request.`);
+				}
+				return true;
+			})
+			.catch(error => {
+				log.error(error);
+				return false;
+			});
 		}
 	}
 	alert('Import succeeded.');
@@ -1324,7 +1394,7 @@ async function processItem()
 		
 		try
 		{
-			str = await fetch(`https://myanimelist.net/${listtype}/${id}`)
+			let str = await fetch(`https://myanimelist.net/${listtype}/${id}`)
 			.then(response => {
 				if(!response.ok)
 				{
@@ -1338,13 +1408,13 @@ async function processItem()
 			.catch(error => {
 				log.error(error);
 				return false;
-			})
+			});
 			if(!str)
 			{
 				continueProcessing();
 				return;
 			}
-			doc = new DOMParser().parseFromString(str, "text/html");
+			let doc = new DOMParser().parseFromString(str, "text/html");
 		
 			/* get current tags */
 			if(!chkTags.checked || chkClearTags.checked) {
@@ -1868,21 +1938,40 @@ async function processItem()
 				if(chkDuration.checked) { tags.push(durationTag); }
 				if(chkTotalDuration.checked) { tags.push(totalDurationTag); }
 				
-				newTagStr = tags.join(", ");
-				
+				let tagsRequestUrl;
+				let animeOrMangaId;
 				if(listtype === 'anime') {
-					reqUrl = 'https://myanimelist.net/includes/ajax.inc.php?t=22&tags=';
-					amid = 'aid';
+					tagsRequestUrl = 'https://myanimelist.net/includes/ajax.inc.php?t=22&tags=';
+					animeOrMangaId = 'aid';
 				} else {
-					reqUrl = 'https://myanimelist.net/includes/ajax.inc.php?t=30&tags=';
-					amid = 'mid';
+					tagsRequestUrl = 'https://myanimelist.net/includes/ajax.inc.php?t=30&tags=';
+					animeOrMangaId = 'mid';
 				}
+				tagsRequestUrl += encodeURIComponent(tags.join(", "));
 
-				request2 = new XMLHttpRequest();
-				request2.open("post", reqUrl + encodeURIComponent(newTagStr), false);
-				request2.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
-				request2.setRequestHeader("X-Requested-With", "XMLHttpRequest");
-				request2.send(`${amid}=${id}&csrf_token=${csrf}`);
+				let headerData = new Headers();
+				headerData.append('X-Requested-With', 'XMLHttpRequest');
+
+				let formData = new URLSearchParams();
+				formData.append(animeOrMangaId, id);
+				formData.append("csrf_token", csrf);
+			
+				await fetch(tagsRequestUrl, {
+					method: "POST",
+					headers: headerData,
+					body: formData
+				})
+				.then(response => {
+					if(!response.ok)
+					{
+						throw new Error(`${listtype} #${id}: Failed to update tags.`);
+					}
+					return true;
+				})
+				.catch(error => {
+					log.error(error);
+					return false;
+				});
 			}
 
 			if(chkNotes.checked)
@@ -1932,11 +2021,25 @@ async function processItem()
 
 				let notesRequestContent = JSON.stringify(notesRequestDict);
 
-				let notesRequest = new XMLHttpRequest();
-				notesRequest.open("post", notesRequestUrl, false);
-				notesRequest.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
-				notesRequest.setRequestHeader("X-Requested-With", "XMLHttpRequest");
-				notesRequest.send(notesRequestContent);
+				let headerData = new Headers();
+				headerData.append('X-Requested-With', 'XMLHttpRequest');
+			
+				await fetch(notesRequestUrl, {
+					method: "POST",
+					headers: headerData,
+					body: notesRequestContent
+				})
+				.then(response => {
+					if(!response.ok)
+					{
+						throw new Error(`${listtype} #${id}: Failed update notes.`);
+					}
+					return true;
+				})
+				.catch(error => {
+					log.error(error);
+					return false;
+				});
 			}
 			
 			/* thumbs */
