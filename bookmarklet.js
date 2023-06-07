@@ -364,12 +364,12 @@ textarea {
 
 .main {
 	display: grid;
+	gap: 0 10px;
 	grid-template-areas: "sidebar workspace" "logs logs";
-	grid-template-columns: 250px 1fr;
+	grid-template-columns: 260px 1fr;
 	grid-template-rows: 1fr auto;
 }
 .main__sidebar {
-	width: 250px;
 	overflow-x: hidden;
 	overflow-y: auto;
 	grid-area: sidebar;
@@ -674,7 +674,7 @@ importBtn.click(()=>{
 });
 $(cssGroup).append(importBtn);
 
-exportBtn = $('<input type="button" value="Create Template" class="btn" title="Create a CSS template for others to use.">');
+exportBtn = $('<input type="button" value="Export" class="btn" title="Create a CSS template for others to use.">');
 exportBtn.click(()=>{
 	$(gui).append(overlay);
 
