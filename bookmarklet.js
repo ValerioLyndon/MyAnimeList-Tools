@@ -1389,765 +1389,770 @@ getListInfo();
 
 var iteration = 0;
 var newData = [];
-var percent = iteration / newData.length * 100 || 0;
+var percent = 0;
 var timeout;
-var timeThen = performance.now() - delay.value;
+var timeThen;
 async function processItem()
 {
-	if(iteration < newData.length)
+	thisData = newData[iteration];
+	id = thisData[`${listtype}_id`];
+	
+	try
 	{
-		thisData = newData[iteration];
-		id = thisData[`${listtype}_id`];
+		let str = await fetch(`https://myanimelist.net/${listtype}/${id}`)
+		.then(response => {
+			if(!response.ok)
+			{
+				throw new Error(`${listtype} #${id}: Failed to get entry information.`);
+			}
+			return response.text();
+		})
+		.then(html => {
+			return html;
+		})
+		.catch(error => {
+			log.error(error);
+			return false;
+		});
+		if(!str)
+		{
+			continueProcessing();
+			return;
+		}
+		let doc = new DOMParser().parseFromString(str, "text/html");
+	
+		/* get current tags */
+		if(!chkTags.checked || chkClearTags.checked) {
+			tags = [];
+		}
+		else if(chkTags.checked)
+		{
+			tags = thisData['tags'].split(',');
+			
+			/* remove extra whitespace */
+			for(j = 0; j < tags.length; j++)
+			{
+				tags[j] = tags[j].trim();
+			}
+		}
 
-		/* set estimated time */
-		timeSince = performance.now() - timeThen;
-		timeThen = performance.now();
+		/* common functions */
+		
+		function removeTagIfExist(match, mode = 0)
+		/* takes input tag and checks if it is already in the tag list.
+		If it is, it removes it. This is so that the new tags added later are not duplicates.
+		It is done this way instead of simply removing the new tag so that the new tags can
+		maintain their order in relation to each other.
+		
+		Modes:
+		0 = old tag is exact match,
+		1 = old tag contains match
+		2 = old tag begins with match
+		3 = old tag ends with match */
+		{
+			if(tags.length == 0) {
+				return;
+			}
 
-		idsRemaining = newData.length - 1 - iteration;
-		seconds = idsRemaining * (timeSince / 1000);
-		if(seconds <= 60)
-		{
-			timeRemaining = `${round(seconds)}s`;
+			tagsLength = tags.length;
+			for(k = 0; k < tagsLength; k++)
+			{
+				tagNormalized = tags[k].toUpperCase();
+				matchNormalized = match.toUpperCase();
+				if(
+					tags[k].length == 0 ||
+					mode == 0 && tagNormalized == matchNormalized ||
+					mode == 1 && tagNormalized.indexOf(matchNormalized) != -1 ||
+					mode == 2 && tagNormalized.startsWith(matchNormalized) ||
+					mode == 3 && tagNormalized.endsWith(matchNormalized)
+				) {
+					tags.splice(k, 1);
+					tagsLength--;
+					k--;
+				}
+			}
 		}
-		else if(seconds > 60 && seconds < 3600)
+
+		/* titles */
+
+		title = thisData[`${listtype}_title`];
+
+		/* English title */
+		
+		titleEn = null;
+		if('anime_title_eng' in thisData)
 		{
-			timeRemaining = `${round(seconds / 60, 1)}m`;
+			titleEn = thisData['anime_title_eng'];
 		}
-		else if(seconds > 3600)
+		else if('manga_english' in thisData)
 		{
-			timeRemaining = `${round(seconds / 60 / 60, 1)}h`;
+			titleEn = thisData['manga_english'];
 		}
-		else
+		removeTagIfExist(titleEn);
+
+		/* French title */
+
+		titleFr = null;
+		titleFrStartTxt = 'French:</span>';
+		titleFrStartIndex = str.indexOf(titleFrStartTxt);
+		if(str.indexOf(titleFrStartTxt) != -1)
 		{
-			timeRemaining = '?';
+			titleFrStartIndex += titleFrStartTxt.length;
+			titleFrEndIndex = str.indexOf('</div>', titleFrStartIndex);
+			titleFr = str.substring(titleFrStartIndex, titleFrEndIndex);
+			titleFr = decodeHtml(titleFr);
+			
+			titleFr = titleFr.trim().replace(',', '');
+			removeTagIfExist(titleFr);
+		}
+
+		/* German title */
+
+		titleDe = null;
+		titleDeStartTxt = 'German:</span>';
+		titleDeStartIndex = str.indexOf(titleDeStartTxt);
+		if(str.indexOf(titleDeStartTxt) != -1)
+		{
+			titleDeStartIndex += titleDeStartTxt.length;
+			titleDeEndIndex = str.indexOf('</div>', titleDeStartIndex);
+			titleDe = str.substring(titleDeStartIndex, titleDeEndIndex);
+			titleDe = decodeHtml(titleDe);
+			
+			titleDe = titleDe.trim().replace(',', '');
+			removeTagIfExist(titleDe);
+		}
+
+		/* Spanish title */
+
+		titleEs = null;
+		titleEsStartTxt = 'Spanish:</span>';
+		titleEsStartIndex = str.indexOf(titleEsStartTxt);
+		if(str.indexOf(titleEsStartTxt) != -1)
+		{
+			titleEsStartIndex += titleEsStartTxt.length;
+			titleEsEndIndex = str.indexOf('</div>', titleEsStartIndex);
+			titleEs = str.substring(titleEsStartIndex, titleEsEndIndex);
+			titleEs = decodeHtml(titleEs);
+			
+			titleEs = titleEs.trim().replace(',', '');
+			removeTagIfExist(titleEs);
 		}
 		
-		try
+		/* Native/raw title - may need some correction for titles that aren't originally japanese. */
+
+		titleNative = null;
+		titleNativeStartTxt = "Japanese:</span>";
+		titleNativeStartIndex = str.indexOf(titleNativeStartTxt);
+		if(str.indexOf(titleNativeStartTxt) != -1)
 		{
-			let str = await fetch(`https://myanimelist.net/${listtype}/${id}`)
+			titleNativeStartIndex += titleNativeStartTxt.length;
+			titleNativeEndIndex = str.indexOf("</div>", titleNativeStartIndex);
+			titleNative = str.substring(titleNativeStartIndex, titleNativeEndIndex);
+			titleNative = decodeHtml(titleNative);
+			
+			titleNative = titleNative.trim().replace(',', '');
+			removeTagIfExist(titleNative);
+		}
+		
+		/* Title synonyms */
+		
+		titleSynStartTxt = 'Synonyms:</span>';
+		titleSynStartIndex = str.indexOf(titleSynStartTxt);
+		if(str.indexOf(titleSynStartTxt) != -1)
+		{
+			titleSynStartIndex += titleSynStartTxt.length;
+			titleSynEndIndex = str.indexOf('</div>', titleSynStartIndex);
+			titleSyn = str.substring(titleSynStartIndex, titleSynEndIndex);
+			titleSyn = decodeHtml(titleSyn);
+			titleSynArr = titleSyn.split(',');
+			if(titleSynArr.length > 0)
+			{
+				titleSyn = titleSynArr[0].trim();
+			}
+		}
+		
+		/* Title fallbacks for when no alternatives found */
+		for (t in [titleEn, titleFr, titleEs, titleDe])
+		{
+			if(t == null && titleSyn != null)
+			{
+				t = titleSyn;
+			}
+			else
+			{
+				t = title;
+			}
+		}
+		
+		/* date */
+		season = null;
+		year = null;
+		dateStartTxt = ( listtype == "anime" ) ? 'Aired:</span>' : 'Published:</span>';
+		dateStartIndex = str.indexOf(dateStartTxt) + dateStartTxt.length;
+		if(str.indexOf(dateStartTxt) != -1)
+		{
+			dateEndIndex = str.indexOf("</div>", dateStartIndex);
+			dateHtml = str.substring(dateStartIndex, dateEndIndex);
+			/* dateHtml should output "Oct 4, 2003 to Oct 2, 2004" or similar */
+			dateArr = dateHtml.split(" to ");
+			dateBegunArr = dateArr[0].split(",");
+
+			if(dateBegunArr.length == 2)
+			{
+				season = null;
+				if(dateBegunArr[0].indexOf("Jan") != -1 || dateBegunArr[0].indexOf("Feb") != -1 || dateBegunArr[0].indexOf("Mar") != -1)
+				{
+					season = "Winter";
+				}
+				else if(dateBegunArr[0].indexOf("Apr") != -1 || dateBegunArr[0].indexOf("May") != -1 || dateBegunArr[0].indexOf("Jun") != -1)
+				{
+					season = "Spring";
+				}
+				else if(dateBegunArr[0].indexOf("Jul") != -1 || dateBegunArr[0].indexOf("Aug") != -1 || dateBegunArr[0].indexOf("Sep") != -1)
+				{
+					season = "Summer";
+				}
+				else if(dateBegunArr[0].indexOf("Oct") != -1 || dateBegunArr[0].indexOf("Nov") != -1 || dateBegunArr[0].indexOf("Dec") != -1)
+				{
+					season = "Fall";
+				}
+				year = dateBegunArr[1].trim();
+				removeTagIfExist(season);
+				removeTagIfExist(year);
+			}
+
+			startDate = dateArr[0].trim();
+			endDate = dateArr.length == 2 ? dateArr[1].trim() : "";
+
+			airedTag = "Aired: " + dateArr[0].trim().replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].trim().replace(',', '') : "");
+			removeTagIfExist('Aired: ', mode = 2);
+			publishedTag = "Published: " + dateArr[0].trim().replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].trim().replace(',', '') : "");
+			removeTagIfExist('Published: ', mode = 2);
+		}
+		
+		/* studio (anime) */
+		studios = null;
+		studiosStartTxt = "Studios:</span>";
+		studiosStartIndex = str.indexOf(studiosStartTxt);
+		if(str.indexOf(studiosStartTxt) != -1)
+		{
+			studiosStartIndex += studiosStartTxt.length;
+			studiosEndIndex = str.indexOf("</div>", studiosStartIndex);
+			studiosHtml = str.substring(studiosStartIndex, studiosEndIndex);
+			
+			studios = studiosHtml.split(",");
+			studiosLength = studios.length;
+			for(j = 0; j < studiosLength; j++)
+			{
+				g1 = studios[j].indexOf("\">") + 2;
+				g2 = studios[j].indexOf("</a>");
+				if(g2 == -1) { studios = null; break; }
+				studios[j] = studios[j].substring(g1, g2).trim();
+				studios[j] = decodeHtml(studios[j]);
+				removeTagIfExist(studios[j]);
+			}
+		}
+		
+		/* authors (manga) */
+		authors = null;
+		authorsStartTxt = "Authors:</span>";
+		authorsStartIndex = str.indexOf(authorsStartTxt);
+		if(str.indexOf(authorsStartTxt) != -1)
+		{
+			authorsStartIndex += authorsStartTxt.length;
+			authorsEndIndex = str.indexOf("</div>", authorsStartIndex);
+			authorsHtml = str.substring(authorsStartIndex, authorsEndIndex);
+
+			authors = authorsHtml.split(", <a");
+			authorsLength = authors.length;
+			for(j = 0; j < authorsLength; j++)
+			{
+				startAt = authors[j].indexOf("\">") + 2;
+				endAt = authors[j].indexOf("</a>");
+				if(endAt == -1) { authors = null; break; }
+				authors[j] = authors[j].substring(startAt, endAt).trim().replaceAll(',','');
+				authors[j] = decodeHtml(authors[j]);
+				removeTagIfExist(authors[j]);
+			}
+		}
+
+		/* producers (anime) */
+		producers = null;
+		producersStartTxt = "Producers:</span>";
+		producersStartIndex = str.indexOf(producersStartTxt);
+		if(str.indexOf(producersStartTxt) != -1)
+		{
+			producersStartIndex += producersStartTxt.length;
+			producersEndIndex = str.indexOf("</div>", producersStartIndex);
+			producersHtml = str.substring(producersStartIndex, producersEndIndex);
+
+			producers = producersHtml.split(",");
+			producersLength = producers.length;
+			for(j = 0; j < producersLength; j++)
+			{
+				if(producers[j].indexOf("<sup>") == -1)
+				{
+					startAt = producers[j].indexOf("\">") + 2;
+					endAt = producers[j].indexOf("</a>");
+					if(endAt == -1) { producers = null; break; }
+					producers[j] = producers[j].substring(startAt, endAt).trim();
+					producers[j] = decodeHtml(producers[j]);
+					removeTagIfExist(producers[j]);
+				}
+				else
+				{
+					producers.splice(j, 1);
+					producersLength--;
+					j--;
+				}
+			}
+		}
+
+		/* licensors (anime) */
+		licensors = null;
+		licensorsStartTxt = "Licensors:</span>";
+		licensorsStartIndex = str.indexOf(licensorsStartTxt);
+		if(str.indexOf(licensorsStartTxt) != -1)
+		{
+			licensorsStartIndex += licensorsStartTxt.length;
+			licensorsEndIndex = str.indexOf("</div>", licensorsStartIndex);
+			licensorsHtml = str.substring(licensorsStartIndex, licensorsEndIndex);
+
+			licensors = licensorsHtml.split(",");
+			licensorsLength = licensors.length;
+			for(j = 0; j < licensorsLength; j++)
+			{
+				if(licensors[j].indexOf("<sup>") == -1)
+				{
+					startAt = licensors[j].indexOf("\">") + 2;
+					endAt = licensors[j].indexOf("</a>");
+					if(endAt == -1) { licensors = null; break; }
+					licensors[j] = licensors[j].substring(startAt, endAt).trim();
+					licensors[j] = decodeHtml(licensors[j]);
+					removeTagIfExist(licensors[j]);
+				}
+				else
+				{
+					licensors.splice(j, 1);
+					licensorsLength--;
+					j--;
+				}
+			}
+		}
+
+		/* serialization (manga) */
+		serializations = null;
+		serializationStartTxt = "Serialization:</span>";
+		serializationStartIndex = str.indexOf(serializationStartTxt);
+		if(str.indexOf(serializationStartTxt) != -1)
+		{
+			serializationStartIndex += serializationStartTxt.length;
+			serializationEndIndex = str.indexOf("</div>", serializationStartIndex);
+			serializationHtml = str.substring(serializationStartIndex, serializationEndIndex);
+
+			serializations = serializationHtml.split(",");
+			serializationLength = serializations.length;
+			for(j = 0; j < serializationLength; j++)
+			{
+				if(serializations[j].indexOf("<sup>") == -1)
+				{
+					startAt = serializations[j].indexOf("\">") + 2;
+					endAt = serializations[j].indexOf("</a>");
+					if(endAt == -1) { serializations = null; break; }
+					serializations[j] = serializations[j].substring(startAt, endAt).trim();
+					serializations[j] = decodeHtml(serializations[j]);
+					removeTagIfExist(serializations[j]);
+				}
+				else
+				{
+					serializations.splice(j, 1);
+					serializationLength--;
+					j--;
+				}
+			}
+		}
+
+		/* rating (anime) */
+		rating = "?";
+		if('anime_mpaa_rating_string' in thisData)
+		{
+			rating = thisData['anime_mpaa_rating_string'];
+		}
+		ratingTag = `Rating: ${rating}`;
+		removeTagIfExist('Rating: ', mode = 2);
+
+		/* duration (anime) */
+		duration = '?';
+		totalDuration = '?';
+		durationStartTxt = "Duration:</span>";
+		durationStartIndex = str.indexOf(durationStartTxt);
+		if(durationStartIndex !== -1)
+		{
+			function splitMinute(minutes)
+			{
+				final = [];
+				leftover = minutes % 60;
+				hours = (minutes - leftover) / 60;
+				if(hours > 0)
+				{
+					final.push(hours + 'h');
+				}
+				final.push(leftover + 'm');
+				return final.join(' ');
+			}
+
+			durationStartIndex += durationStartTxt.length;
+			durationEndIndex = str.indexOf("</div>", durationStartIndex);
+
+			durationSubStr = str.substring(durationStartIndex, durationEndIndex);
+			if(durationSubStr.indexOf('hr') !== -1)
+			{
+				splitHr = durationSubStr.split('hr');
+				hours = parseInt(splitHr[0].trim());
+				minutes = parseInt(splitHr[1].replace(/[^0-9]*/g, ''));
+				minutes += hours * 60;
+			}
+			else
+			{
+				minutes = parseInt(durationSubStr.split('min')[0].trim());
+			}
+
+			if(!isNaN(minutes))
+			{
+				duration = splitMinute(minutes);
+
+				episodesStartTxt = 'Episodes:</span>';
+				episodesStartIndex = str.indexOf(episodesStartTxt);
+				if(episodesStartIndex !== -1)
+				{
+					episodesStartIndex += episodesStartTxt.length;
+					episodesEndIndex = str.indexOf("</div>", episodesStartIndex);
+					episodes = parseInt(str.substring(episodesStartIndex, episodesEndIndex).trim());
+
+					if(!isNaN(episodes))
+					{
+						totalDuration = splitMinute(minutes * episodes);
+					}
+				}
+			}
+		}
+		durationTag = `Duration/Ep: ${duration}`;
+		totalDurationTag = `Duration: ${totalDuration}`;
+		removeTagIfExist('Duration/Ep: ', mode = 2);
+		removeTagIfExist('Duration: ', mode = 2);
+
+		/* genres */
+		genres = [];
+		for(each of thisData['genres'])
+		{
+			genre = each['name'];
+			genres.push(genre);
+			removeTagIfExist(genre);
+		}
+
+		/* themes */
+		themes = [];
+		themesRaw = $(doc).find('span.dark_text:contains("Theme") ~ [itemprop="genre"]');
+		if(themesRaw.length > 0)
+		{
+			for(j = 0; j < themesRaw.length; j++)
+			{
+				themes[j] = themesRaw.eq(j).text().trim();
+				removeTagIfExist(themes[j]);
+			}
+		}
+
+		/* demographic */
+		demographics = [];
+		for(each of thisData['demographics'])
+		{
+			demographic = each['name'];
+			demographics.push(demographic);
+			removeTagIfExist(demographic);
+		}
+
+		/* rank */
+		rank = "?";
+		rankStartTxt = "Ranked:</span>";
+		rankStartIndex = str.indexOf(rankStartTxt);
+		if(rankStartIndex != -1)
+		{
+			rankStartIndex += rankStartTxt.length;
+			rankEndIndex = str.indexOf("<sup>", rankStartIndex);
+			rank = str.substring(rankStartIndex, rankEndIndex);
+			rank = rank.trim().replace("#", "");
+		}
+		rankTag = `Ranked: ${rank}`;
+		removeTagIfExist('Ranked: ', mode = 2);
+		
+		/* popularity */
+		popularity = "?";
+		popularityStartTxt = "Popularity:</span>";
+		popularityStartIndex = str.indexOf(popularityStartTxt);
+		if(popularityStartIndex != -1)
+		{
+			popularityStartIndex += popularityStartTxt.length;
+			popularityEndIndex = str.indexOf("</div>", popularityStartIndex);
+			popularity = str.substring(popularityStartIndex, popularityEndIndex);
+			popularity = popularity.trim().replace("#", "");
+		}
+		popularityTag = `Popularity: ${popularity}`;
+		removeTagIfExist('Popularity: ', mode = 2);
+		
+		/* score */
+		score = "?";
+		scoreEle = $(doc).find("[itemprop=\"ratingValue\"]");
+		if(scoreEle.length > 0)
+		{
+			score = scoreEle.text().trim();
+		}
+		scoreTag = `Score: ${score}`;
+		removeTagIfExist('Score: ', mode = 2);
+
+		/* Synopsis (description) */
+		synopsis = $(doc).find("[itemprop=\"description\"]").text().trim();
+		synopsisCss = synopsis.replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").trim();
+		
+		/* Update Notes & Tags */
+
+		let csrf = $('meta[name="csrf_token"]').attr('content');
+
+		if(chkTags.checked)
+		{
+			if(titleEn && chkEnglish.checked) { tags.push(titleEn); }
+			if(titleFr && chkFrench.checked) { tags.push(titleFr); }
+			if(titleEs && chkSpanish.checked) { tags.push(titleEs); }
+			if(titleDe && chkGerman.checked) { tags.push(titleDe); }
+			if(titleNative && chkNative.checked) { tags.push(titleNative); }
+			if(season && chkSeason.checked) { tags.push(season); }
+			if(year && chkYear.checked) { tags.push(year); }
+			if(studios && chkStudio.checked) { tags.push(studios); }
+			if(producers && chkProducers.checked) { tags.push(producers); }
+			if(licensors && chkLicensors.checked) { tags.push(licensors); }
+			if(serializations && chkSerialization.checked) { tags.push(serializations); }
+			if(genres && chkGenres.checked) { tags.push(genres); }
+			if(themes && chkThemes.checked) { tags.push(themes); }
+			if(demographic && chkDemographic.checked) { tags.push(demographic); }
+			if(authors && chkAuthors.checked) { tags.push(authors); }
+			if(chkAired.checked) { tags.push(airedTag); }
+			if(chkPublished.checked) { tags.push(publishedTag); }
+			if(chkScore.checked) { tags.push(scoreTag); }
+			if(chkRank.checked) { tags.push(rankTag); }
+			if(chkPopularity.checked) { tags.push(popularityTag); }
+			if(chkRating.checked) { tags.push(ratingTag); }
+			if(chkDuration.checked) { tags.push(durationTag); }
+			if(chkTotalDuration.checked) { tags.push(totalDurationTag); }
+			
+			let tagsRequestUrl;
+			let animeOrMangaId;
+			if(listtype === 'anime') {
+				tagsRequestUrl = 'https://myanimelist.net/includes/ajax.inc.php?t=22&tags=';
+				animeOrMangaId = 'aid';
+			} else {
+				tagsRequestUrl = 'https://myanimelist.net/includes/ajax.inc.php?t=30&tags=';
+				animeOrMangaId = 'mid';
+			}
+			tagsRequestUrl += encodeURIComponent(tags.join(", "));
+
+			let headerData = new Headers();
+			headerData.append('X-Requested-With', 'XMLHttpRequest');
+
+			let formData = new URLSearchParams();
+			formData.append(animeOrMangaId, id);
+			formData.append("csrf_token", csrf);
+		
+			await fetch(tagsRequestUrl, {
+				method: "POST",
+				headers: headerData,
+				body: formData
+			})
 			.then(response => {
 				if(!response.ok)
 				{
-					throw new Error(`${listtype} #${id}: Failed to get entry information.`);
+					throw new Error(`${listtype} #${id}: Failed to update tags.`);
 				}
-				return response.text();
-			})
-			.then(html => {
-				return html;
+				return true;
 			})
 			.catch(error => {
 				log.error(error);
 				return false;
 			});
-			if(!str)
-			{
-				continueProcessing();
-				return;
+		}
+
+		if(chkNotes.checked)
+		{
+			let notes = [];
+
+			if(titleEn && chkEnglishNotes.checked) { notes.push(titleEn); }
+			if(titleFr && chkFrenchNotes.checked) { notes.push(titleFr); }
+			if(titleEs && chkSpanishNotes.checked) { notes.push(titleEs); }
+			if(titleDe && chkGermanNotes.checked) { notes.push(titleDe); }
+			if(titleNative && chkNativeNotes.checked) { notes.push(titleNative); }
+			if(season && chkSeasonNotes.checked) { notes.push(season); }
+			if(year && chkYearNotes.checked) { notes.push(year); }
+			if(studios && chkStudioNotes.checked) { notes.push(studios); }
+			if(producers && chkProducersNotes.checked) { notes.push(producers); }
+			if(licensors && chkLicensorsNotes.checked) { notes.push(licensors); }
+			if(serializations && chkSerializationNotes.checked) { notes.push(serializations); }
+			if(genres && chkGenresNotes.checked) { notes.push(genres); }
+			if(themes && chkThemesNotes.checked) { notes.push(themes); }
+			if(demographic && chkDemographicNotes.checked) { notes.push(demographic); }
+			if(authors && chkAuthorsNotes.checked) { notes.push(authors); }
+			if(chkAiredNotes.checked) { notes.push(airedTag); }
+			if(chkPublishedNotes.checked) { notes.push(publishedTag); }
+			if(chkScoreNotes.checked) { notes.push(scoreTag); }
+			if(chkRankNotes.checked) { notes.push(rankTag); }
+			if(chkPopularityNotes.checked) { notes.push(popularityTag); }
+			if(chkRatingNotes.checked) { notes.push(ratingTag); }
+			if(chkDurationNotes.checked) { notes.push(durationTag); }
+			if(chkTotalDurationNotes.checked) { notes.push(totalDurationTag); }
+			if(chkSynopsisNotes.checked) { notes.push(synopsis); }
+
+			let notesStr = notes.join("\n\n");
+			let notesRequestUrl = '';
+			let notesRequestDict = {
+				"comments": notesStr,
+				"status": thisData['status'],
+				"csrf_token": csrf
+			};
+
+			if(listtype === 'anime') {
+				notesRequestDict['anime_id'] = id;
+				notesRequestUrl = 'https://myanimelist.net/ownlist/anime/edit_convert.json';
+			} else {
+				notesRequestDict['manga_id'] = id;
+				notesRequestUrl = 'https://myanimelist.net/ownlist/manga/edit_convert.json';
 			}
-			let doc = new DOMParser().parseFromString(str, "text/html");
+
+			let notesRequestContent = JSON.stringify(notesRequestDict);
+
+			let headerData = new Headers();
+			headerData.append('X-Requested-With', 'XMLHttpRequest');
 		
-			/* get current tags */
-			if(!chkTags.checked || chkClearTags.checked) {
-				tags = [];
-			}
-			else if(chkTags.checked)
-			{
-				tags = thisData['tags'].split(',');
-				
-				/* remove extra whitespace */
-				for(j = 0; j < tags.length; j++)
+			await fetch(notesRequestUrl, {
+				method: "POST",
+				headers: headerData,
+				body: notesRequestContent
+			})
+			.then(response => {
+				if(!response.ok)
 				{
-					tags[j] = tags[j].trim();
+					throw new Error(`${listtype} #${id}: Failed update notes.`);
 				}
-			}
-
-			/* common functions */
+				return true;
+			})
+			.catch(error => {
+				log.error(error);
+				return false;
+			});
+		}
+		
+		/* thumbs */
+		try
+		{
+			img = $(doc).find('img[itemprop="image"]')[0];
+			imgUrl = img.getAttribute("data-src") || img.src;
 			
-			function removeTagIfExist(match, mode = 0)
-			/* takes input tag and checks if it is already in the tag list.
-			If it is, it removes it. This is so that the new tags added later are not duplicates.
-			It is done this way instead of simply removing the new tag so that the new tags can
-			maintain their order in relation to each other.
-			
-			Modes:
-			0 = old tag is exact match,
-			1 = old tag contains match
-			2 = old tag begins with match
-			3 = old tag ends with match */
-			{
-				if(tags.length == 0) {
-					return;
-				}
-
-				tagsLength = tags.length;
-				for(k = 0; k < tagsLength; k++)
-				{
-					tagNormalized = tags[k].toUpperCase();
-					matchNormalized = match.toUpperCase();
-					if(
-						tags[k].length == 0 ||
-						mode == 0 && tagNormalized == matchNormalized ||
-						mode == 1 && tagNormalized.indexOf(matchNormalized) != -1 ||
-						mode == 2 && tagNormalized.startsWith(matchNormalized) ||
-						mode == 3 && tagNormalized.endsWith(matchNormalized)
-					) {
-						tags.splice(k, 1);
-						tagsLength--;
-						k--;
-					}
-				}
-			}
-
-			/* titles */
-
-			title = thisData[`${listtype}_title`];
-
-			/* English title */
-			
-			titleEn = null;
-			if('anime_title_eng' in thisData)
-			{
-				titleEn = thisData['anime_title_eng'];
-			}
-			else if('manga_english' in thisData)
-			{
-				titleEn = thisData['manga_english'];
-			}
-			removeTagIfExist(titleEn);
-
-			/* French title */
-
-			titleFr = null;
-			titleFrStartTxt = 'French:</span>';
-			titleFrStartIndex = str.indexOf(titleFrStartTxt);
-			if(str.indexOf(titleFrStartTxt) != -1)
-			{
-				titleFrStartIndex += titleFrStartTxt.length;
-				titleFrEndIndex = str.indexOf('</div>', titleFrStartIndex);
-				titleFr = str.substring(titleFrStartIndex, titleFrEndIndex);
-				titleFr = decodeHtml(titleFr);
-				
-				titleFr = titleFr.trim().replace(',', '');
-				removeTagIfExist(titleFr);
-			}
-
-			/* German title */
-
-			titleDe = null;
-			titleDeStartTxt = 'German:</span>';
-			titleDeStartIndex = str.indexOf(titleDeStartTxt);
-			if(str.indexOf(titleDeStartTxt) != -1)
-			{
-				titleDeStartIndex += titleDeStartTxt.length;
-				titleDeEndIndex = str.indexOf('</div>', titleDeStartIndex);
-				titleDe = str.substring(titleDeStartIndex, titleDeEndIndex);
-				titleDe = decodeHtml(titleDe);
-				
-				titleDe = titleDe.trim().replace(',', '');
-				removeTagIfExist(titleDe);
-			}
-
-			/* Spanish title */
-
-			titleEs = null;
-			titleEsStartTxt = 'Spanish:</span>';
-			titleEsStartIndex = str.indexOf(titleEsStartTxt);
-			if(str.indexOf(titleEsStartTxt) != -1)
-			{
-				titleEsStartIndex += titleEsStartTxt.length;
-				titleEsEndIndex = str.indexOf('</div>', titleEsStartIndex);
-				titleEs = str.substring(titleEsStartIndex, titleEsEndIndex);
-				titleEs = decodeHtml(titleEs);
-				
-				titleEs = titleEs.trim().replace(',', '');
-				removeTagIfExist(titleEs);
-			}
-			
-			/* Native/raw title - may need some correction for titles that aren't originally japanese. */
-
-			titleNative = null;
-			titleNativeStartTxt = "Japanese:</span>";
-			titleNativeStartIndex = str.indexOf(titleNativeStartTxt);
-			if(str.indexOf(titleNativeStartTxt) != -1)
-			{
-				titleNativeStartIndex += titleNativeStartTxt.length;
-				titleNativeEndIndex = str.indexOf("</div>", titleNativeStartIndex);
-				titleNative = str.substring(titleNativeStartIndex, titleNativeEndIndex);
-				titleNative = decodeHtml(titleNative);
-				
-				titleNative = titleNative.trim().replace(',', '');
-				removeTagIfExist(titleNative);
-			}
-			
-			/* Title synonyms */
-			
-			titleSynStartTxt = 'Synonyms:</span>';
-			titleSynStartIndex = str.indexOf(titleSynStartTxt);
-			if(str.indexOf(titleSynStartTxt) != -1)
-			{
-				titleSynStartIndex += titleSynStartTxt.length;
-				titleSynEndIndex = str.indexOf('</div>', titleSynStartIndex);
-				titleSyn = str.substring(titleSynStartIndex, titleSynEndIndex);
-				titleSyn = decodeHtml(titleSyn);
-				titleSynArr = titleSyn.split(',');
-				if(titleSynArr.length > 0)
-				{
-					titleSyn = titleSynArr[0].trim();
-				}
-			}
-			
-			/* Title fallbacks for when no alternatives found */
-			for (t in [titleEn, titleFr, titleEs, titleDe])
-			{
-				if(t == null && titleSyn != null)
-				{
-					t = titleSyn;
-				}
-				else
-				{
-					t = title;
-				}
-			}
-			
-			/* date */
-			season = null;
-			year = null;
-			dateStartTxt = ( listtype == "anime" ) ? 'Aired:</span>' : 'Published:</span>';
-			dateStartIndex = str.indexOf(dateStartTxt) + dateStartTxt.length;
-			if(str.indexOf(dateStartTxt) != -1)
-			{
-				dateEndIndex = str.indexOf("</div>", dateStartIndex);
-				dateHtml = str.substring(dateStartIndex, dateEndIndex);
-				/* dateHtml should output "Oct 4, 2003 to Oct 2, 2004" or similar */
-				dateArr = dateHtml.split(" to ");
-				dateBegunArr = dateArr[0].split(",");
-
-				if(dateBegunArr.length == 2)
-				{
-					season = null;
-					if(dateBegunArr[0].indexOf("Jan") != -1 || dateBegunArr[0].indexOf("Feb") != -1 || dateBegunArr[0].indexOf("Mar") != -1)
-					{
-						season = "Winter";
-					}
-					else if(dateBegunArr[0].indexOf("Apr") != -1 || dateBegunArr[0].indexOf("May") != -1 || dateBegunArr[0].indexOf("Jun") != -1)
-					{
-						season = "Spring";
-					}
-					else if(dateBegunArr[0].indexOf("Jul") != -1 || dateBegunArr[0].indexOf("Aug") != -1 || dateBegunArr[0].indexOf("Sep") != -1)
-					{
-						season = "Summer";
-					}
-					else if(dateBegunArr[0].indexOf("Oct") != -1 || dateBegunArr[0].indexOf("Nov") != -1 || dateBegunArr[0].indexOf("Dec") != -1)
-					{
-						season = "Fall";
-					}
-					year = dateBegunArr[1].trim();
-					removeTagIfExist(season);
-					removeTagIfExist(year);
-				}
-
-				startDate = dateArr[0].trim();
-				endDate = dateArr.length == 2 ? dateArr[1].trim() : "";
-
-				airedTag = "Aired: " + dateArr[0].trim().replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].trim().replace(',', '') : "");
-				removeTagIfExist('Aired: ', mode = 2);
-				publishedTag = "Published: " + dateArr[0].trim().replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].trim().replace(',', '') : "");
-				removeTagIfExist('Published: ', mode = 2);
-			}
-			
-			/* studio (anime) */
-			studios = null;
-			studiosStartTxt = "Studios:</span>";
-			studiosStartIndex = str.indexOf(studiosStartTxt);
-			if(str.indexOf(studiosStartTxt) != -1)
-			{
-				studiosStartIndex += studiosStartTxt.length;
-				studiosEndIndex = str.indexOf("</div>", studiosStartIndex);
-				studiosHtml = str.substring(studiosStartIndex, studiosEndIndex);
-				
-				studios = studiosHtml.split(",");
-				studiosLength = studios.length;
-				for(j = 0; j < studiosLength; j++)
-				{
-					g1 = studios[j].indexOf("\">") + 2;
-					g2 = studios[j].indexOf("</a>");
-					if(g2 == -1) { studios = null; break; }
-					studios[j] = studios[j].substring(g1, g2).trim();
-					studios[j] = decodeHtml(studios[j]);
-					removeTagIfExist(studios[j]);
-				}
-			}
-			
-			/* authors (manga) */
-			authors = null;
-			authorsStartTxt = "Authors:</span>";
-			authorsStartIndex = str.indexOf(authorsStartTxt);
-			if(str.indexOf(authorsStartTxt) != -1)
-			{
-				authorsStartIndex += authorsStartTxt.length;
-				authorsEndIndex = str.indexOf("</div>", authorsStartIndex);
-				authorsHtml = str.substring(authorsStartIndex, authorsEndIndex);
-
-				authors = authorsHtml.split(", <a");
-				authorsLength = authors.length;
-				for(j = 0; j < authorsLength; j++)
-				{
-					startAt = authors[j].indexOf("\">") + 2;
-					endAt = authors[j].indexOf("</a>");
-					if(endAt == -1) { authors = null; break; }
-					authors[j] = authors[j].substring(startAt, endAt).trim().replaceAll(',','');
-					authors[j] = decodeHtml(authors[j]);
-					removeTagIfExist(authors[j]);
-				}
-			}
-
-			/* producers (anime) */
-			producers = null;
-			producersStartTxt = "Producers:</span>";
-			producersStartIndex = str.indexOf(producersStartTxt);
-			if(str.indexOf(producersStartTxt) != -1)
-			{
-				producersStartIndex += producersStartTxt.length;
-				producersEndIndex = str.indexOf("</div>", producersStartIndex);
-				producersHtml = str.substring(producersStartIndex, producersEndIndex);
-	
-				producers = producersHtml.split(",");
-				producersLength = producers.length;
-				for(j = 0; j < producersLength; j++)
-				{
-					if(producers[j].indexOf("<sup>") == -1)
-					{
-						startAt = producers[j].indexOf("\">") + 2;
-						endAt = producers[j].indexOf("</a>");
-						if(endAt == -1) { producers = null; break; }
-						producers[j] = producers[j].substring(startAt, endAt).trim();
-						producers[j] = decodeHtml(producers[j]);
-						removeTagIfExist(producers[j]);
-					}
-					else
-					{
-						producers.splice(j, 1);
-						producersLength--;
-						j--;
-					}
-				}
-			}
-
-			/* licensors (anime) */
-			licensors = null;
-			licensorsStartTxt = "Licensors:</span>";
-			licensorsStartIndex = str.indexOf(licensorsStartTxt);
-			if(str.indexOf(licensorsStartTxt) != -1)
-			{
-				licensorsStartIndex += licensorsStartTxt.length;
-				licensorsEndIndex = str.indexOf("</div>", licensorsStartIndex);
-				licensorsHtml = str.substring(licensorsStartIndex, licensorsEndIndex);
-	
-				licensors = licensorsHtml.split(",");
-				licensorsLength = licensors.length;
-				for(j = 0; j < licensorsLength; j++)
-				{
-					if(licensors[j].indexOf("<sup>") == -1)
-					{
-						startAt = licensors[j].indexOf("\">") + 2;
-						endAt = licensors[j].indexOf("</a>");
-						if(endAt == -1) { licensors = null; break; }
-						licensors[j] = licensors[j].substring(startAt, endAt).trim();
-						licensors[j] = decodeHtml(licensors[j]);
-						removeTagIfExist(licensors[j]);
-					}
-					else
-					{
-						licensors.splice(j, 1);
-						licensorsLength--;
-						j--;
-					}
-				}
-			}
-
-			/* serialization (manga) */
-			serializations = null;
-			serializationStartTxt = "Serialization:</span>";
-			serializationStartIndex = str.indexOf(serializationStartTxt);
-			if(str.indexOf(serializationStartTxt) != -1)
-			{
-				serializationStartIndex += serializationStartTxt.length;
-				serializationEndIndex = str.indexOf("</div>", serializationStartIndex);
-				serializationHtml = str.substring(serializationStartIndex, serializationEndIndex);
-	
-				serializations = serializationHtml.split(",");
-				serializationLength = serializations.length;
-				for(j = 0; j < serializationLength; j++)
-				{
-					if(serializations[j].indexOf("<sup>") == -1)
-					{
-						startAt = serializations[j].indexOf("\">") + 2;
-						endAt = serializations[j].indexOf("</a>");
-						if(endAt == -1) { serializations = null; break; }
-						serializations[j] = serializations[j].substring(startAt, endAt).trim();
-						serializations[j] = decodeHtml(serializations[j]);
-						removeTagIfExist(serializations[j]);
-					}
-					else
-					{
-						serializations.splice(j, 1);
-						serializationLength--;
-						j--;
-					}
-				}
-			}
-
-			/* rating (anime) */
-			rating = "?";
-			if('anime_mpaa_rating_string' in thisData)
-			{
-				rating = thisData['anime_mpaa_rating_string'];
-			}
-			ratingTag = `Rating: ${rating}`;
-			removeTagIfExist('Rating: ', mode = 2);
-
-			/* duration (anime) */
-			duration = '?';
-			totalDuration = '?';
-			durationStartTxt = "Duration:</span>";
-			durationStartIndex = str.indexOf(durationStartTxt);
-			if(durationStartIndex !== -1)
-			{
-				function splitMinute(minutes)
-				{
-					final = [];
-					leftover = minutes % 60;
-					hours = (minutes - leftover) / 60;
-					if(hours > 0)
-					{
-						final.push(hours + 'h');
-					}
-					final.push(leftover + 'm');
-					return final.join(' ');
-				}
-
-				durationStartIndex += durationStartTxt.length;
-				durationEndIndex = str.indexOf("</div>", durationStartIndex);
-
-				durationSubStr = str.substring(durationStartIndex, durationEndIndex);
-				if(durationSubStr.indexOf('hr') !== -1)
-				{
-					splitHr = durationSubStr.split('hr');
-					hours = parseInt(splitHr[0].trim());
-					minutes = parseInt(splitHr[1].replace(/[^0-9]*/g, ''));
-					minutes += hours * 60;
-				}
-				else
-				{
-					minutes = parseInt(durationSubStr.split('min')[0].trim());
-				}
-
-				if(!isNaN(minutes))
-				{
-					duration = splitMinute(minutes);
-
-					episodesStartTxt = 'Episodes:</span>';
-					episodesStartIndex = str.indexOf(episodesStartTxt);
-					if(episodesStartIndex !== -1)
-					{
-						episodesStartIndex += episodesStartTxt.length;
-						episodesEndIndex = str.indexOf("</div>", episodesStartIndex);
-						episodes = parseInt(str.substring(episodesStartIndex, episodesEndIndex).trim());
-
-						if(!isNaN(episodes))
-						{
-							totalDuration = splitMinute(minutes * episodes);
-						}
-					}
-				}
-			}
-			durationTag = `Duration/Ep: ${duration}`;
-			totalDurationTag = `Duration: ${totalDuration}`;
-			removeTagIfExist('Duration/Ep: ', mode = 2);
-			removeTagIfExist('Duration: ', mode = 2);
-
-			/* genres */
-			genres = [];
-			for(each of thisData['genres'])
-			{
-				genre = each['name'];
-				genres.push(genre);
-				removeTagIfExist(genre);
-			}
-
-			/* themes */
-			themes = [];
-			themesRaw = $(doc).find('span.dark_text:contains("Theme") ~ [itemprop="genre"]');
-			if(themesRaw.length > 0)
-			{
-				for(j = 0; j < themesRaw.length; j++)
-				{
-					themes[j] = themesRaw.eq(j).text().trim();
-					removeTagIfExist(themes[j]);
-				}
-			}
-
-			/* demographic */
-			demographics = [];
-			for(each of thisData['demographics'])
-			{
-				demographic = each['name'];
-				demographics.push(demographic);
-				removeTagIfExist(demographic);
-			}
-
-			/* rank */
-			rank = "?";
-			rankStartTxt = "Ranked:</span>";
-			rankStartIndex = str.indexOf(rankStartTxt);
-			if(rankStartIndex != -1)
-			{
-				rankStartIndex += rankStartTxt.length;
-				rankEndIndex = str.indexOf("<sup>", rankStartIndex);
-				rank = str.substring(rankStartIndex, rankEndIndex);
-				rank = rank.trim().replace("#", "");
-			}
-			rankTag = `Ranked: ${rank}`;
-			removeTagIfExist('Ranked: ', mode = 2);
-			
-			/* popularity */
-			popularity = "?";
-			popularityStartTxt = "Popularity:</span>";
-			popularityStartIndex = str.indexOf(popularityStartTxt);
-			if(popularityStartIndex != -1)
-			{
-				popularityStartIndex += popularityStartTxt.length;
-				popularityEndIndex = str.indexOf("</div>", popularityStartIndex);
-				popularity = str.substring(popularityStartIndex, popularityEndIndex);
-				popularity = popularity.trim().replace("#", "");
-			}
-			popularityTag = `Popularity: ${popularity}`;
-			removeTagIfExist('Popularity: ', mode = 2);
-			
-			/* score */
-			score = "?";
-			scoreEle = $(doc).find("[itemprop=\"ratingValue\"]");
-			if(scoreEle.length > 0)
-			{
-				score = scoreEle.text().trim();
-			}
-			scoreTag = `Score: ${score}`;
-			removeTagIfExist('Score: ', mode = 2);
-
-			/* Synopsis (description) */
-			synopsis = $(doc).find("[itemprop=\"description\"]").text().trim();
-			synopsisCss = synopsis.replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").trim();
-			
-			/* Update Notes & Tags */
-
-			let csrf = $('meta[name="csrf_token"]').attr('content');
-
-			if(chkTags.checked)
-			{
-				if(titleEn && chkEnglish.checked) { tags.push(titleEn); }
-				if(titleFr && chkFrench.checked) { tags.push(titleFr); }
-				if(titleEs && chkSpanish.checked) { tags.push(titleEs); }
-				if(titleDe && chkGerman.checked) { tags.push(titleDe); }
-				if(titleNative && chkNative.checked) { tags.push(titleNative); }
-				if(season && chkSeason.checked) { tags.push(season); }
-				if(year && chkYear.checked) { tags.push(year); }
-				if(studios && chkStudio.checked) { tags.push(studios); }
-				if(producers && chkProducers.checked) { tags.push(producers); }
-				if(licensors && chkLicensors.checked) { tags.push(licensors); }
-				if(serializations && chkSerialization.checked) { tags.push(serializations); }
-				if(genres && chkGenres.checked) { tags.push(genres); }
-				if(themes && chkThemes.checked) { tags.push(themes); }
-				if(demographic && chkDemographic.checked) { tags.push(demographic); }
-				if(authors && chkAuthors.checked) { tags.push(authors); }
-				if(chkAired.checked) { tags.push(airedTag); }
-				if(chkPublished.checked) { tags.push(publishedTag); }
-				if(chkScore.checked) { tags.push(scoreTag); }
-				if(chkRank.checked) { tags.push(rankTag); }
-				if(chkPopularity.checked) { tags.push(popularityTag); }
-				if(chkRating.checked) { tags.push(ratingTag); }
-				if(chkDuration.checked) { tags.push(durationTag); }
-				if(chkTotalDuration.checked) { tags.push(totalDurationTag); }
-				
-				let tagsRequestUrl;
-				let animeOrMangaId;
-				if(listtype === 'anime') {
-					tagsRequestUrl = 'https://myanimelist.net/includes/ajax.inc.php?t=22&tags=';
-					animeOrMangaId = 'aid';
-				} else {
-					tagsRequestUrl = 'https://myanimelist.net/includes/ajax.inc.php?t=30&tags=';
-					animeOrMangaId = 'mid';
-				}
-				tagsRequestUrl += encodeURIComponent(tags.join(", "));
-
-				let headerData = new Headers();
-				headerData.append('X-Requested-With', 'XMLHttpRequest');
-
-				let formData = new URLSearchParams();
-				formData.append(animeOrMangaId, id);
-				formData.append("csrf_token", csrf);
-			
-				await fetch(tagsRequestUrl, {
-					method: "POST",
-					headers: headerData,
-					body: formData
-				})
-				.then(response => {
-					if(!response.ok)
-					{
-						throw new Error(`${listtype} #${id}: Failed to update tags.`);
-					}
-					return true;
-				})
-				.catch(error => {
-					log.error(error);
-					return false;
-				});
-			}
-
-			if(chkNotes.checked)
-			{
-				let notes = [];
-
-				if(titleEn && chkEnglishNotes.checked) { notes.push(titleEn); }
-				if(titleFr && chkFrenchNotes.checked) { notes.push(titleFr); }
-				if(titleEs && chkSpanishNotes.checked) { notes.push(titleEs); }
-				if(titleDe && chkGermanNotes.checked) { notes.push(titleDe); }
-				if(titleNative && chkNativeNotes.checked) { notes.push(titleNative); }
-				if(season && chkSeasonNotes.checked) { notes.push(season); }
-				if(year && chkYearNotes.checked) { notes.push(year); }
-				if(studios && chkStudioNotes.checked) { notes.push(studios); }
-				if(producers && chkProducersNotes.checked) { notes.push(producers); }
-				if(licensors && chkLicensorsNotes.checked) { notes.push(licensors); }
-				if(serializations && chkSerializationNotes.checked) { notes.push(serializations); }
-				if(genres && chkGenresNotes.checked) { notes.push(genres); }
-				if(themes && chkThemesNotes.checked) { notes.push(themes); }
-				if(demographic && chkDemographicNotes.checked) { notes.push(demographic); }
-				if(authors && chkAuthorsNotes.checked) { notes.push(authors); }
-				if(chkAiredNotes.checked) { notes.push(airedTag); }
-				if(chkPublishedNotes.checked) { notes.push(publishedTag); }
-				if(chkScoreNotes.checked) { notes.push(scoreTag); }
-				if(chkRankNotes.checked) { notes.push(rankTag); }
-				if(chkPopularityNotes.checked) { notes.push(popularityTag); }
-				if(chkRatingNotes.checked) { notes.push(ratingTag); }
-				if(chkDurationNotes.checked) { notes.push(durationTag); }
-				if(chkTotalDurationNotes.checked) { notes.push(totalDurationTag); }
-				if(chkSynopsisNotes.checked) { notes.push(synopsis); }
-
-				let notesStr = notes.join("\n\n");
-				let notesRequestUrl = '';
-				let notesRequestDict = {
-					"comments": notesStr,
-					"status": thisData['status'],
-					"csrf_token": csrf
-				};
-
-				if(listtype === 'anime') {
-					notesRequestDict['anime_id'] = id;
-					notesRequestUrl = 'https://myanimelist.net/ownlist/anime/edit_convert.json';
-				} else {
-					notesRequestDict['manga_id'] = id;
-					notesRequestUrl = 'https://myanimelist.net/ownlist/manga/edit_convert.json';
-				}
-
-				let notesRequestContent = JSON.stringify(notesRequestDict);
-
-				let headerData = new Headers();
-				headerData.append('X-Requested-With', 'XMLHttpRequest');
-			
-				await fetch(notesRequestUrl, {
-					method: "POST",
-					headers: headerData,
-					body: notesRequestContent
-				})
-				.then(response => {
-					if(!response.ok)
-					{
-						throw new Error(`${listtype} #${id}: Failed update notes.`);
-					}
-					return true;
-				})
-				.catch(error => {
-					log.error(error);
-					return false;
-				});
-			}
-			
-			/* thumbs */
-			try
-			{
-				img = $(doc).find('img[itemprop="image"]')[0];
-				imgUrl = img.getAttribute("data-src") || img.src;
-				
-				imgUrlt = imgUrl.replace(".jpg", "t.jpg");
-				imgUrlv = imgUrl.replace(".jpg", "v.jpg");
-				imgUrll = imgUrl.replace(".jpg", "l.jpg");
-			}
-			catch(e)
-			{
-				imgUrl = imgUrlt = imgUrlv = imgUrll = 'none';
-				log.warn(`${listtype} #${id}: no image found`);
-			}
-			
-			/* Generate CSS */
-			cssLine = template.value
-				.replaceAll('[DEL]', '')
-				.replaceAll('[ID]', id)
-				.replaceAll('[TYPE]', listtype)
-				.replaceAll('[IMGURL]', imgUrl)
-				.replaceAll('[IMGURLT]', imgUrlt)
-				.replaceAll('[IMGURLV]', imgUrlv)
-				.replaceAll('[IMGURLL]', imgUrll)
-				.replaceAll('[TITLE]', title)
-				.replaceAll(/(\[TITLEEN\]|\[TITLEENG\]|\[ENGTITLE\])/g, titleEn)
-				.replaceAll('[TITLEFR]', titleFr ? titleFr : title)
-				.replaceAll('[TITLEES]', titleEs ? titleEs : title)
-				.replaceAll('[TITLEDE]', titleDe ? titleDe : title)
-				.replaceAll('[TITLERAW]', titleNative ? titleNative : "")
-				.replaceAll('[GENRES]', genres ? genres.join(", ") : "")
-				.replaceAll('[THEMES]', themes ? themes.join(", ") : "")
-				.replaceAll('[DEMOGRAPHIC]', demographics ? demographics.join(", ") : "")
-				.replaceAll('[STUDIOS]', studios ? studios.join(", ") : "")
-				.replaceAll('[PRODUCERS]', producers ? producers.join(", ") : "")
-				.replaceAll('[LICENSORS]', licensors ? licensors.join(", ") : "")
-				.replaceAll('[SERIALIZATION]', serializations ? serializations.join(", ") : "")
-				.replaceAll('[AUTHORS]', authors ? authors.join(" & ") : "")
-				.replaceAll('[SEASON]', season)
-				.replaceAll('[YEAR]', year)
-				.replaceAll('[RANK]', rank)
-				.replaceAll(/\[POPULARITY\]|\[POP\]/g, popularity)
-				.replaceAll('[SCORE]', score)
-				.replaceAll('[STARTDATE]', startDate)
-				.replaceAll('[ENDDATE]', endDate)
-				.replaceAll('[RATING]', rating)
-				.replaceAll('[DURATIONEP]', duration)
-				.replaceAll('[DURATIONTOTAL]', totalDuration)
-				.replaceAll('[DESC]', synopsisCss);
-			
-			result.value += cssLine + "\n";
-			result.scrollTop = result.scrollHeight;
+			imgUrlt = imgUrl.replace(".jpg", "t.jpg");
+			imgUrlv = imgUrl.replace(".jpg", "v.jpg");
+			imgUrll = imgUrl.replace(".jpg", "l.jpg");
 		}
 		catch(e)
 		{
-			log.error(`${listtype} #${id}: ${e}`);
+			imgUrl = imgUrlt = imgUrlv = imgUrll = 'none';
+			log.warn(`${listtype} #${id}: no image found`);
 		}
 		
-		continueProcessing();
+		/* Generate CSS */
+		cssLine = template.value
+			.replaceAll('[DEL]', '')
+			.replaceAll('[ID]', id)
+			.replaceAll('[TYPE]', listtype)
+			.replaceAll('[IMGURL]', imgUrl)
+			.replaceAll('[IMGURLT]', imgUrlt)
+			.replaceAll('[IMGURLV]', imgUrlv)
+			.replaceAll('[IMGURLL]', imgUrll)
+			.replaceAll('[TITLE]', title)
+			.replaceAll(/(\[TITLEEN\]|\[TITLEENG\]|\[ENGTITLE\])/g, titleEn)
+			.replaceAll('[TITLEFR]', titleFr ? titleFr : title)
+			.replaceAll('[TITLEES]', titleEs ? titleEs : title)
+			.replaceAll('[TITLEDE]', titleDe ? titleDe : title)
+			.replaceAll('[TITLERAW]', titleNative ? titleNative : "")
+			.replaceAll('[GENRES]', genres ? genres.join(", ") : "")
+			.replaceAll('[THEMES]', themes ? themes.join(", ") : "")
+			.replaceAll('[DEMOGRAPHIC]', demographics ? demographics.join(", ") : "")
+			.replaceAll('[STUDIOS]', studios ? studios.join(", ") : "")
+			.replaceAll('[PRODUCERS]', producers ? producers.join(", ") : "")
+			.replaceAll('[LICENSORS]', licensors ? licensors.join(", ") : "")
+			.replaceAll('[SERIALIZATION]', serializations ? serializations.join(", ") : "")
+			.replaceAll('[AUTHORS]', authors ? authors.join(" & ") : "")
+			.replaceAll('[SEASON]', season)
+			.replaceAll('[YEAR]', year)
+			.replaceAll('[RANK]', rank)
+			.replaceAll(/\[POPULARITY\]|\[POP\]/g, popularity)
+			.replaceAll('[SCORE]', score)
+			.replaceAll('[STARTDATE]', startDate)
+			.replaceAll('[ENDDATE]', endDate)
+			.replaceAll('[RATING]', rating)
+			.replaceAll('[DURATIONEP]', duration)
+			.replaceAll('[DURATIONTOTAL]', totalDuration)
+			.replaceAll('[DESC]', synopsisCss);
+		
+		result.value += cssLine + "\n";
+		result.scrollTop = result.scrollHeight;
 	}
-	else
+	catch(e)
 	{
-		finishProcessing();
+		log.error(`${listtype} #${id}: ${e}`);
 	}
+	
+	continueProcessing();
 }
 
 function continueProcessing()
 {
 	iteration++;
-	
-	statusText.textContent = `Processed ${iteration} of ${newData.length}`;
-	statusBar.style.cssText = `--percent: ${percent}%`;
 
+	/* update variables */
+
+	percent = iteration / newData.length * 100;
+
+	if(iteration === 1)
+	{
+		timeThen = performance.now() - delay.value;
+	}
+	timeSince = performance.now() - timeThen;
+	timeThen = performance.now();
+
+	idsRemaining = newData.length - iteration;
+	seconds = idsRemaining * (timeSince / 1000);
+	if(seconds <= 60)
+	{
+		timeRemaining = `${round(seconds)}s`;
+	}
+	else if(seconds > 60 && seconds < 3600)
+	{
+		timeRemaining = `${round(seconds / 60, 1)}m`;
+	}
+	else if(seconds > 3600)
+	{
+		timeRemaining = `${round(seconds / 60 / 60, 1)}h`;
+	}
+	else
+	{
+		timeRemaining = '?';
+	}
+
+	/* update UI */
+
+	statusText.textContent = `Processed ${iteration} of ${newData.length}`;
+	statusBar.style.cssText = `--percent: ${percent}%; --colour: var(--stat-working);`;
 	timeText.textContent = `~ ${timeRemaining} left`;
 	
+	if(iteration === newData.length){
+		finishProcessing();
+		return;
+	}
 	timeout = setTimeout(processItem, delay.value);
 }
 
