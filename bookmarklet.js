@@ -1,4 +1,4 @@
-javascript:function main(){/*
+javascript:/*
 MyAnimeList-Tools
 
 - Original code   2018/Aug/10 by BurntJello http://burntjello.webs.com
@@ -6,6 +6,8 @@ MyAnimeList-Tools
 - Fixes           2020/Oct    by Cry5talz 
 - Further changes 2021+       by Valerio Lyndon
 */
+
+function main(){
 
 const ver = '9.1';
 const verMod = '2023/Jun/06';
