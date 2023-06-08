@@ -35,11 +35,15 @@ function primaryCss( css, id = false ){
 
 if( document.body.getAttribute('data-owner') == 1 ){
 	let button = $('<a href="javascript:void(0);">Tools</a>')
-		.click(()=>{
+	.click(()=>{
+		if( UI && UI.dead === false ){
+			UI.open();
+		}
+		else {
 			main();
-		});
+		}
+	});
 
-	let listIsModern = (document.getElementById("list_surround")) ? false : true;
 	let buttonParent;
 	if( listIsModern ){
 		buttonParent = $('.list-menu-float');

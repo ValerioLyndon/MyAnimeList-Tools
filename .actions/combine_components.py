@@ -42,3 +42,12 @@ for recipe in fileRecipes:
 	
 	with open(recipe['out'], 'w+') as file:
 		file.write(text)
+
+# Create bookmarklet version without whitespace for testing purposes
+
+import re
+with open('../bookmarklet.js', 'r') as infile:
+	with open('../bookmarklet-test.nfp.js', 'w') as outfile:
+		text = infile.read()
+		text = re.sub(r"[\n\r]", '', text)
+		outfile.write(text)
