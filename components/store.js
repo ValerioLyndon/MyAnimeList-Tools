@@ -13,7 +13,7 @@ class Store {
 			GM_setValue(key,value);
 		}
 		else {
-			key = `${prefix}${key}`;
+			key = `${this.prefix}${key}`;
 			localStorage.setItem(key,value);
 		}
 	}
@@ -24,7 +24,7 @@ class Store {
 			value = GM_getValue(key);
 		}
 		else {
-			key = `${prefix}${key}`;
+			key = `${this.prefix}${key}`;
 			value = localStorage.getItem(key,value);
 			if( value === null ){
 				value = undefined;
@@ -42,7 +42,7 @@ class Store {
 			GM_deleteValue(key);
 		}
 		else {
-			key = `${prefix}${key}`;
+			key = `${this.prefix}${key}`;
 			localStorage.removeItem(key);
 		}
 	}
