@@ -1,4 +1,4 @@
-function main(){
+function main() {
 
 const ver = '/*$$$ver$$$*/';
 const verMod = '/*$$$vermod$$$*/';
@@ -78,24 +78,24 @@ const defaultSettings = {
 /* handle settings from old versions */
 var settings = defaultSettings;
 
-if(localStorage.getItem('burnt_settings') !== null)
+if(store.has('settings'))
 {
-	localStorage.setItem('burnt_anime_settings', localStorage.getItem('burnt_settings'));
-	localStorage.setItem('burnt_manga_settings', localStorage.getItem('burnt_settings'));
-	localStorage.removeItem('burnt_settings');
+	store.set('anime_settings', store.get('settings'));
+	store.set('manga_settings', store.get('settings'));
+	store.remove('settings');
 }
-if(localStorage.getItem('burnt_last_run') !== null)
+if(store.has('last_run'))
 {
-	localStorage.setItem('burnt_last_anime_run', localStorage.getItem('burnt_settings'));
-	localStorage.setItem('burnt_last_manga_run', localStorage.getItem('burnt_settings'));
-	localStorage.removeItem('burnt_last_run');
+	store.set('last_anime_run', store.get('settings'));
+	store.set('last_manga_run', store.get('settings'));
+	store.remove('last_run');
 }
 
-if(localStorage.getItem(`burnt_${listtype}_settings`) !== null)
+if(store.has(`${listtype}_settings`))
 {
 	try
 	{
-		settings = JSON.parse(localStorage.getItem(`burnt_${listtype}_settings`));
+		settings = JSON.parse(store.get(`${listtype}_settings`));
 	
 		/* Check for missing settings and fill them in. This prevents errors while maintaining user settings, especially in the case of a user updating from an older version. */
 		for(let [key, value] of Object.entries(defaultSettings))
@@ -121,6 +121,12 @@ if(localStorage.getItem(`burnt_${listtype}_settings`) !== null)
 		alert("Encountered an error while parsing your previous settings. Your settings have been reverted to defaults. To quickly recover your template settings, try selecting \"Last Run\" and then \"Autofill\". Other settings will need to be manually set. \n\nIf you've never run this tool before, you should never see this.");
 		settings = defaultSettings;
 	}
+}
+
+/* remove oddly formatted variable from v9.x */
+if(localStorage.getItem('burnt-theme') !== null)
+{
+	localStorage.removeItem('burnt-theme');
 }
 
 /* GENERIC FUNCTIONS */
@@ -861,7 +867,7 @@ $(sidebar).append($('<hr>'));
 
 /* Dark/light mode switch */
 
-let chosenTheme = localStorage.getItem('burnt-theme');
+let chosenTheme = store.get('theme');
 if(chosenTheme)
 {
 	gui.classList.remove('light', 'dark');
@@ -881,18 +887,18 @@ let switchTheme = $('<input class="btn" type="button" value="Switch Theme">')
 	let theme = gui.classList.contains('dark') ? 'light' : 'dark';
 	gui.classList.remove('light', 'dark');
 	gui.classList.add(theme);
-	localStorage.setItem('burnt-theme', theme);
+	store.set('theme', theme);
 });
 $(sidebar).append(switchTheme);
 
 /* Settings section */
 
 clearBtn = $('<input type="button" value="Clear Settings" class="btn" title="Clears any stored settings from previous runs.">');
-if(localStorage.getItem(`burnt_${listtype}_settings`) !== null || localStorage.getItem(`burnt_last_${listtype}_run`) !== null)
+if(store.has(`${listtype}_settings`) || store.has(`last_${listtype}_run`))
 {
 	clearBtn.click(()=>{
-		localStorage.removeItem(`burnt_${listtype}_settings`);
-		localStorage.removeItem(`burnt_last_${listtype}_run`);
+		store.remove(`${listtype}_settings`);
+		store.remove(`last_${listtype}_run`);
 		alert('Please exit and restart the tool to complete the clearing of your settings.');
 	});
 }
@@ -917,10 +923,10 @@ $(textareaL).append(topL);
 $(topL).append($('<b>Input</b>'));
 
 lastRun = $('<input type="button" value="Last Run" class="btn btn-right" title="Fills the input field with the last known output of this tool.">');
-if(localStorage.getItem(`burnt_last_${listtype}_run`) !== null)
+if(store.has(`last_${listtype}_run`))
 {
 	lastRun.click(()=>{
-		existing.value = localStorage.getItem(`burnt_last_${listtype}_run`);
+		existing.value = store.get(`last_${listtype}_run`);
 	});
 }
 else {
@@ -2153,7 +2159,7 @@ function finishProcessing()
 {
 	if(result.value.length > 0)
 	{
-		localStorage.setItem(`burnt_last_${listtype}_run`, result.value);
+		store.set(`last_${listtype}_run`, result.value);
 	}
 	thumbBtn.value = "Done";
 	thumbBtn.disabled = "disabled";
@@ -2361,7 +2367,7 @@ function saveSettings()
 		"clear_tags": chkClearTags.checked,
 		"check_existing": chkExisting.checked
 	};
-	localStorage.setItem(`burnt_${listtype}_settings`, JSON.stringify(settings));
+	store.set(`${listtype}_settings`, JSON.stringify(settings));
 }
 
 function Exit()

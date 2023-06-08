@@ -10,6 +10,7 @@ fileRecipes = [
 		'base': '../components/userscript-base.js',
 		'combine': [
 			['credit', '../components/credit.js'],
+			['store', '../components/store.js'],
 			['main', '../components/main.js']
 		],
 		'out': '../script.user.js'
@@ -18,6 +19,7 @@ fileRecipes = [
 		'base': '../components/bookmarklet-base.js',
 		'combine': [
 			['credit', '../components/credit.js'],
+			['store', '../components/store.js'],
 			['main', '../components/main.js']
 		],
 		'out': '../bookmarklet.js'

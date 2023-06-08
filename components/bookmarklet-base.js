@@ -1,6 +1,6 @@
 javascript:/*<<<credit>>>*/
 
-/*<<<main>>>*/
+/*<<<store>>>*/
 
 /*<<<main>>>*/
 

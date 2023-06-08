@@ -1,23 +1,81 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      9.1
+// @version      9.2-pre
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
 // @match        https://myanimelist.net/mangalist/*
-// @grant        none
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_deleteValue
 // @run-at       document-end
 // ==/UserScript==
 
 /*
-- Original code by BurntJello, with changes by Cateinya and Cry5talz.
-- Heavily modified by Valerio Lyndon
+MyAnimeList-Tools
+
+- Original code   2018/Aug/10 by BurntJello http://burntjello.webs.com
+- Extra features  2019        by Cateinya
+- Fixes           2020/Oct    by Cry5talz 
+- Further changes 2021+       by Valerio Lyndon
 */
 
-function main(){
+class Store {
+	constructor( type = 'localStorage' ){
+		this.type = type;
+		this.prefix = 'burnt_';
+	}
 
-const ver = '9.1';
+	set( key, value ){
+		if( value instanceof Object ){
+			value = JSON.stringify(value);
+		}
+
+		if( this.type === 'userscript' ){
+			GM_setValue(key,value);
+		}
+		else {
+			key = `${prefix}${key}`;
+			localStorage.setItem(key,value);
+		}
+	}
+
+	get( key ){
+		let value;
+		if( this.type === 'userscript' ){
+			value = GM_getValue(key);
+		}
+		else {
+			key = `${prefix}${key}`;
+			value = localStorage.getItem(key,value);
+			if( value === null ){
+				value = undefined;
+			}
+		}
+		return value;
+	}
+
+	has( key ){
+		return this.get(key) !== undefined;
+	}
+
+	remove( key ){
+		if( this.type === 'userscript' ){
+			GM_deleteValue(key);
+		}
+		else {
+			key = `${prefix}${key}`;
+			localStorage.removeItem(key);
+		}
+	}
+}
+
+var store = new Store('userscript');
+
+function main() {
+
+const ver = '9.2-pre';
 const verMod = '2023/Jun/06';
 
 var listIsModern = (document.getElementById("list_surround")) ? false : true;
@@ -95,24 +153,24 @@ const defaultSettings = {
 /* handle settings from old versions */
 var settings = defaultSettings;
 
-if(localStorage.getItem('burnt_settings') !== null)
+if(store.has('settings'))
 {
-	localStorage.setItem('burnt_anime_settings', localStorage.getItem('burnt_settings'));
-	localStorage.setItem('burnt_manga_settings', localStorage.getItem('burnt_settings'));
-	localStorage.removeItem('burnt_settings');
+	store.set('anime_settings', store.get('settings'));
+	store.set('manga_settings', store.get('settings'));
+	store.remove('settings');
 }
-if(localStorage.getItem('burnt_last_run') !== null)
+if(store.has('last_run'))
 {
-	localStorage.setItem('burnt_last_anime_run', localStorage.getItem('burnt_settings'));
-	localStorage.setItem('burnt_last_manga_run', localStorage.getItem('burnt_settings'));
-	localStorage.removeItem('burnt_last_run');
+	store.set('last_anime_run', store.get('settings'));
+	store.set('last_manga_run', store.get('settings'));
+	store.remove('last_run');
 }
 
-if(localStorage.getItem(`burnt_${listtype}_settings`) !== null)
+if(store.has(`${listtype}_settings`))
 {
 	try
 	{
-		settings = JSON.parse(localStorage.getItem(`burnt_${listtype}_settings`));
+		settings = JSON.parse(store.get(`${listtype}_settings`));
 	
 		/* Check for missing settings and fill them in. This prevents errors while maintaining user settings, especially in the case of a user updating from an older version. */
 		for(let [key, value] of Object.entries(defaultSettings))
@@ -138,6 +196,12 @@ if(localStorage.getItem(`burnt_${listtype}_settings`) !== null)
 		alert("Encountered an error while parsing your previous settings. Your settings have been reverted to defaults. To quickly recover your template settings, try selecting \"Last Run\" and then \"Autofill\". Other settings will need to be manually set. \n\nIf you've never run this tool before, you should never see this.");
 		settings = defaultSettings;
 	}
+}
+
+/* remove oddly formatted variable from v9.x */
+if(localStorage.getItem('burnt-theme') !== null)
+{
+	localStorage.removeItem('burnt-theme');
 }
 
 /* GENERIC FUNCTIONS */
@@ -878,7 +942,7 @@ $(sidebar).append($('<hr>'));
 
 /* Dark/light mode switch */
 
-let chosenTheme = localStorage.getItem('burnt-theme');
+let chosenTheme = store.get('theme');
 if(chosenTheme)
 {
 	gui.classList.remove('light', 'dark');
@@ -898,18 +962,18 @@ let switchTheme = $('<input class="btn" type="button" value="Switch Theme">')
 	let theme = gui.classList.contains('dark') ? 'light' : 'dark';
 	gui.classList.remove('light', 'dark');
 	gui.classList.add(theme);
-	localStorage.setItem('burnt-theme', theme);
+	store.set('theme', theme);
 });
 $(sidebar).append(switchTheme);
 
 /* Settings section */
 
 clearBtn = $('<input type="button" value="Clear Settings" class="btn" title="Clears any stored settings from previous runs.">');
-if(localStorage.getItem(`burnt_${listtype}_settings`) !== null || localStorage.getItem(`burnt_last_${listtype}_run`) !== null)
+if(store.has(`${listtype}_settings`) || store.has(`last_${listtype}_run`))
 {
 	clearBtn.click(()=>{
-		localStorage.removeItem(`burnt_${listtype}_settings`);
-		localStorage.removeItem(`burnt_last_${listtype}_run`);
+		store.remove(`${listtype}_settings`);
+		store.remove(`last_${listtype}_run`);
 		alert('Please exit and restart the tool to complete the clearing of your settings.');
 	});
 }
@@ -934,10 +998,10 @@ $(textareaL).append(topL);
 $(topL).append($('<b>Input</b>'));
 
 lastRun = $('<input type="button" value="Last Run" class="btn btn-right" title="Fills the input field with the last known output of this tool.">');
-if(localStorage.getItem(`burnt_last_${listtype}_run`) !== null)
+if(store.has(`last_${listtype}_run`))
 {
 	lastRun.click(()=>{
-		existing.value = localStorage.getItem(`burnt_last_${listtype}_run`);
+		existing.value = store.get(`last_${listtype}_run`);
 	});
 }
 else {
@@ -2170,7 +2234,7 @@ function finishProcessing()
 {
 	if(result.value.length > 0)
 	{
-		localStorage.setItem(`burnt_last_${listtype}_run`, result.value);
+		store.set(`last_${listtype}_run`, result.value);
 	}
 	thumbBtn.value = "Done";
 	thumbBtn.disabled = "disabled";
@@ -2378,7 +2442,7 @@ function saveSettings()
 		"clear_tags": chkClearTags.checked,
 		"check_existing": chkExisting.checked
 	};
-	localStorage.setItem(`burnt_${listtype}_settings`, JSON.stringify(settings));
+	store.set(`${listtype}_settings`, JSON.stringify(settings));
 }
 
 function Exit()
@@ -2388,7 +2452,7 @@ function Exit()
 
 };
 
-/* Userscript-only Codes */
+/* Add "Tools" button to list */
 
 function primaryCss( css, id = false ){
 	newCSS = document.createElement('style');
@@ -2402,10 +2466,6 @@ function primaryCss( css, id = false ){
 }
 
 if( document.body.getAttribute('data-owner') == 1 ){
-	generateUI();
-}
-
-function generateUI( ){
 	let button = $('<a href="javascript:void(0);">Tools</a>')
 		.click(()=>{
 			main();
@@ -2425,11 +2485,11 @@ function generateUI( ){
 		buttonParent = $('#mal_cs_otherlinks div:last-of-type');
 	}
 	buttonParent.append(button);
-}
 
-css(`
-.burnt-trigger-icon {
-	top: 15px;
-	left: 15px;
+	primaryCss(`
+	.burnt-trigger-icon {
+		top: 15px;
+		left: 15px;
+	}
+	`);
 }
-`);

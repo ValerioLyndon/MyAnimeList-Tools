@@ -6,11 +6,17 @@
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
 // @match        https://myanimelist.net/mangalist/*
-// @grant        none
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_deleteValue
 // @run-at       document-end
 // ==/UserScript==
 
 /*<<<credit>>>*/
+
+/*<<<store>>>*/
+
+var store = new Store('userscript');
 
 /*<<<main>>>*/
 
