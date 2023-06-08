@@ -14,7 +14,7 @@
 
 /*<<<main>>>*/
 
-/* Userscript-only Codes */
+/* Add "Tools" button to list */
 
 function primaryCss( css, id = false ){
 	newCSS = document.createElement('style');
@@ -28,10 +28,6 @@ function primaryCss( css, id = false ){
 }
 
 if( document.body.getAttribute('data-owner') == 1 ){
-	generateUI();
-}
-
-function generateUI( ){
 	let button = $('<a href="javascript:void(0);">Tools</a>')
 		.click(()=>{
 			main();
@@ -51,11 +47,11 @@ function generateUI( ){
 		buttonParent = $('#mal_cs_otherlinks div:last-of-type');
 	}
 	buttonParent.append(button);
-}
 
-css(`
-.burnt-trigger-icon {
-	top: 15px;
-	left: 15px;
+	primaryCss(`
+	.burnt-trigger-icon {
+		top: 15px;
+		left: 15px;
+	}
+	`);
 }
-`);

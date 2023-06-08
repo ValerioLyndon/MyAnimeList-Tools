@@ -2,7 +2,7 @@ javascript:/*<<<credit>>>*/
 
 /*<<<main>>>*/
 
-/* Bookmarklet-only Codes */
+/*<<<main>>>*/
 
 main();
 void(0);
