@@ -7,6 +7,9 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
+const ver = '9.2-pre_b0';
+const verMod = '2023/Jun/07';
+
 class Store {
 	constructor( type = 'localStorage' ){
 		this.type = type;
@@ -59,9 +62,6 @@ class Store {
 
 var store = new Store('localStorage');
 
-/* metadata vars */
-var ver = '9.2-pre';
-var verMod = '2023/Jun/07';
 /* functionality vars */
 var listIsModern = (document.getElementById("list_surround")) ? false : true;
 var listtype = window.location.pathname.split('/')[1].substring(0,5);

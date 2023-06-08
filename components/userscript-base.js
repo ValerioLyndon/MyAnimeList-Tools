@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      /*$$$ver$$$*/
+// @version      /*$$$ver_core$$$*/_a/*$$$ver_user$$$*/
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -13,6 +13,9 @@
 // ==/UserScript==
 
 /*<<<credit>>>*/
+
+const ver = '/*$$$ver_core$$$*/_a/*$$$ver_user$$$*/';
+const verMod = '/*$$$ver_date$$$*/';
 
 /*<<<store>>>*/
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      9.2-pre
+// @version      9.2-pre_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -20,6 +20,9 @@ MyAnimeList-Tools
 - Fixes           2020/Oct    by Cry5talz 
 - Further changes 2021+       by Valerio Lyndon
 */
+
+const ver = '9.2-pre_a0';
+const verMod = '2023/Jun/07';
 
 class Store {
 	constructor( type = 'localStorage' ){
@@ -73,9 +76,6 @@ class Store {
 
 var store = new Store('userscript');
 
-/* metadata vars */
-var ver = '9.2-pre';
-var verMod = '2023/Jun/07';
 /* functionality vars */
 var listIsModern = (document.getElementById("list_surround")) ? false : true;
 var listtype = window.location.pathname.split('/')[1].substring(0,5);

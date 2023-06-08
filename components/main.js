@@ -1,6 +1,3 @@
-/* metadata vars */
-var ver = '/*$$$ver$$$*/';
-var verMod = '/*$$$vermod$$$*/';
 /* functionality vars */
 var listIsModern = (document.getElementById("list_surround")) ? false : true;
 var listtype = window.location.pathname.split('/')[1].substring(0,5);
