@@ -1,5 +1,5 @@
-[color=transparent][size=0] [Script] List Tools — generate CSS and update Tags or Notes[/size][/color][quote][size=120][b]Latest update is v9.1[/b]
-[b][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v9.1/bookmarklet.js][View Code][/url][/b] — [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases/tag/v9.1]Changelog[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases]Past updates[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/issues]Planned updates[/url][/size][/quote]
+[color=transparent][size=0] [Script] List Tools — generate CSS and update Tags or Notes[/size][/color][quote][size=120][b]Latest update is v9.2[/b]
+[b][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v9.2/user.script.js][Install Userscript][/url][/b] — [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases/tag/v9.2]Changelog[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases]Past updates[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/issues]Planned updates[/url][/size][/quote]
 
 [quote][img align=right]https://i.imgur.com/X0t9a0X.png[/img][size=150][b]What can it do?[/b][/size]
 
@@ -21,32 +21,54 @@ This allows you to do many things, such as:
 
 [quote][size=150][b]How do I use it?[/b][/size]
 
-[size=120][b]Installation and basic use[/b][/size]
+[size=120][b]Installation[/b][/size]
 
-This tool comes in the form of a bookmarklet. This is a bookmark that executes code when clicked as opposed to loading a new page.
+This tool can be installed either of two ways: a userscript or a bookmarklet. The userscript requires the use of a browser extension but is a more powerful option, where-as the bookmarklet requires no extensions but is more clunky.
+
+[spoiler="Userscript Install — Recommended!"]A userscript is a script that can be run by any browser extension that supports them. Here's how to install it.
+[list=1][*]If you don't already have a userscript extension, you can install TamperMonkey from: [url=https://www.tampermonkey.net/index.php?browser=chrome][Here][/url]. 
+[*]With a userscript extension installed, visit the code URL:
+[url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v9.2/user.script.js][CODE][/url]
+
+You should immediately be prompted by the extension if you want to install. Click through the install prompt to complete it.
+[*]To activate the tool, go to your list. On modern lists, you should see a new button in the user menu:
+[img]https://i.imgur.com/MUlDPZF.png[/img]
+On classic lists, you should see a new link in the top bar:
+[img]https://i.imgur.com/viYoqih.png[/img]
+
+Click that button and you should see a popup that looks similar to this:
+[spoiler="Image"][img]https://i.postimg.cc/fLFGCpR1/v9-0.webp[/img][/spoiler][/list][/spoiler]
+[spoiler="Bookmarklet Install"]A bookmarklet is a browser bookmark that executes code when clicked instead of loading a new page. Thus, to install it we will create a new bookmark containing the code.
 [list=1][*]To create the bookmarklet, first open this page containing the code:
-[b][size=120][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v9.1/bookmarklet.js][CODE][/url][/size][/b]
+[b][size=120][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v9.2/bookmarklet.js][CODE][/url][/size][/b]
 Copy everything on that page, and paste it into the URL/location field of a new bookmark. I recommend saving the bookmark to your bookmark toolbar for easy access. See this GIF for an example:
 [spoiler="Image"][img]https://i.imgur.com/MaemlX2.gif[/img][/spoiler]
 [*]To activate the tool, go to your list. Then, click on the bookmark. You should see a popup that looks similar to this:
-[spoiler="Image"][img]https://i.postimg.cc/fLFGCpR1/v9-0.webp[/img][/spoiler]
-[*][img align=right]https://i.imgur.com/MZFbfBh.gif[/img]Now is where you can set your desired options which you will see on the left of the popup window.
+[spoiler="Image"][img]https://i.postimg.cc/fLFGCpR1/v9-0.webp[/img][/spoiler][/list]
+[/spoiler]
+[size=120][b]Usage[/b][/size]
 
-[b]Delay:[/b]
-The Delay controls how many milliseconds the program pauses between generating entries. Setting this too low may trigger MAL's spam detection. If you're getting a lot of errors, you should try increasing this.
+[img align=right]https://i.imgur.com/MZFbfBh.gif[/img]Once you've installed and opened the program, you will see the window can set your desired options and get started modifying your list.
 
-[b]Templates:[/b]
+These settings are split into the different categories they relate to, those being: CSS Generation, Tag Updating, and Genre Updating. There are also some General Options that apply to all categories. You can use one, two, or all of these categories, it is for you to decide.
+
+For help understanding any of the settings, see the respective spoilers below.
+[spoiler="Delay"][b]Delay:[/b]
+The Delay controls how many milliseconds the program pauses between generating entries. Setting this too low may trigger MAL's spam detection. If you're getting a lot of errors, you should try increasing this.[/spoiler]
+[spoiler="CSS Options"][b]Templates:[/b]
 The CSS Template controls what CSS is created. See further down for guidance on creating your own templates or using premade templates made by others. The Match Template is used for identifying previously generated CSS lines when updating your CSS.
 
-[b]Tags:[/b]
-To turn on/off updating of tags, enable the "Update Tags" checkbox and then enable whichever info you wish to add to your tags.
+][b]Validate Existing Images:[/b]
+This option is only for use when [b]re-[/b]generating cover image CSS with the [IMGURL] template. This option will make sure every image is still valid and up-to-date. You shouldn't need this very often, but it can be useful if a lot of your cover images are out of date.[/spoiler]
+[spoiler="Tag Options"][b]Tags:[/b]
+To turn on/off updating of tags, enable the "Update Tags" checkbox and then enable the checkboxes for whichever info you and to add to your tags.
 
-You can also enable "Overwrite current tags". This will [b]completely remove[/b] your current tags, with no way to recover them. Leave this disabled if you have any tags you wish to keep.
+You can also enable "Overwrite current tags". This will [b]completely remove[/b] your current tags, with no way to recover them. Leave this disabled if you have any tags you wish to keep, but be aware that there is still a chance of loss even with this check disabled.[/spoiler]
+[spoiler="Note Options"][b]Notes:[/b]
+To turn on/off updating of notes, enable the "Update Notes" checkbox and then enable the checkboxes for whichever info you and to add to your tags.
 
-[b]Other options:[/b]
-The final option you can change is the "Check Existing Images" option, which is only for use when [b]re-[/b]generating cover image CSS with the [IMGURL] template. This option will make sure every image is still valid and up-to-date. You shouldn't need this very often.
-
-[*]Once you have your settings correct, you can begin generating CSS and updating tags by clicking "Start" in the top left. This process can take a lot of time, depending on how many anime you have and what you set the delay at. At any time, you can click "Stop" without losing what is already generated/updated. Once the program is done, this button will change to "Done" automatically.[/list]
+This will [b]completely remove[/b] your current notes, with no way to recover them. There is no toggle for this behaviour at this time, but let me know if you want one.[/spoiler]
+Once you have your settings correct, you can begin generating CSS and updating tags by clicking "Start" in the top left. This process can take a lot of time, depending on how many anime you have and what you set the delay at. At any time, you can click "Stop" without losing what is already generated/updated. You can also "Minimise" the program to keep navigating your list. Once the program is done, this button will change to "Done" automatically.[/list]
 On repeat uses, you can copy-paste your previously generated CSS into the large text box that says "Copy previously generated code here." The tool should automatically save your last-generated CSS to make this quicker, just click "Last Run" above the text field. This will save a lot of time on future uses and prevents re-generating everything.
 
 [size=120][b]Notes on usage - [u]please read![/u][/b][/size]
