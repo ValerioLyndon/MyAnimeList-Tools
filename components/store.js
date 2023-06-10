@@ -8,6 +8,7 @@ class Store {
 		if( value instanceof Object ){
 			value = JSON.stringify(value);
 		}
+		value = value.toString();
 
 		if( this.type === 'userscript' ){
 			GM_setValue(key,value);

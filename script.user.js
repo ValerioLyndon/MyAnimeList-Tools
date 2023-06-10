@@ -34,6 +34,7 @@ class Store {
 		if( value instanceof Object ){
 			value = JSON.stringify(value);
 		}
+		value = value.toString();
 
 		if( this.type === 'userscript' ){
 			GM_setValue(key,value);
@@ -1072,6 +1073,37 @@ function main() {
 	/* "Copyright" section */
 
 	$(sidebar).append($(`<footer>MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</footer>`));
+
+	/* Notify about new updates */
+
+	let chkDate = store.get('update_checked');
+	let threeDays = 259200;
+	if( !chkDate || chkDate && Date.now() - parseInt(chkDate) >= threeDays ){	
+		fetch('https://api.github.com/repos/ValerioLyndon/MyAnimeList-Tools/releases/latest')
+		.then(response => {
+			if( !response.ok ){
+				throw new Error(`Failed to check for updates.`);
+			}
+			store.set('update_checked', Date.now());
+			return response.json();
+		})
+		.then(json => {
+			let extractCoreVer = /^.*?([0-9\.]+).*$/;
+			let currentVer = ver.replace(extractCoreVer,'$1');
+			let newVer = json['tag_name'].replace(extractCoreVer,'$1');
+
+			if( newVer > currentVer ){
+				$(sidebar).append($(`<span>A new version is available for download!<br>v${currentVer} -> v${newVer}</span>`));
+			}
+			else {
+				log.generic('You are on an unreleased build. Have fun, but proceed with caution!', true);
+			}
+		})
+		.catch(error => {
+			log.error(error, false);
+			return false;
+		});
+	}
 
 	/* Textareas */
 
