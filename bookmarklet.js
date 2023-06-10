@@ -200,8 +200,8 @@ function main() {
 	}
 	if(store.has('last_run'))
 	{
-		store.set('last_anime_run', store.get('settings'));
-		store.set('last_manga_run', store.get('settings'));
+		store.set('last_anime_run', store.get('last_run'));
+		store.set('last_manga_run', store.get('last_run'));
 		store.remove('last_run');
 	}
 
