@@ -435,7 +435,7 @@ function main() {
 		);
 	}
 
-	.is-closed .status {
+	.is-closed .main:not(.is-hidden) .status {
 		visibility: visible;
 		position: fixed;
 		bottom: -45px;
@@ -447,6 +447,21 @@ function main() {
 
 	.status__time {
 		float: right;
+	}
+
+	#hideBtn {
+		display: none;
+	}
+	.is-closed .main:not(.is-hidden) #hideBtn {
+		visibility: visible;
+		position: fixed;
+		bottom: -35px;
+		left: 205px;
+		display: block;
+		padding-left: 10px;
+		border-top-left-radius: 0;
+		border-bottom-left-radius: 0;
+		pointer-events: auto;
 	}
 
 
@@ -559,6 +574,12 @@ function main() {
 		UI.close();
 	});
 	$(sidebar).append(closeBtn);
+
+	let hideBtn = $('<input id="hideBtn" class="btn" type="button" value="Hide" title="Hide the status bar. The program will keep running in the background." />')
+	.click(()=>{
+		gui.classList.add('is-hidden');
+	});
+	$(sidebar).append(hideBtn);
 
 	let exitBtn = document.createElement("input");
 	sidebar.append(exitBtn);
