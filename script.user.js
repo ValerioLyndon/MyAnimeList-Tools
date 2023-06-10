@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      9.2-pre_a0
+// @version      10.0-pre_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -21,8 +21,8 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '9.2-pre_a0';
-const verMod = '2023/Jun/09';
+const ver = '10.0-pre_a0';
+const verMod = '2023/Jun/10';
 
 class Store {
 	constructor( type = 'localStorage' ){
@@ -409,6 +409,10 @@ function main() {
 	.btn-right {
 		margin-left: 3px;
 		float: right;
+	}
+	.btn--block {
+		display: block;
+		margin-top: 3px;
 	}
 
 	.label {
@@ -1023,6 +1027,77 @@ function main() {
 		chkDurationNotes.parentNode.style.display = 'none';
 		chkTotalDurationNotes.parentNode.style.display = 'none';
 	}
+
+	/* Program options section */
+
+	$(sidebar).append($('<hr><b class="group-title">Program Options</b>'));
+	let programGroup = $('<div class="group"></div>');
+	$(sidebar).append(programGroup);
+
+	dropboxBtn = $('<input type="button" value="CSS Upload Settings" class="btn btn--block" title="Open the settings for automatically uploading your CSS to a file host.">');
+	dropboxBtn.click(()=>{
+		$(gui).append(overlay);
+
+		let popup = $(`
+			<div class="popup popup--small">
+				<p class="paragraph">
+					todo
+				</p>
+
+				<input id="auth-btn" class="btn" type="button" value="Authenticate with Dropbox">
+
+				<div id="after-auth" class="drawer is-closed">
+					<label class="chk">
+						<input id="enable-upload" type="checkbox"></input>
+						Enable uploading.
+					</label>
+
+					<label class="chk">
+						<input id="enable-css" type="checkbox"></input>
+						Enable updating of your CSS.
+					</label>
+
+					<input class="field" type="text" readonly="readonly" placeholder="The URL for your CSS will be placed here.">
+				</div>
+
+				<br />
+
+				<input id="close" type="button" value="Close" class="btn">
+			</div>
+		`);
+
+		let drawer = $(popup).find('#after-auth');
+		let authBtn = $(popup).find('#auth-btn');
+
+		let auth = store.get('auth');
+		if( auth ){
+			auth = JSON.parse(auth);
+			if( auth['dropbox'] == true ){
+				drawer.removeClass('is-closed');
+				authBtn.attr('disabled', 'disabled');
+			}
+		}
+
+		authBtn.click(()=>{
+			log.generic('todo', true);
+		});
+
+		$(popup).find('#enable-upload').on('input', ()=>{
+			log.generic('todo', true);
+		});
+
+		$(popup).find('#enable-css').on('input', ()=>{
+			log.generic('todo', true);
+		});
+
+		$(gui).append(popup);
+		
+		$(popup).find('#close').click(()=>{
+			popup.remove();
+			overlay.remove();
+		});
+	});
+	$(programGroup).append(dropboxBtn);
 
 	$(sidebar).append($('<hr>'));
 
