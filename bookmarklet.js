@@ -1027,24 +1027,28 @@ function main() {
 		let popup = $(`
 			<div class="popup popup--small">
 				<p class="paragraph">
-					todo
+					To link your Dropbox account, click the button below to grant the app access. It will only ask for access to it's own folder and nothing more.
 				</p>
 
 				<input id="auth-btn" class="btn" type="button" value="Authenticate with Dropbox">
 
-				<div id="after-auth" class="drawer is-closed">
-					<label class="chk">
-						<input id="enable-upload" type="checkbox"></input>
-						Enable uploading.
-					</label>
+				<p class="paragraph">
+					Once Dropbox prompts you with a code, enter that code in this text box.
+				</p>
 
-					<label class="chk">
-						<input id="enable-css" type="checkbox"></input>
-						Enable updating of your CSS.
-					</label>
+				<input id="oauth-code" class="field" type="text" placeholder="Paste your Dropbox code here to allow access.">
+				
+				<label class="chk">
+					<input id="enable-upload" type="checkbox"></input>
+					Enable uploading.
+				</label>
 
-					<input class="field" type="text" readonly="readonly" placeholder="The URL for your CSS will be placed here.">
-				</div>
+				<label class="chk">
+					<input id="enable-css" type="checkbox"></input>
+					Enable updating of your CSS.
+				</label>
+
+				<input class="field" type="text" readonly="readonly" placeholder="The URL for your CSS will be placed here.">
 
 				<br />
 
@@ -1052,20 +1056,10 @@ function main() {
 			</div>
 		`);
 
-		let drawer = $(popup).find('#after-auth');
 		let authBtn = $(popup).find('#auth-btn');
 
-		let auth = store.get('auth');
-		if( auth ){
-			auth = JSON.parse(auth);
-			if( auth['dropbox'] == true ){
-				drawer.removeClass('is-closed');
-				authBtn.attr('disabled', 'disabled');
-			}
-		}
-
 		authBtn.click(()=>{
-			log.generic('todo', true);
+			window.open('https://www.dropbox.com/oauth2/authorize?client_id=odribfnp0304xy2&response_type=code', '_blank');
 		});
 
 		$(popup).find('#enable-upload').on('input', ()=>{
@@ -1074,6 +1068,17 @@ function main() {
 
 		$(popup).find('#enable-css').on('input', ()=>{
 			log.generic('todo', true);
+		});
+
+		let oauthInput = $(popup).find('#oauth-code');
+		oauthInput.on('input', ()=>{
+			let val = oauthInput.val();
+			if( val.length > 0 ){
+				store.set('auth_dropbox', val);
+			}
+			else {
+				store.remove('auth_dropbox');
+			}
 		});
 
 		$(gui).append(popup);
