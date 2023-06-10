@@ -403,7 +403,7 @@ function main() {
 		opacity: 0.7;
 		cursor: not-allowed;
 	}
-	.btn + .btn {
+	.btn + .btn:not(.btn--block) {
 		margin-left: 3px;
 	}
 	.btn-right {
@@ -687,7 +687,7 @@ function main() {
 	timeText.className = 'status__time';
 	statusBar.append(timeText);
 
-	function field(value, title, desc) {
+	function field(value, title, desc, parent = cssGroup) {
 		lbl = document.createElement('label');
 		lbl.textContent = title;
 		lbl.className = 'label';
@@ -700,7 +700,7 @@ function main() {
 		input.spellcheck = false;
 
 		lbl.append(input);
-		$(cssGroup).append(lbl);
+		$(parent).append(lbl);
 		return input;
 	}
 
@@ -728,6 +728,9 @@ function main() {
 	let globalGroup = $('<div class="group"></div>');
 	$(sidebar).append(globalGroup);
 
+	delay = field(settings['delay'], "Delay between items", "Delay (ms) between requests to avoid spamming the server.", globalGroup);
+	delay.style.width = "50px";
+
 	chkCategory = chk(settings['select_categories'], "Update only specific categories.", globalGroup, 'Want to only update entries in certain categories instead of everything at once?');
 	chkCategory.addEventListener('input', () => { toggleChks(chkCategory, categoryDrawer); });
 
@@ -750,14 +753,8 @@ function main() {
 	let cssGroup = $('<div class="group"></div>');
 	$(sidebar).append(cssGroup);
 
-	delay = field(settings['delay'], "Delay", "Delay (ms) between requests to avoid spamming the server.");
-	delay.style.width = "50px";
-	delay.parentNode.classList.add('label--inline');
-
-	matchTemplate = field(settings['match_template'], "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
-	matchTemplate.parentNode.classList.add('label--inline');
-
 	template = field(settings['css_template'], "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEEN], [TITLEFR], [TITLEES], [TITLEDE], [TITLERAW], [GENRES], [THEMES], [DEMOGRAPHIC], [RANK], [POPULARITY], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
+	matchTemplate = field(settings['match_template'], "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
 
 	function toggleChks(checkbox, drawerSelector) {
 		if(checkbox.checked)
@@ -912,6 +909,79 @@ function main() {
 	});
 	$(cssGroup).append(exportBtn);
 
+	dropboxBtn = $('<input type="button" value="Upload Settings" class="btn btn--block" title="Open the settings for automatically uploading your CSS to a file host.">');
+	dropboxBtn.click(()=>{
+		$(gui).append(overlay);
+
+		let popup = $(`
+			<div class="popup popup--small">
+				<p class="paragraph">
+					To link your Dropbox account, click the button below to grant the app access. It will only ask for access to it's own folder and nothing more.
+				</p>
+
+				<input id="auth-btn" class="btn" type="button" value="Authenticate with Dropbox">
+
+				<p class="paragraph">
+					Once Dropbox prompts you with a code, enter that code in this text box.
+				</p>
+
+				<input id="oauth-code" class="field" type="text" placeholder="Paste your Dropbox code here to allow access.">
+				
+				<label class="chk">
+					<input id="enable-upload" type="checkbox"></input>
+					Enable uploading.
+				</label>
+
+				<label class="chk">
+					<input id="enable-css" type="checkbox"></input>
+					Enable updating of your CSS.
+				</label>
+
+				<input class="field" type="text" readonly="readonly" placeholder="The URL for your CSS will be placed here.">
+
+				<br />
+
+				<input id="close" type="button" value="Close" class="btn">
+			</div>
+		`);
+
+		let authBtn = $(popup).find('#auth-btn');
+
+		authBtn.click(()=>{
+			window.open('https://www.dropbox.com/oauth2/authorize?client_id=odribfnp0304xy2&response_type=code', '_blank');
+		});
+
+		$(popup).find('#enable-upload').on('input', ()=>{
+			log.generic('todo', true);
+		});
+
+		$(popup).find('#enable-css').on('input', ()=>{
+			log.generic('todo', true);
+		});
+
+		let oauthInput = $(popup).find('#oauth-code');
+		if( store.has('auth_dropbox') ){
+			oauthInput.val(store.get('auth_dropbox'));
+		}
+		oauthInput.on('input', ()=>{
+			let val = oauthInput.val();
+			if( val.length > 0 ){
+				store.set('auth_dropbox', val);
+			}
+			else {
+				store.remove('auth_dropbox');
+			}
+		});
+
+		$(gui).append(popup);
+		
+		$(popup).find('#close').click(()=>{
+			popup.remove();
+			overlay.remove();
+		});
+	});
+	$(cssGroup).append(dropboxBtn);
+
 	/* CHECK BOXES - TAGS/NOTES */
 
 	$(sidebar).append($('<b class="group-title">Tag Options</b>'));
@@ -1027,82 +1097,6 @@ function main() {
 		chkDurationNotes.parentNode.style.display = 'none';
 		chkTotalDurationNotes.parentNode.style.display = 'none';
 	}
-
-	/* Program options section */
-
-	$(sidebar).append($('<hr><b class="group-title">Program Options</b>'));
-	let programGroup = $('<div class="group"></div>');
-	$(sidebar).append(programGroup);
-
-	dropboxBtn = $('<input type="button" value="CSS Upload Settings" class="btn btn--block" title="Open the settings for automatically uploading your CSS to a file host.">');
-	dropboxBtn.click(()=>{
-		$(gui).append(overlay);
-
-		let popup = $(`
-			<div class="popup popup--small">
-				<p class="paragraph">
-					To link your Dropbox account, click the button below to grant the app access. It will only ask for access to it's own folder and nothing more.
-				</p>
-
-				<input id="auth-btn" class="btn" type="button" value="Authenticate with Dropbox">
-
-				<p class="paragraph">
-					Once Dropbox prompts you with a code, enter that code in this text box.
-				</p>
-
-				<input id="oauth-code" class="field" type="text" placeholder="Paste your Dropbox code here to allow access.">
-				
-				<label class="chk">
-					<input id="enable-upload" type="checkbox"></input>
-					Enable uploading.
-				</label>
-
-				<label class="chk">
-					<input id="enable-css" type="checkbox"></input>
-					Enable updating of your CSS.
-				</label>
-
-				<input class="field" type="text" readonly="readonly" placeholder="The URL for your CSS will be placed here.">
-
-				<br />
-
-				<input id="close" type="button" value="Close" class="btn">
-			</div>
-		`);
-
-		let authBtn = $(popup).find('#auth-btn');
-
-		authBtn.click(()=>{
-			window.open('https://www.dropbox.com/oauth2/authorize?client_id=odribfnp0304xy2&response_type=code', '_blank');
-		});
-
-		$(popup).find('#enable-upload').on('input', ()=>{
-			log.generic('todo', true);
-		});
-
-		$(popup).find('#enable-css').on('input', ()=>{
-			log.generic('todo', true);
-		});
-
-		let oauthInput = $(popup).find('#oauth-code');
-		oauthInput.on('input', ()=>{
-			let val = oauthInput.val();
-			if( val.length > 0 ){
-				store.set('auth_dropbox', val);
-			}
-			else {
-				store.remove('auth_dropbox');
-			}
-		});
-
-		$(gui).append(popup);
-		
-		$(popup).find('#close').click(()=>{
-			popup.remove();
-			overlay.remove();
-		});
-	});
-	$(programGroup).append(dropboxBtn);
 
 	$(sidebar).append($('<hr>'));
 

@@ -325,7 +325,7 @@ function main() {
 		opacity: 0.7;
 		cursor: not-allowed;
 	}
-	.btn + .btn {
+	.btn + .btn:not(.btn--block) {
 		margin-left: 3px;
 	}
 	.btn-right {
@@ -609,7 +609,7 @@ function main() {
 	timeText.className = 'status__time';
 	statusBar.append(timeText);
 
-	function field(value, title, desc) {
+	function field(value, title, desc, parent = cssGroup) {
 		lbl = document.createElement('label');
 		lbl.textContent = title;
 		lbl.className = 'label';
@@ -622,7 +622,7 @@ function main() {
 		input.spellcheck = false;
 
 		lbl.append(input);
-		$(cssGroup).append(lbl);
+		$(parent).append(lbl);
 		return input;
 	}
 
@@ -650,6 +650,9 @@ function main() {
 	let globalGroup = $('<div class="group"></div>');
 	$(sidebar).append(globalGroup);
 
+	delay = field(settings['delay'], "Delay between items", "Delay (ms) between requests to avoid spamming the server.", globalGroup);
+	delay.style.width = "50px";
+
 	chkCategory = chk(settings['select_categories'], "Update only specific categories.", globalGroup, 'Want to only update entries in certain categories instead of everything at once?');
 	chkCategory.addEventListener('input', () => { toggleChks(chkCategory, categoryDrawer); });
 
@@ -672,14 +675,8 @@ function main() {
 	let cssGroup = $('<div class="group"></div>');
 	$(sidebar).append(cssGroup);
 
-	delay = field(settings['delay'], "Delay", "Delay (ms) between requests to avoid spamming the server.");
-	delay.style.width = "50px";
-	delay.parentNode.classList.add('label--inline');
-
-	matchTemplate = field(settings['match_template'], "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
-	matchTemplate.parentNode.classList.add('label--inline');
-
 	template = field(settings['css_template'], "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEEN], [TITLEFR], [TITLEES], [TITLEDE], [TITLERAW], [GENRES], [THEMES], [DEMOGRAPHIC], [RANK], [POPULARITY], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
+	matchTemplate = field(settings['match_template'], "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
 
 	function toggleChks(checkbox, drawerSelector) {
 		if(checkbox.checked)
