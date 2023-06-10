@@ -1,67 +1,3 @@
-javascript:(()=>{/*
-MyAnimeList-Tools
-
-- Original code   2018/Aug/10 by BurntJello http://burntjello.webs.com
-- Extra features  2019        by Cateinya
-- Fixes           2020/Oct    by Cry5talz 
-- Further changes 2021+       by Valerio Lyndon
-*/
-
-const ver = '9.2-pre_b0';
-const verMod = '2023/Jun/09';
-
-class Store {
-	constructor( type = 'localStorage' ){
-		this.type = type;
-		this.prefix = 'burnt_';
-	}
-
-	set( key, value ){
-		if( value instanceof Object ){
-			value = JSON.stringify(value);
-		}
-
-		if( this.type === 'userscript' ){
-			GM_setValue(key,value);
-		}
-		else {
-			key = `${this.prefix}${key}`;
-			localStorage.setItem(key,value);
-		}
-	}
-
-	get( key ){
-		let value;
-		if( this.type === 'userscript' ){
-			value = GM_getValue(key);
-		}
-		else {
-			key = `${this.prefix}${key}`;
-			value = localStorage.getItem(key,value);
-			if( value === null ){
-				value = undefined;
-			}
-		}
-		return value;
-	}
-
-	has( key ){
-		return this.get(key) !== undefined;
-	}
-
-	remove( key ){
-		if( this.type === 'userscript' ){
-			GM_deleteValue(key);
-		}
-		else {
-			key = `${this.prefix}${key}`;
-			localStorage.removeItem(key);
-		}
-	}
-}
-
-var store = new Store('localStorage');
-
 /* functionality vars */
 var listIsModern = (document.getElementById("list_surround")) ? false : true;
 var listtype = window.location.pathname.split('/')[1].substring(0,5);
@@ -2512,6 +2448,3 @@ function main() {
 		store.set(`${listtype}_settings`, JSON.stringify(settings));
 	}
 };
-
-main();
-})();void(0);
