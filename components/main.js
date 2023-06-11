@@ -317,8 +317,11 @@ function main() {
 	List.determineStyle();
 	UI = new UserInterface();
 
-	/* handle settings from old versions */
 	var settings = defaultSettings;
+
+	/* Handle older settings */
+
+	/* Convert v8.0 -> v8.1 */
 
 	if(store.has('settings'))
 	{
@@ -333,11 +336,28 @@ function main() {
 		store.remove('last_run');
 	}
 
+	/* Convert v9.x -> v10.0 */
+
+	if(localStorage.getItem('burnt-theme') !== null)
+	{
+		localStorage.removeItem('burnt-theme');
+	}
+
+	if( store.has(`${List.type}_settings`) && !store.has(`${List.type}_settings--type`) ){
+		store.set(`${List.type}_settings`, JSON.parse(store.get(`${List.type}_settings`)));
+	}
+
+	if( store.has(`last_${List.type}_run`) && !store.has(`last_${List.type}_run--type`) ){
+		store.set(`last_${List.type}_run`, store.get(`last_${List.type}_run`));
+	}
+
+	/* Default settings handling */
+
 	if(store.has(`${List.type}_settings`))
 	{
 		try
 		{
-			settings = JSON.parse(store.get(`${List.type}_settings`));
+			settings = store.get(`${List.type}_settings`);
 		
 			/* Check for missing settings and fill them in. This prevents errors while maintaining user settings, especially in the case of a user updating from an older version. */
 			for(let [key, value] of Object.entries(defaultSettings))
@@ -363,12 +383,6 @@ function main() {
 			alert("Encountered an error while parsing your previous settings. Your settings have been reverted to defaults. To quickly recover your template settings, try selecting \"Last Run\" and then \"Autofill\". Other settings will need to be manually set. \n\nIf you've never run this tool before, you should never see this.");
 			settings = defaultSettings;
 		}
-	}
-
-	/* remove oddly formatted variable from v9.x */
-	if(localStorage.getItem('burnt-theme') !== null)
-	{
-		localStorage.removeItem('burnt-theme');
 	}
 
 	/* TOOL CODE */
@@ -2071,6 +2085,6 @@ function main() {
 			"clear_tags": chkClearTags.checked,
 			"check_existing": chkExisting.checked
 		};
-		store.set(`${List.type}_settings`, JSON.stringify(settings));
+		store.set(`${List.type}_settings`, settings);
 	}
 };
