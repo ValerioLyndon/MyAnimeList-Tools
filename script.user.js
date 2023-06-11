@@ -6,6 +6,9 @@
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
 // @match        https://myanimelist.net/mangalist/*
+// @homepageURL  https://github.com/ValerioLyndon/MyAnimeList-Tools
+// @supportURL   https://github.com/ValerioLyndon/MyAnimeList-Tools/issues
+// @license      GPL-3.0-only
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
