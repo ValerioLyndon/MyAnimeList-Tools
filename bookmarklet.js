@@ -314,6 +314,17 @@ function createDOM( string ){
 	return new DOMParser().parseFromString(string, 'text/html');
 }
 
+function decodeHtml( html ){
+	txt = document.createElement("textarea");
+	txt.innerHTML = html;
+	return txt.value;
+}
+
+function round( value, precision ){
+	let multiplier = Math.pow(10, precision || 0);
+	return Math.round(value * multiplier) / multiplier;
+}
+
 /* Main Program */
 
 class UserInterface {
@@ -1373,18 +1384,6 @@ footer {
 
 	/* Common Functions */
 
-	function decodeHtml(html)
-	{
-		txt = document.createElement("textarea");
-		txt.innerHTML = html;
-		return txt.value;
-	}
-
-	function round(value, precision) {
-		let multiplier = Math.pow(10, precision || 0);
-		return Math.round(value * multiplier) / multiplier;
-	}
-
 	async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 		csrf = $('meta[name="csrf_token"]').attr('content');
 		template.value = newTemplate;
@@ -1492,7 +1491,7 @@ footer {
 	var failures = 0;
 	var faildelay = 0;
 	var statusPercent = 30;
-	function getListInfo()
+	function getListItems()
 	{
 		/* will take a list URL:
 		https://myanimelist.net/animelist/Valerio_Lyndon?status=2
@@ -1511,7 +1510,7 @@ footer {
 				statusText.textContent = `Fetching list data (${offset} of ?)...`;
 				statusPercent += 10;
 				statusBar.style.cssText = `--percent: ${statusPercent <= 85 ? statusPercent : '85'}%; --colour: var(--stat-loading);`;
-				getListInfo();
+				getListItems();
 			}
 			else
 			{
@@ -1535,10 +1534,10 @@ footer {
 				return;
 			}
 
-			setTimeout(getListInfo, faildelay);
+			setTimeout(getListItems, faildelay);
 		});
 	};
-	getListInfo();
+	getListItems();
 
 
 
