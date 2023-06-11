@@ -123,6 +123,7 @@ class ListInfo {
 		this.customCssEle = this.isModern ? $('#custom-css') : $('head style:first-of-type');
 		this.customCss = this.customCssEle.text().trim();
 		this.customCssModified = this.customCss.replaceAll(/\/\*MYANIMELIST-TOOLS START\*\/(.|\n)*\/\*MYANIMELIST-TOOLS END\*\//g, '').trim();
+		this.csrf = $('meta[name="csrf_token"]').attr('content');
 	}
 
 	async determineStyle( ){
@@ -135,10 +136,10 @@ class ListInfo {
 	}
 
 	#determineModernStyle( ){
-		stylesheet = $('head style[type="text/css"]:first-of-type').text();
+		let stylesheet = $('head style[type="text/css"]:first-of-type').text();
 
-		styleColIndex = stylesheet.indexOf('background-color', stylesheet.indexOf('.list-unit .list-status-title {')) + 17;
-		styleCol = stylesheet.substr(styleColIndex, 8).replaceAll(/\s|\:|\;/g, '');
+		let styleColIndex = stylesheet.indexOf('background-color', stylesheet.indexOf('.list-unit .list-status-title {')) + 17;
+		let styleCol = stylesheet.substr(styleColIndex, 8).replaceAll(/\s|\:|\;/g, '');
 
 		switch(styleCol) {
 			case '#4065BA':
@@ -261,6 +262,10 @@ function round( value, precision ){
 	return Math.round(value * multiplier) / multiplier;
 }
 
+function sleep( ms ){
+	return new Promise(resolve => { setTimeout(resolve, ms); });
+}
+
 /* Main Program */
 
 class UserInterface {
@@ -317,8 +322,11 @@ function main() {
 	List.determineStyle();
 	UI = new UserInterface();
 
-	/* handle settings from old versions */
 	var settings = defaultSettings;
+
+	/* Handle older settings */
+
+	/* Convert v8.0 -> v8.1 */
 
 	if(store.has('settings'))
 	{
@@ -333,11 +341,28 @@ function main() {
 		store.remove('last_run');
 	}
 
+	/* Convert v9.x -> v10.0 */
+
+	if(localStorage.getItem('burnt-theme') !== null)
+	{
+		localStorage.removeItem('burnt-theme');
+	}
+
+	if( store.has(`${List.type}_settings`) && !store.has(`${List.type}_settings--type`) ){
+		store.set(`${List.type}_settings`, JSON.parse(store.get(`${List.type}_settings`)));
+	}
+
+	if( store.has(`last_${List.type}_run`) && !store.has(`last_${List.type}_run--type`) ){
+		store.set(`last_${List.type}_run`, store.get(`last_${List.type}_run`));
+	}
+
+	/* Default settings handling */
+
 	if(store.has(`${List.type}_settings`))
 	{
 		try
 		{
-			settings = JSON.parse(store.get(`${List.type}_settings`));
+			settings = store.get(`${List.type}_settings`);
 		
 			/* Check for missing settings and fill them in. This prevents errors while maintaining user settings, especially in the case of a user updating from an older version. */
 			for(let [key, value] of Object.entries(defaultSettings))
@@ -363,12 +388,6 @@ function main() {
 			alert("Encountered an error while parsing your previous settings. Your settings have been reverted to defaults. To quickly recover your template settings, try selecting \"Last Run\" and then \"Autofill\". Other settings will need to be manually set. \n\nIf you've never run this tool before, you should never see this.");
 			settings = defaultSettings;
 		}
-	}
-
-	/* remove oddly formatted variable from v9.x */
-	if(localStorage.getItem('burnt-theme') !== null)
-	{
-		localStorage.removeItem('burnt-theme');
 	}
 
 	/* TOOL CODE */
@@ -1034,7 +1053,6 @@ function main() {
 	/* Common Functions */
 
 	async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
-		csrf = $('meta[name="csrf_token"]').attr('content');
 		template.value = newTemplate;
 		matchTemplate.value = newMatchTemplate;
 		if( newCss !== false ){
@@ -1054,11 +1072,12 @@ function main() {
 			/* Send new CSS to MAL */
 			if( List.isModern ){
 				let styleUrl = `https://myanimelist.net/ownlist/style/theme/${List.style}`;
-				
-				let bg_attach = $(doc).find('#style_edit_theme_background_image_attachment').find('[selected]').val() || '';
-				let bg_vert = $(doc).find('#style_edit_theme_background_image_vertical_position').find('[selected]').val() || '';
-				let bg_hori = $(doc).find('#style_edit_theme_background_image_horizontal_position').find('[selected]').val() || '';
-				let bg_repeat = $(doc).find('#style_edit_theme_background_image_repeat').find('[selected]').val() || '';
+
+				let stylePage = await request(styleUrl);
+				let bg_attach = $(stylePage).find('#style_edit_theme_background_image_attachment').find('[selected]').val() || '';
+				let bg_vert = $(stylePage).find('#style_edit_theme_background_image_vertical_position').find('[selected]').val() || '';
+				let bg_hori = $(stylePage).find('#style_edit_theme_background_image_horizontal_position').find('[selected]').val() || '';
+				let bg_repeat = $(stylePage).find('#style_edit_theme_background_image_repeat').find('[selected]').val() || '';
 				
 				let formData = new FormData();
 				formData.append("style_edit_theme[show_cover_image]", "1");
@@ -1071,7 +1090,7 @@ function main() {
 				formData.append("style_edit_theme[background_image_repeat]", bg_repeat);
 				formData.append("style_edit_theme[css]", finalCss);
 				formData.append("style_edit_theme[save]", "");
-				formData.append("csrf_token", csrf);
+				formData.append("csrf_token", List.csrf);
 				
 				let post = await fetch(styleUrl, {
 					method: "POST",
@@ -1101,7 +1120,7 @@ function main() {
 				let formData = new URLSearchParams();
 				formData.append('cssText', finalCss);
 				formData.append('subForm', 'Update CSS');
-				formData.append('csrf_token', csrf);
+				formData.append('csrf_token', List.csrf);
 				
 				let post = await fetch(styleUrl, {
 					method: "POST",
@@ -1192,14 +1211,13 @@ function main() {
 
 	/* Primary Functions */
 
-	var iteration = 0;
+	var iteration = -1;
 	var newData = [];
 	var percent = 0;
 	var timeout;
 	var timeThen;
-	async function processItem()
-	{
-		thisData = newData[iteration];
+	async function processItem( ){
+		let thisData = newData[iteration];
 		id = thisData[`${List.type}_id`];
 		
 		try
@@ -1706,8 +1724,6 @@ function main() {
 			
 			/* Update Notes & Tags */
 
-			let csrf = $('meta[name="csrf_token"]').attr('content');
-
 			if(chkTags.checked)
 			{
 				if(titleEn && chkEnglish.checked) { tags.push(titleEn); }
@@ -1750,7 +1766,7 @@ function main() {
 
 				let formData = new URLSearchParams();
 				formData.append(animeOrMangaId, id);
-				formData.append("csrf_token", csrf);
+				formData.append("csrf_token", List.csrf);
 			
 				await fetch(tagsRequestUrl, {
 					method: "POST",
@@ -1804,7 +1820,7 @@ function main() {
 				let notesRequestDict = {
 					"comments": notesStr,
 					"status": thisData['status'],
-					"csrf_token": csrf
+					"csrf_token": List.csrf
 				};
 
 				if(List.isAnime) {
@@ -1900,55 +1916,34 @@ function main() {
 		continueProcessing();
 	}
 
-	function continueProcessing()
-	{
+	function continueProcessing( ){
 		iteration++;
-
+		
 		/* update variables */
 
-		percent = iteration / newData.length * 100;
+		percent = iteration / newData.length * 100 || 100;
 
-		if(iteration === 1)
-		{
+		if( iteration === 0 ){
 			timeThen = performance.now() - delay.value;
 		}
 		timeSince = performance.now() - timeThen;
 		timeThen = performance.now();
-
 		idsRemaining = newData.length - iteration;
-		seconds = idsRemaining * (timeSince / 1000);
-		if(seconds <= 60)
-		{
-			timeRemaining = `${round(seconds)}s`;
-		}
-		else if(seconds > 60 && seconds < 3600)
-		{
-			timeRemaining = `${round(seconds / 60, 1)}m`;
-		}
-		else if(seconds > 3600)
-		{
-			timeRemaining = `${round(seconds / 60 / 60, 1)}h`;
-		}
-		else
-		{
-			timeRemaining = '?';
-		}
+		timeRemaining(idsRemaining, newData.length, timeSince);
 
 		/* update UI */
 
 		statusText.textContent = `Processed ${iteration} of ${newData.length}`;
 		statusBar.style.cssText = `--percent: ${percent}%; --colour: var(--stat-working);`;
-		timeText.textContent = `~ ${timeRemaining} left`;
 		
-		if(iteration === newData.length){
+		if( iteration >= newData.length ){
 			finishProcessing();
 			return;
 		}
 		timeout = setTimeout(processItem, delay.value);
 	}
 
-	function finishProcessing()
-	{
+	function finishProcessing( ){
 		window.removeEventListener('beforeunload', warnUserBeforeLeaving);
 
 		if(result.value.length > 0)
@@ -2016,12 +2011,36 @@ function main() {
 		}
 	}
 
-	function beginProcessing()
-	{
+	var imagesTotal = 0;
+	var imagesDone = 0;
+	var imageDelay = 50;
+
+	function updateImageStatus( ){
+		imagesDone++;
+		let imagesRemaining = imagesTotal - imagesDone;
+		statusText.textContent = `Validating images (${imagesDone} of ~${imagesTotal})...`;
+		timeRemaining(imagesRemaining, imagesTotal, imageDelay);
+	}
+
+	function timeRemaining( remainingCount, delayInMs ){
+		let seconds = remainingCount * (delayInMs / 1000);
+		let formatted = '?';
+		if( seconds <= 60 ){
+			formatted = `${round(seconds)}s`;
+		}
+		else if( seconds > 60 && seconds < 3600 ){
+			formatted = `${round(seconds / 60, 1)}m`;
+		}
+		else if( seconds > 3600 ){
+			formatted = `${round(seconds / 60 / 60, 1)}h`;
+		}
+		timeText.textContent = `~ ${formatted} left`;
+	}
+
+	async function beginProcessing( ){
 		saveSettings();
 		window.addEventListener('beforeunload', warnUserBeforeLeaving);
 
-		let imageLoadDelay = 0;
 		exitBtn.disabled = "disabled";
 		importBtn.attr('disabled', 'disabled');
 		exportBtn.attr('disabled', 'disabled');
@@ -2044,81 +2063,98 @@ function main() {
 				categories.push(parseInt(categoryId));
 			}
 		}
-		
+
 		result.value += `\/*\nGenerated by MyAnimeList-Tools v${ver}\nhttps://github.com/ValerioLyndon/MyAnimeList-Tools\n\nTemplate=${template.value.replace(/\*\//g, "*[DEL]/")}\nMatchTemplate=${matchTemplate.value}\n*\/\n\n`;
 
-		for(let k = 0; k < data.length; k++)
-		{
-			statusText.textContent = 'Checking your input for matches...';
-			let id = data[k][`${List.type}_id`];
-			let skip;
-			/* Check old CSS for any existing lines and set "skip" var to true if found. */
-			oldLines = existing.value.split("\n");
-			oldLinesCount = oldLines.length;
-			for(let j = 0; j < oldLinesCount; j++)
-			{
+		let beforeProcessing = [];
+		let oldLines = existing.value.replace(/\/\*[\s\S]*?Generated by MyAnimeList-Tools[\s\S]*?\*\/\s+/,'').split("\n");
+		imagesTotal = oldLines.length;
+		statusText.textContent = `Checking your input for matches...`;
+
+		for( let i = 0; i < data.length; i++ ){
+			let item = data[i];
+			let id = item[`${List.type}_id`];
+			
+			/* Skip item if category does not match selected user options */
+			if( chkCategory.checked ){
+				let skip = true;
+				let rewatchKey = List.isAnime ? 'is_rewatching' : 'is_rereading';
+				for( let categoryId of categories ){
+					/* if rewatching then set status to watching, since this is how it appears to the user */
+					if( item[rewatchKey] === 1 ){
+						item['status'] = 1;
+					}
+					if( item['status'] === categoryId ){
+						skip = false;
+						break;
+					}
+				}
+				if( skip ){
+					continue;
+				}
+			}
+
+
+			/* Check old CSS for any existing lines so they can be skipped later. */
+			let lineExists;
+			let lineText;
+			for( let j = 0; j < oldLines.length; j++ ){
+				lineText = oldLines[j];
 				let match = matchTemplate.value.replaceAll(/\[ID\]/g, id).replaceAll(/\[TYPE\]/g, List.type);
-				skip = oldLines[j].indexOf(match) !== -1 ? true : false;
-				if(skip)
-				{
+				lineExists = lineText.indexOf(match) === -1 ? false : true;
+				if( lineExists ){
 					break;
 				}
 			}
 
-			if(skip)
-			{
-				if(chkExisting.checked)
-				{
-					imageLoadDelay = 5000;
-					let urlStart = oldLines[j].indexOf("http");
-					let urlEnd = oldLines[j].indexOf(".jpg", urlStart);
-					if(urlEnd === -1)
-					{
-						urlEnd = oldLines[j].indexOf(".webp", urlStart);
+			/* Add to processing list or skip any existing lines.
+			If validating old images, that step will also occur here. */
+			if( lineExists ){
+				if( chkExisting.checked ){
+					let imgUrl = lineText.match(/http.*?\.(?:jpe?g|webp)/);
+					if( imgUrl.length === 0 ){
+						newData.push(item);
+						imagesTotal--;
+						continue;
 					}
-					let imgUrl = oldLines[j].substring(urlStart, urlEnd + 4);
-					let tempImg = document.createElement("img");
-					tempImg.oldLine = oldLines[j];
-					tempImg.animeId = id;
-					tempImg.data = data[k];
-					tempImg.onload = function(imgLoadEvent)
-					{
-						result.value += imgLoadEvent.target.oldLine + "\n";
-					};
-					tempImg.onerror = function(imgErrorEvent)
-					{
-						newData.push(imgErrorEvent.target.data);
-					};
-					tempImg.src = imgUrl;
+
+					/* Validate image by loading it in the HTML */
+					let imageLoad = new Promise((resolve)=>{
+						let tempImg = document.createElement('img');
+						tempImg.addEventListener('load', ()=>{
+							result.value += lineText + "\n";
+							updateImageStatus();
+							resolve(true);
+						});
+						tempImg.addEventListener('error', ()=>{
+							newData.push(item);
+							updateImageStatus();
+							resolve(false);
+						});
+						tempImg.src = imgUrl;
+					});
+
+					/* Add to Promise stack to await resolution */
+					beforeProcessing.push(imageLoad);
+					/* Add delay to prevent image loading spam */
+					await sleep(imageDelay);
 				}
-				else
-				{
-					result.value += oldLines[j] + "\n";
-				}
-			}
-			else if(chkCategory.checked)
-			{
-				let rewatchKey = List.isAnime ? 'is_rewatching' : 'is_rewatching';
-				for(let categoryId of categories)
-				{
-					/* if rewatching then set status to watching, since this is how it appears to the user */
-					if(data[k][rewatchKey] === 1)
-					{
-						data[k]['status'] = 1;
-					}
-					if(data[k]['status'] == categoryId)
-					{
-						newData.push(data[k]);
-					}
+				else {
+					result.value += lineText + "\n";
 				}
 			}
-			else
-			{
-				newData.push(data[k]);
+			/* If not in existing, add to list for processing */
+			else {
+				imagesTotal--;
+				newData.push(item);
 			}
 		}
 
-		timeout = setTimeout(processItem, imageLoadDelay);
+		/* Start processing items */
+		Promise.allSettled(beforeProcessing)
+		.then(()=>{
+			continueProcessing();
+		})
 	}
 
 	function saveSettings()
@@ -2191,6 +2227,6 @@ function main() {
 			"clear_tags": chkClearTags.checked,
 			"check_existing": chkExisting.checked
 		};
-		store.set(`${List.type}_settings`, JSON.stringify(settings));
+		store.set(`${List.type}_settings`, settings);
 	}
 };

@@ -203,6 +203,7 @@ textarea {
 		var(--colour) var(--percent),
 		transparent var(--percent)
 	);
+	white-space: nowrap;
 }
 
 .is-closed .main:not(.is-hidden) .status {
