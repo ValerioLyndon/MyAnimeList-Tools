@@ -712,12 +712,30 @@ function main() {
 			window.open('https://www.dropbox.com/oauth2/authorize?client_id=odribfnp0304xy2&response_type=code', '_blank');
 		});
 
-		$(popup).find('#enable-upload').on('input', ()=>{
-			log.generic('todo', true);
+		let autoBtn = $(popup).find('#enable-upload');
+		if( store.has('auto_dropbox') ){
+			autoBtn.prop('checked', (Boolean(store.get('auto_dropbox'))));
+		}
+		autoBtn.on('input', (ev)=>{
+			if( ev.target.checked ){
+				store.set('auto_dropbox', 'true');
+			}
+			else {
+				store.set('auto_dropbox', 'false');
+			}
 		});
 
-		$(popup).find('#enable-css').on('input', ()=>{
-			log.generic('todo', true);
+		let importBtn = $(popup).find('#enable-upload');
+		if( store.has('auto_import') ){
+			importBtn.prop('checked', (Boolean(store.get('auto_import'))));
+		}
+		importBtn.on('input', (ev)=>{
+			if( ev.target.checked ){
+				store.set('auto_import', 'true');
+			}
+			else {
+				store.set('auto_import', 'false');
+			}
 		});
 
 		let oauthInput = $(popup).find('#oauth-code');
@@ -1967,6 +1985,35 @@ function main() {
 				alert(`${Log.errorCount} error(s) and ${Log.warningCount} warning(s) occurred while processing.\n\nOut of ${iteration} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
 			}
 		};
+
+		if( store.has('auth_dropbox') && store.get('auto_dropbox') === 'true' ){
+			let headerData = new Headers();
+			headerData.append('Content-Type', 'application/octet-stream');
+			headerData.append('Authorization', `Bearer ${store.get('auth_dropbox')}`);
+			headerData.append('Dropbox-API-Arg', JSON.stringify({
+				'autorename': false,
+				'mode': 'overwrite',
+				'path': `/css/${List.isModern ? 'modern' : 'classic'}_${List.style}.css`
+			}));
+			let fileData = new Blob([result.value], {
+				type: "text/css"
+			});
+
+			fetch('https://content.dropboxapi.com/2/files/upload', {
+				method: "POST",
+				headers: headerData,
+				body: fileData
+			})
+			.then((response)=>{
+				if( !response.ok ){
+					throw new Error(`${response.status} ${response.statusText}`);
+				}
+				Log.generic('File uploaded.', true);
+			})
+			.catch((err)=>{
+				Log.error(`File failed to upload: ${err}`);
+			});
+		}
 	}
 
 	function beginProcessing()
