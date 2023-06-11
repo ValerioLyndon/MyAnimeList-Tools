@@ -5,9 +5,14 @@ const verMod = '/*$$$ver_date$$$*/';
 
 /*<<<store>>>*/
 
-var store = new Store('localStorage');
+var store = new CustomStorage('localStorage');
 
 /*<<<main>>>*/
 
-main();
+if( List.isOwner ){
+	main();
+}
+else {
+	alert('This script is only designed to work on your own list. Be sure you\'ve loaded your anime or manga list and are logged in.');
+}
 })();void(0);
