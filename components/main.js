@@ -135,10 +135,10 @@ class ListInfo {
 	}
 
 	#determineModernStyle( ){
-		stylesheet = $('head style[type="text/css"]:first-of-type').text();
+		let stylesheet = $('head style[type="text/css"]:first-of-type').text();
 
-		styleColIndex = stylesheet.indexOf('background-color', stylesheet.indexOf('.list-unit .list-status-title {')) + 17;
-		styleCol = stylesheet.substr(styleColIndex, 8).replaceAll(/\s|\:|\;/g, '');
+		let styleColIndex = stylesheet.indexOf('background-color', stylesheet.indexOf('.list-unit .list-status-title {')) + 17;
+		let styleCol = stylesheet.substr(styleColIndex, 8).replaceAll(/\s|\:|\;/g, '');
 
 		switch(styleCol) {
 			case '#4065BA':
