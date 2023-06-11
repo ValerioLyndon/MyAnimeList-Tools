@@ -6,6 +6,9 @@
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
 // @match        https://myanimelist.net/mangalist/*
+// @homepageURL  https://github.com/ValerioLyndon/MyAnimeList-Tools
+// @supportURL   https://github.com/ValerioLyndon/MyAnimeList-Tools/issues
+// @license      GPL-3.0-only
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
@@ -24,7 +27,7 @@ MyAnimeList-Tools
 const ver = '10.0-pre_a0';
 const verMod = '2023/Jun/10';
 
-class Store {
+class CustomStorage {
 	constructor( type = 'localStorage' ){
 		this.type = type;
 		this.prefix = 'burnt_';
@@ -74,11 +77,9 @@ class Store {
 	}
 }
 
-var store = new Store('userscript');
+var store = new CustomStorage('userscript');
 
 /* functionality vars */
-var listIsModern = (document.getElementById("list_surround")) ? false : true;
-var listtype = window.location.pathname.split('/')[1].substring(0,5);
 var defaultSettings = {
 	"select_categories": false,
 	"checked_categories": {
@@ -148,6 +149,188 @@ var defaultSettings = {
 	}
 };
 
+class Logger {
+	constructor( parent = null ){
+		this.parent = parent;
+		this.errorCount = 0;
+		this.warningCount = 0;
+	}
+
+	createMsgBox( msg = '', type = 'ERROR' ){
+		let errorBox = document.createElement('div');
+		errorBox.className = 'log-line';
+		errorBox.insertAdjacentHTML('afterbegin', `<b>[${type}]</b> ${msg}`);
+		if( this.parent instanceof HTMLElement ){
+			this.parent.append(errorBox);
+		}
+	}
+	
+	/* tellUser can be one of: true (show to user), false (only to console), or string (show custom string to user) */
+	
+	error( msg = 'Something happened.', tellUser = true ){
+		this.errorCount++;
+		console.log('[MAL-Tools][ERROR]', msg);
+		if( tellUser ){
+			let userMsg = typeof tellUser == 'string' ? tellUser : msg;
+			this.createMsgBox(userMsg, 'Error');
+		}
+	}
+	
+	warn( msg = 'Something happened.', tellUser = true ){
+		this.warningCount++;
+		console.log('[MAL-Tools][warn]', msg);
+		if( tellUser ){
+			let userMsg = typeof tellUser == 'string' ? tellUser : msg;
+			this.createMsgBox(userMsg, 'Warning');
+		}
+	}
+
+	generic( msg = 'Something happened.', tellUser = false ){
+		console.log('[MAL-Tools][info]', msg);
+		if( tellUser ){
+			let userMsg = typeof tellUser == 'string' ? tellUser : msg;
+			this.createMsgBox(userMsg, 'Info');
+		}
+	}
+}
+
+class ListInfo {
+	constructor( ){
+		this.type = window.location.pathname.split('/')[1].substring(0,5);
+		this.isAnime = (this.type === 'anime');
+		this.isOwner = ($('body').attr('data-owner') === "1");
+		this.isModern = ($('#list_surround').length === 0);
+		this.style = undefined;
+		this.customCssEle = this.isModern ? $('#custom-css') : $('head style:first-of-type');
+		this.customCss = this.customCssEle.text().trim();
+		this.customCssModified = this.customCss.replaceAll(/\/\*MYANIMELIST-TOOLS START\*\/(.|\n)*\/\*MYANIMELIST-TOOLS END\*\//g, '').trim();
+	}
+
+	async determineStyle( ){
+		if( this.isModern ){
+			this.style = await this.#determineModernStyle();
+		}
+		else {
+			this.style = await this.#determineClassicStyle();
+		}
+	}
+
+	#determineModernStyle( ){
+		stylesheet = $('head style[type="text/css"]:first-of-type').text();
+
+		styleColIndex = stylesheet.indexOf('background-color', stylesheet.indexOf('.list-unit .list-status-title {')) + 17;
+		styleCol = stylesheet.substr(styleColIndex, 8).replaceAll(/\s|\:|\;/g, '');
+
+		switch(styleCol) {
+			case '#4065BA':
+				if(stylesheet.indexOf('logo_mal_blue.png') !== -1)
+				{
+					return 2;
+				}
+				else
+				{
+					return 1;
+				}
+			case '#244291':
+				return 3;
+			case '#23B230':
+				return 4;
+			case '#A32E2E':
+				return 5;
+			case '#FAD54A':
+				return 6;
+			case '#0080FF':
+				return 7;
+			case '#39c65d':
+				return 8;
+			case '#ff00bf':
+				return 9;
+			case '#DB1C03':
+				return 10;
+			default:
+				Log.error('Failed to determine modern list style.');
+				return false;
+		}
+	}
+
+	/* This function is long and complicated because to figure out the style it must 
+	scrape the list of advanced classic styles the user has created and subsequently
+	scrape the CSS from each of those styles until it finds one that matches the
+	currently applied CSS. */
+	async #determineClassicStyle( ){
+		let userStylesPage = await request('https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv');
+		if( !userStylesPage ){
+			Log.errror('Could not access your classic list style page.');
+			return false;
+		}
+
+		/* get style IDs from page HTML
+		should produce one-two elements something like this:
+		<a href="?go=stylepref&do=cssadv&id=473785">Style ID#473785</a> */
+		let styleUrls = [];
+		$(userStylesPage).find('#dialog a').each((i, ele)=>{
+			let styleId = ele.href.split('&id=')[1];
+			styleUrls.push(`https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv&id=${styleId}`);
+		});
+
+		if( styleUrls.length < 1 ){
+			Log.error('Failed to parse your classic list style page.', false);
+			return false;
+		}
+
+		for( let url of styleUrls ){
+			let userCSSPage = await request(url);
+			if( !userCSSPage ){
+				Log.error('Could not access your classic CSS.', false);
+				return false;
+			}
+
+			let styleCss = $(userCSSPage).find('textarea[name="cssText"]').text().trim();
+
+			if( styleCss === this.customCss ){
+				return url.split('id=')[1];
+			}
+		}
+
+		Log.error('Could not determine classic list style.', false);
+		return false;
+	}
+}
+
+var Log = new Logger();
+var List = new ListInfo();
+
+/* wrapper for common fetch requests to remove some boilerplate */
+async function request( url, result = 'html' ){
+	let pageText = await fetch(url)
+	.then(response => {
+		if( !response.ok ){
+			throw new Error();
+		}
+		return response.text();
+	})
+	.then(text => {
+		return text;
+	})
+	.catch(() => {
+		return false;
+	});
+
+	if( !pageText ){
+		return false;
+	}
+	if( result === 'html' ){
+		return createDOM(pageText);
+	}
+	if( result === 'string' ){
+		return pageText;
+	}
+}
+
+function createDOM( string ){
+	return new DOMParser().parseFromString(string, 'text/html');
+}
+
 /* Main Program */
 
 class UserInterface {
@@ -201,6 +384,7 @@ function warnUserBeforeLeaving( e ){
 }
 
 function main() {
+	List.determineStyle();
 	UI = new UserInterface();
 
 	/* handle settings from old versions */
@@ -219,11 +403,11 @@ function main() {
 		store.remove('last_run');
 	}
 
-	if(store.has(`${listtype}_settings`))
+	if(store.has(`${List.type}_settings`))
 	{
 		try
 		{
-			settings = JSON.parse(store.get(`${listtype}_settings`));
+			settings = JSON.parse(store.get(`${List.type}_settings`));
 		
 			/* Check for missing settings and fill them in. This prevents errors while maintaining user settings, especially in the case of a user updating from an older version. */
 			for(let [key, value] of Object.entries(defaultSettings))
@@ -257,60 +441,12 @@ function main() {
 		localStorage.removeItem('burnt-theme');
 	}
 
-	/* GENERIC FUNCTIONS */
-
-	class Logger {
-		constructor( parent = null ){
-			this.parent = parent;
-			this.errorCount = 0;
-			this.warningCount = 0;
-		}
-
-		createMsgBox( msg = '', type = 'ERROR' ){
-			let errorBox = document.createElement('div');
-			errorBox.className = 'log-line';
-			errorBox.insertAdjacentHTML('afterbegin', `<b>[${type}]</b> ${msg}`);
-			if( this.parent instanceof HTMLElement ){
-				this.parent.append(errorBox);
-			}
-		}
-		
-		/* tellUser can be one of: true (show to user), false (only to console), or string (show custom string to user) */
-		
-		error( msg = 'Something happened.', tellUser = true ){
-			this.errorCount++;
-			console.log('[MAL-Tools][ERROR]', msg);
-			if( tellUser ){
-				let userMsg = typeof tellUser == 'string' ? tellUser : msg;
-				this.createMsgBox(userMsg, 'Error');
-			}
-		}
-		
-		warn( msg = 'Something happened.', tellUser = true ){
-			this.warningCount++;
-			console.log('[MAL-Tools][warn]', msg);
-			if( tellUser ){
-				let userMsg = typeof tellUser == 'string' ? tellUser : msg;
-				this.createMsgBox(userMsg, 'Warning');
-			}
-		}
-
-		generic( msg = 'Something happened.', tellUser = false ){
-			console.log('[MAL-Tools][info]', msg);
-			if( tellUser ){
-				let userMsg = typeof tellUser == 'string' ? tellUser : msg;
-				this.createMsgBox(userMsg, 'Info');
-			}
-		}
-	}
-	var log = new Logger();
-
 	/* TOOL CODE */
 
 	/* Create GUI */
 
 	UI.css(`
-	/* Box Sizing */
+/* Box Sizing */
 
 *, *::before, *::after {
 	box-sizing: inherit;
@@ -641,7 +777,7 @@ footer {
 	let guiB = document.createElement('div');
 	guiB.id = 'logs';
 	gui.append(guiB);
-	log.parent = guiB;
+	Log.parent = guiB;
 
 	let actionBtn = document.createElement("input");
 	sidebar.append(actionBtn);
@@ -652,13 +788,13 @@ footer {
 	actionBtn.onclick = ()=>{ beginProcessing(); };
 
 	let closeBtn = $('<input value="Minimise" class="btn" type="button" title="Closes the program window while it keeps running in the background.">')
-	.click(()=>{
+	.on('click',()=>{
 		UI.close();
 	});
 	$(sidebar).append(closeBtn);
 
 	let hideBtn = $('<input id="hideBtn" class="btn" type="button" value="Hide" title="Hide the status bar. The program will keep running in the background." />')
-	.click(()=>{
+	.on('click',()=>{
 		gui.classList.add('is-hidden');
 	});
 	$(sidebar).append(hideBtn);
@@ -737,7 +873,7 @@ footer {
 	let categoryDrawer = $('<div class="drawer"></div>');
 	$(globalGroup).append(categoryDrawer);
 
-	let watchOrRead = listtype == 'anime' ? "Watching" : "Reading";
+	let watchOrRead = List.type == 'anime' ? "Watching" : "Reading";
 	let categoryChks = {
 		"1": chk(settings['checked_categories']['1'], watchOrRead, categoryDrawer),
 		"2": chk(settings['checked_categories']['2'], "Completed", categoryDrawer),
@@ -774,7 +910,7 @@ footer {
 	/* Import/Export section */
 
 	importBtn = $('<input type="button" value="Import Template" class="btn" title="Import a CSS template to get started quickly.">');
-	importBtn.click(()=>{
+	importBtn.on('click',()=>{
 		$(gui).append(overlay);
 
 		importOverlay = $(`
@@ -796,7 +932,7 @@ footer {
 
 		$(gui).append(importOverlay);
 
-		$(importOverlay).find('#import-btn').click(()=>{
+		$(importOverlay).find('#import-btn').on('click',()=>{
 			value = $(importOverlay).find('#import-field').val();
 
 			if(value.length < 1)
@@ -828,7 +964,7 @@ footer {
 			}
 		});
 		
-		$(importOverlay).find('#close').click(()=>{
+		$(importOverlay).find('#close').on('click',()=>{
 			importOverlay.remove();
 			overlay.remove();
 		});
@@ -836,7 +972,7 @@ footer {
 	$(cssGroup).append(importBtn);
 
 	exportBtn = $('<input type="button" value="Export" class="btn" title="Create a CSS template for others to use.">');
-	exportBtn.click(()=>{
+	exportBtn.on('click',()=>{
 		$(gui).append(overlay);
 
 		exportOverlay = $(`
@@ -875,7 +1011,7 @@ footer {
 		$(exportOverlay).find('#export-template').val(template.value);
 		$(exportOverlay).find('#export-match').val(matchTemplate.value);
 
-		$(exportOverlay).find('#export-btn').click(()=>{
+		$(exportOverlay).find('#export-btn').on('click',()=>{
 			let newTemplate = $(exportOverlay).find('#export-template').val();
 			let newMatchTemplate = $(exportOverlay).find('#export-match').val();
 
@@ -902,7 +1038,7 @@ footer {
 			}
 		});
 		
-		$(exportOverlay).find('#close').click(()=>{
+		$(exportOverlay).find('#close').on('click',()=>{
 			exportOverlay.remove();
 			overlay.remove();
 		});
@@ -1069,7 +1205,7 @@ footer {
 	chkSerializationNotes = chk(settings['checked_notes']['serialization'], "Serialization", notesDrawer);
 
 	/* HIDE IRRELEVANT */
-	if(listtype === 'anime')
+	if(List.isAnime)
 	{
 		chkPublished.parentNode.style.display = 'none';
 		chkAuthors.parentNode.style.display = 'none';
@@ -1118,7 +1254,7 @@ footer {
 	}
 
 	let switchTheme = $('<input class="btn" type="button" value="Switch Theme">')
-	.click(()=>{
+	.on('click',()=>{
 		let theme = gui.classList.contains('dark') ? 'light' : 'dark';
 		gui.classList.remove('light', 'dark');
 		gui.classList.add(theme);
@@ -1129,11 +1265,11 @@ footer {
 	/* Settings section */
 
 	clearBtn = $('<input type="button" value="Clear Settings" class="btn" title="Clears any stored settings from previous runs.">');
-	if(store.has(`${listtype}_settings`) || store.has(`last_${listtype}_run`))
+	if(store.has(`${List.type}_settings`) || store.has(`last_${List.type}_run`))
 	{
-		clearBtn.click(()=>{
-			store.remove(`${listtype}_settings`);
-			store.remove(`last_${listtype}_run`);
+		clearBtn.on('click',()=>{
+			store.remove(`${List.type}_settings`);
+			store.remove(`last_${List.type}_run`);
 			alert('Please exit and restart the tool to complete the clearing of your settings.');
 		});
 	}
@@ -1158,10 +1294,10 @@ footer {
 	$(topL).append($('<b>Input</b>'));
 
 	lastRun = $('<input type="button" value="Last Run" class="btn btn-right" title="Fills the input field with the last known output of this tool.">');
-	if(store.has(`last_${listtype}_run`))
+	if(store.has(`last_${List.type}_run`))
 	{
-		lastRun.click(()=>{
-			existing.value = store.get(`last_${listtype}_run`);
+		lastRun.on('click',()=>{
+			existing.value = store.get(`last_${List.type}_run`);
 		});
 	}
 	else {
@@ -1170,7 +1306,7 @@ footer {
 	$(topL).append(lastRun);
 
 	autofill = $('<input type="button" value="Autofill" class="btn btn-right" title="Autofill the template fields based on any previously generated code found in the input.">')
-	.click(()=>{
+	.on('click',()=>{
 		code = existing.value;
 
 		if(code.length < 1)
@@ -1233,7 +1369,7 @@ footer {
 
 	copyOutput = $('<input type="button" value="Copy to Clipboard" class="btn btn-right" title="Copies output to clipboard.">');
 	$(topR).append(copyOutput);
-	copyOutput.click(()=>{
+	copyOutput.on('click',()=>{
 		result.select();
 		document.execCommand('copy');
 	});
@@ -1267,117 +1403,31 @@ footer {
 	}
 
 	async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
+		csrf = $('meta[name="csrf_token"]').attr('content');
 		template.value = newTemplate;
 		matchTemplate.value = newMatchTemplate;
-		if(newCss !== false && newCss.trim() !== '')
-		{
-			if(listIsModern)
-			{
-				/* Determine theme currently being used */
+		if( newCss !== false ){
+			if( !List.style ){
+				alert('Failed to import CSS: Not able to determine style ID.');
+				return false;
+			}
 
-				stylesheet = $('head style[type="text/css"]:first-of-type').text();
+			finalCss = List.customCssModified;
+			if( newCss.length > 0 ){
+				finalCss += '\n\n/*MYANIMELIST-TOOLS START*/\n\n' + newCss + '\n\n/*MYANIMELIST-TOOLS END*/';
+			}
+			if( finalCss.length >= 65535 ){
+				alert('Your MAL Custom CSS may be longer than the max allowed length. If your CSS has been cut off at the end, you will need to resolve this issue.');
+			}
 
-				style = false;
-				styleColIndex = stylesheet.indexOf('background-color', stylesheet.indexOf('.list-unit .list-status-title {')) + 17;
-				styleCol = stylesheet.substr(styleColIndex, 8).replaceAll(/\s|\:|\;/g, '');
-
-				switch(styleCol) {
-					case '#4065BA':
-						if(stylesheet.indexOf('logo_mal_blue.png') !== -1)
-						{
-							style = 2;
-						}
-						else
-						{
-							style = 1;
-						}
-						break;
-					case '#244291':
-						style = 3;
-						break;
-					case '#23B230':
-						style = 4;
-						break;
-					case '#A32E2E':
-						style = 5;
-						break;
-					case '#FAD54A':
-						style = 6;
-						break;
-					case '#0080FF':
-						style = 7;
-						break;
-					case '#39c65d':
-						style = 8;
-						break;
-					case '#ff00bf':
-						style = 9;
-						break;
-					case '#DB1C03':
-						style = 10;
-						break;
-				}
-
-				if(style === false)
-				{
-					alert('Failed to import CSS: Not able to determine style for change.');
-					return false;
-				}
-
-				/* Update MAL custom CSS */
-
-				styleUrl = `https://myanimelist.net/ownlist/style/theme/${style}`;
+			/* Send new CSS to MAL */
+			if( List.isModern ){
+				let styleUrl = `https://myanimelist.net/ownlist/style/theme/${List.style}`;
 				
-				let str = await fetch(styleUrl)
-				.then(response => {
-					if(!response.ok)
-					{
-						throw new Error(`Failed to fetch modern list CSS.`);
-					}
-					return response.text();
-				})
-				.then(html => {
-					return html;
-				})
-				.catch(error => {
-					log.error(error);
-					return false;
-				});
-				if(!str)
-				{
-					return false;
-				}
-				let doc = new DOMParser().parseFromString(str, "text/html");
-
-				customCss = $(doc).find('pre#custom-css').text();
-
-				/* Temporarily update the page's CSS to make sure no page reload is required */
-				$('head').append($(`<style>${newCss}</style>`));
-
-				/* Remove any previously added myanimelist-tools CSS */
-				customCss = customCss.replaceAll(/\/\*MYANIMELIST-TOOLS START\*\/(.|\n)*\/\*MYANIMELIST-TOOLS END\*\//g, '');
-
-				if(newCss.length > 0)
-				{
-					finalCss = customCss + '\n\n/*MYANIMELIST-TOOLS START*/\n\n' + newCss + '\n\n/*MYANIMELIST-TOOLS END*/';
-				}
-				else
-				{
-					finalCss = customCss;
-				}
-
-				if(finalCss.length >= 65535)
-				{
-					alert('Your MAL Custom CSS may be longer than the max allowed length. If your CSS has been cut off at the end, you will need to resolve this issue.');
-				}
-
-				/* Send new CSS to MAL */
-				
-				csrf = $('meta[name="csrf_token"]').attr('content');
-				bg_attach = $(doc).find('#style_edit_theme_background_image_attachment').find('[selected]').val() || '';
-				bg_vert = $(doc).find('#style_edit_theme_background_image_vertical_position').find('[selected]').val() || '';
-				bg_hori = $(doc).find('#style_edit_theme_background_image_horizontal_position').find('[selected]').val() || '';
-				bg_repeat = $(doc).find('#style_edit_theme_background_image_repeat').find('[selected]').val() || '';
+				let bg_attach = $(doc).find('#style_edit_theme_background_image_attachment').find('[selected]').val() || '';
+				let bg_vert = $(doc).find('#style_edit_theme_background_image_vertical_position').find('[selected]').val() || '';
+				let bg_hori = $(doc).find('#style_edit_theme_background_image_horizontal_position').find('[selected]').val() || '';
+				let bg_repeat = $(doc).find('#style_edit_theme_background_image_repeat').find('[selected]').val() || '';
 				
 				let formData = new FormData();
 				formData.append("style_edit_theme[show_cover_image]", "1");
@@ -1397,116 +1447,21 @@ footer {
 					body: formData
 				})
 				.then(response => {
-					if(!response.ok)
-					{
+					if( !response.ok) {
 						throw new Error(`Failed to send modern CSS update request.`);
 					}
 					return true;
 				})
 				.catch(error => {
-					log.error(error);
+					Log.error(error);
 					return false;
 				});
-				if(!post)
-				{
+				if( !post ){
 					return false;
 				}
 			}
-			else
-			{
-				oldCss = $('head style[type="text/css"]:first-of-type');
-				
-				/* Update MAL custom CSS */
-
-				let styleListsStr = await fetch('https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv')
-				.then(response => {
-					if(!response.ok)
-					{
-						throw new Error(`Failed to fetch classic list styles.`);
-					}
-					return response.text();
-				})
-				.then(html => {
-					return html;
-				})
-				.catch(error => {
-					log.error(error);
-					return false;
-				});
-				if(!styleListsStr)
-				{
-					return false;
-				}
-				let styleListsDoc = new DOMParser().parseFromString(styleListsStr, "text/html");
-
-				let styleUrl = false;
-				let styleUrls = [];
-				
-				/* should produce one-two elements something like this:
-				<a href="?go=stylepref&do=cssadv&id=473785">Style ID#473785</a> */
-				$(styleListsDoc).find('#dialog a').each((i, ele)=>{
-					let styleId = ele.href.split('&id=')[1];
-					styleUrls.push(`https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv&id=${styleId}`);
-				});
-
-				if(styleUrls.length < 1)
-				{
-					alert('Failed to import CSS: Not able to determine style for change.');
-					return false;
-				}
-
-				for(let url of styleUrls)
-				{
-					let str = await fetch(url)
-					.then(response => {
-						if(!response.ok)
-						{
-							throw new Error(`Failed to get fetch classic list CSS.`);
-						}
-						return response.text();
-					})
-					.then(html => {
-						return html;
-					})
-					.catch(error => {
-						log.error(error);
-						return false;
-					});
-					if(!str)
-					{
-						return false;
-					}
-					let doc = new DOMParser().parseFromString(str, "text/html");
-
-					customCss = $(doc).find('textarea[name="cssText"]').text();
-
-					if(customCss.trim() == oldCss.text().trim())
-					{
-						styleUrl = url;
-						break;
-					}
-				}
-				if(styleUrl === false)
-				{
-					log.error('Failed to update classic CSS: could not determine style. Try again after reloading the page.');
-					return false;
-				}
-
-				/* Remove any previously added myanimelist-tools CSS */
-				customCss = customCss.replaceAll(/\/\*MYANIMELIST-TOOLS START\*\/(.|\n)*\/\*MYANIMELIST-TOOLS END\*\//g, '');
-
-				if(newCss.length > 0)
-				{
-					finalCss = customCss + '\n\n/*MYANIMELIST-TOOLS START*/\n\n' + newCss + '\n\n/*MYANIMELIST-TOOLS END*/';
-				}
-				else
-				{
-					finalCss = customCss;
-				}
-
-				/* Send new CSS to MAL */
-				
-				csrf = $('meta[name="csrf_token"]').attr('content');
+			else {
+				let styleUrl = `https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv&id=${List.style}`;
 				
 				let headerData = new Headers();
 				headerData.append('Content-Type', 'application/x-www-form-urlencoded');
@@ -1523,29 +1478,22 @@ footer {
 					body: formData
 				})
 				.then(response => {
-					if(!response.ok)
-					{
+					if( !response.ok ){
 						throw new Error(`Failed to send classic CSS update request.`);
 					}
 					return true;
 				})
 				.catch(error => {
-					log.error(error);
+					Log.error(error);
 					return false;
 				});
-				if(!post)
-				{
+				if( !post ){
 					return false;
 				}
-
-				if(finalCss.length >= 65535)
-				{
-					alert('Your MAL Custom CSS may be longer than the max allowed length. If your CSS has been cut off at the end, you will need to resolve this issue.');
-				}
-
-				/* Temporarily update the page's CSS to make sure no page reload is required */
-				oldCss.text(finalCss);
 			}
+
+			/* Temporarily update the page's CSS to make sure no page reload is required */
+			List.customCssEle.text(finalCss);
 		}
 		alert('Import succeeded.');
 		return true;
@@ -1621,31 +1569,17 @@ footer {
 	async function processItem()
 	{
 		thisData = newData[iteration];
-		id = thisData[`${listtype}_id`];
+		id = thisData[`${List.type}_id`];
 		
 		try
 		{
-			let str = await fetch(`https://myanimelist.net/${listtype}/${id}`)
-			.then(response => {
-				if(!response.ok)
-				{
-					throw new Error(`${listtype} #${id}: Failed to get entry information.`);
-				}
-				return response.text();
-			})
-			.then(html => {
-				return html;
-			})
-			.catch(error => {
-				log.error(error);
-				return false;
-			});
-			if(!str)
-			{
+			let str = await request(`https://myanimelist.net/${List.type}/${id}`, 'string');
+			if( !str ){
+				Log.error(`${List.type} #${id}: Failed to get entry information.`);
 				continueProcessing();
 				return;
 			}
-			let doc = new DOMParser().parseFromString(str, "text/html");
+			let doc = createDOM(str);
 		
 			/* get current tags */
 			if(!chkTags.checked || chkClearTags.checked) {
@@ -1701,7 +1635,7 @@ footer {
 
 			/* titles */
 
-			title = thisData[`${listtype}_title`];
+			title = thisData[`${List.type}_title`];
 
 			/* English title */
 			
@@ -1813,7 +1747,7 @@ footer {
 			/* date */
 			season = null;
 			year = null;
-			dateStartTxt = ( listtype == "anime" ) ? 'Aired:</span>' : 'Published:</span>';
+			dateStartTxt = ( List.type == "anime" ) ? 'Aired:</span>' : 'Published:</span>';
 			dateStartIndex = str.indexOf(dateStartTxt) + dateStartTxt.length;
 			if(str.indexOf(dateStartTxt) != -1)
 			{
@@ -2171,7 +2105,7 @@ footer {
 				
 				let tagsRequestUrl;
 				let animeOrMangaId;
-				if(listtype === 'anime') {
+				if(List.isAnime) {
 					tagsRequestUrl = 'https://myanimelist.net/includes/ajax.inc.php?t=22&tags=';
 					animeOrMangaId = 'aid';
 				} else {
@@ -2195,12 +2129,12 @@ footer {
 				.then(response => {
 					if(!response.ok)
 					{
-						throw new Error(`${listtype} #${id}: Failed to update tags.`);
+						throw new Error(`${List.type} #${id}: Failed to update tags.`);
 					}
 					return true;
 				})
 				.catch(error => {
-					log.error(error);
+					Log.error(error);
 					return false;
 				});
 			}
@@ -2242,7 +2176,7 @@ footer {
 					"csrf_token": csrf
 				};
 
-				if(listtype === 'anime') {
+				if(List.isAnime) {
 					notesRequestDict['anime_id'] = id;
 					notesRequestUrl = 'https://myanimelist.net/ownlist/anime/edit_convert.json';
 				} else {
@@ -2263,12 +2197,12 @@ footer {
 				.then(response => {
 					if(!response.ok)
 					{
-						throw new Error(`${listtype} #${id}: Failed update notes.`);
+						throw new Error(`${List.type} #${id}: Failed update notes.`);
 					}
 					return true;
 				})
 				.catch(error => {
-					log.error(error);
+					Log.error(error);
 					return false;
 				});
 			}
@@ -2286,14 +2220,14 @@ footer {
 			catch(e)
 			{
 				imgUrl = imgUrlt = imgUrlv = imgUrll = 'none';
-				log.warn(`${listtype} #${id}: no image found`);
+				Log.warn(`${List.type} #${id}: no image found`);
 			}
 			
 			/* Generate CSS */
 			cssLine = template.value
 				.replaceAll('[DEL]', '')
 				.replaceAll('[ID]', id)
-				.replaceAll('[TYPE]', listtype)
+				.replaceAll('[TYPE]', List.type)
 				.replaceAll('[IMGURL]', imgUrl)
 				.replaceAll('[IMGURLT]', imgUrlt)
 				.replaceAll('[IMGURLV]', imgUrlv)
@@ -2329,7 +2263,7 @@ footer {
 		}
 		catch(e)
 		{
-			log.error(`${listtype} #${id}: ${e}`);
+			Log.error(`${List.type} #${id}: ${e}`);
 		}
 		
 		continueProcessing();
@@ -2388,11 +2322,11 @@ footer {
 
 		if(result.value.length > 0)
 		{
-			store.set(`last_${listtype}_run`, result.value);
+			store.set(`last_${List.type}_run`, result.value);
 		}
 		actionBtn.value = "Done";
 		actionBtn.disabled = "disabled";
-		statusText.textContent = `Completed with ${log.errorCount} errors`;
+		statusText.textContent = `Completed with ${Log.errorCount} errors`;
 		timeText.textContent = '';
 		exportBtn.removeAttr('disabled');
 		clearBtn.removeAttr('disabled');
@@ -2406,18 +2340,18 @@ footer {
 				alert("Refesh the page for tag and note updates to show.");
 			}
 			
-			errorPercent = log.errorCount / i * 100;
-			if(log.errorCount < 1 && log.warningCount > 0)
+			errorPercent = Log.errorCount / i * 100;
+			if(Log.errorCount < 1 && Log.warningCount > 0)
 			{
-				alert(`${log.warningCount} warning(s) occurred while processing.\n\nIt is likely that all updates were successful. However, if you notice missing images, try running the tool again.`);
+				alert(`${Log.warningCount} warning(s) occurred while processing.\n\nIt is likely that all updates were successful. However, if you notice missing images, try running the tool again.`);
 			}
-			else if(log.errorCount > 0 && log.warningCount < 1)
+			else if(Log.errorCount > 0 && Log.warningCount < 1)
 			{
-				alert(`${log.errorCount} error(s) occurred while processing.\n\nOut of ${iteration} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
+				alert(`${Log.errorCount} error(s) occurred while processing.\n\nOut of ${iteration} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
 			}
-			else if(log.errorCount > 0 && log.warningCount > 0)
+			else if(Log.errorCount > 0 && Log.warningCount > 0)
 			{
-				alert(`${log.errorCount} error(s) and ${log.warningCount} warning(s) occurred while processing.\n\nOut of ${iteration} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
+				alert(`${Log.errorCount} error(s) and ${Log.warningCount} warning(s) occurred while processing.\n\nOut of ${iteration} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
 			}
 		};
 	}
@@ -2456,14 +2390,14 @@ footer {
 		for(let k = 0; k < data.length; k++)
 		{
 			statusText.textContent = 'Checking your input for matches...';
-			let id = data[k][`${listtype}_id`];
+			let id = data[k][`${List.type}_id`];
 			let skip;
 			/* Check old CSS for any existing lines and set "skip" var to true if found. */
 			oldLines = existing.value.split("\n");
 			oldLinesCount = oldLines.length;
 			for(let j = 0; j < oldLinesCount; j++)
 			{
-				let match = matchTemplate.value.replaceAll(/\[ID\]/g, id).replaceAll(/\[TYPE\]/g, listtype);
+				let match = matchTemplate.value.replaceAll(/\[ID\]/g, id).replaceAll(/\[TYPE\]/g, List.type);
 				skip = oldLines[j].indexOf(match) !== -1 ? true : false;
 				if(skip)
 				{
@@ -2504,7 +2438,7 @@ footer {
 			}
 			else if(chkCategory.checked)
 			{
-				let rewatchKey = listtype === 'anime' ? 'is_rewatching' : 'is_rewatching';
+				let rewatchKey = List.isAnime ? 'is_rewatching' : 'is_rewatching';
 				for(let categoryId of categories)
 				{
 					/* if rewatching then set status to watching, since this is how it appears to the user */
@@ -2597,26 +2531,15 @@ footer {
 			"clear_tags": chkClearTags.checked,
 			"check_existing": chkExisting.checked
 		};
-		store.set(`${listtype}_settings`, JSON.stringify(settings));
+		store.set(`${List.type}_settings`, JSON.stringify(settings));
 	}
 };
 
 /* Add "Tools" button to list */
 
-function primaryCss( css, id = false ){
-	newCSS = document.createElement('style');
-	newCSS.className = 'burnt-css';
-	if( id ){
-		newCSS.id = id;
-	}
-	newCSS.textContent = css;
-	document.head.append(newCSS);
-	return newCSS;
-}
-
-if( document.body.getAttribute('data-owner') == 1 ){
+if( List.isOwner ){
 	let button = $('<a href="javascript:void(0);">Tools</a>')
-	.click(()=>{
+	.on('click',()=>{
 		if( UI && UI.dead === false ){
 			UI.open();
 		}
@@ -2625,24 +2548,22 @@ if( document.body.getAttribute('data-owner') == 1 ){
 		}
 	});
 
-	let buttonParent;
-	if( listIsModern ){
-		buttonParent = $('.list-menu-float');
+	if( List.isModern ){
 		button.addClass('icon-menu');
 		button.html(`
 			<svg class="icon burnt-trigger-icon" xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 512 512"><!--! Font Awesome Free 6.4.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2023 Fonticons, Inc. --><path d="M78.6 5C69.1-2.4 55.6-1.5 47 7L7 47c-8.5 8.5-9.4 22-2.1 31.6l80 104c4.5 5.9 11.6 9.4 19 9.4h54.1l109 109c-14.7 29-10 65.4 14.3 89.6l112 112c12.5 12.5 32.8 12.5 45.3 0l64-64c12.5-12.5 12.5-32.8 0-45.3l-112-112c-24.2-24.2-60.6-29-89.6-14.3l-109-109V104c0-7.5-3.5-14.5-9.4-19L78.6 5zM19.9 396.1C7.2 408.8 0 426.1 0 444.1C0 481.6 30.4 512 67.9 512c18 0 35.3-7.2 48-19.9L233.7 374.3c-7.8-20.9-9-43.6-3.6-65.1l-61.7-61.7L19.9 396.1zM512 144c0-10.5-1.1-20.7-3.2-30.5c-2.4-11.2-16.1-14.1-24.2-6l-63.9 63.9c-3 3-7.1 4.7-11.3 4.7H352c-8.8 0-16-7.2-16-16V102.6c0-4.2 1.7-8.3 4.7-11.3l63.9-63.9c8.1-8.1 5.2-21.8-6-24.2C388.7 1.1 378.5 0 368 0C288.5 0 224 64.5 224 144l0 .8 85.3 85.3c36-9.1 75.8 .5 104 28.7L429 274.5c49-23 83-72.8 83-130.5zM56 432a24 24 0 1 1 48 0 24 24 0 1 1 -48 0z"/></svg>
 			<span class="text">Tools</span>
 		`);
+		$('.list-menu-float').append(button);
 	}
 	else {
-		buttonParent = $('#mal_cs_otherlinks div:last-of-type');
+		$('#mal_cs_otherlinks div:last-of-type').append(button);
 	}
-	buttonParent.append(button);
 
-	primaryCss(`
-	.burnt-trigger-icon {
-		top: 15px;
-		left: 15px;
-	}
+	$('<head>').append('<style>').text(`
+		.burnt-trigger-icon {
+			top: 15px;
+			left: 15px;
+		}
 	`);
 }

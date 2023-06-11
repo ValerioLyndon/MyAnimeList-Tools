@@ -1,4 +1,4 @@
-class Store {
+class CustomStorage {
 	constructor( type = 'localStorage' ){
 		this.type = type;
 		this.prefix = 'burnt_';
