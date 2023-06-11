@@ -8,7 +8,7 @@ MyAnimeList-Tools
 */
 
 const ver = '9.2-pre_b0';
-const verMod = '2023/Jun/10';
+const verMod = '2023/Jun/11';
 
 class CustomStorage {
 	constructor( type = 'localStorage' ){
@@ -17,30 +17,48 @@ class CustomStorage {
 	}
 
 	set( key, value ){
-		if( value instanceof Object ){
+		let valType = typeof value;
+		if( valType === 'object' ){
 			value = JSON.stringify(value);
+		}
+		else {
+			value = value.toString();
 		}
 
 		if( this.type === 'userscript' ){
 			GM_setValue(key,value);
+			GM_setValue(`${key}--type`,valType);
 		}
 		else {
 			key = `${this.prefix}${key}`;
 			localStorage.setItem(key,value);
+			localStorage.setItem(`${key}--type`,valType);
 		}
 	}
 
 	get( key ){
 		let value;
+		let valType;
 		if( this.type === 'userscript' ){
+			valType = GM_getValue(`${key}--type`);
 			value = GM_getValue(key);
 		}
 		else {
 			key = `${this.prefix}${key}`;
-			value = localStorage.getItem(key,value);
+			valType = localStorage.getItem(`${key}--type`);
+			value = localStorage.getItem(key);
 			if( value === null ){
 				value = undefined;
 			}
+		}
+		if( value === undefined ){
+			return value;
+		}
+		if( valType === 'object' ){
+			value = JSON.parse(value);
+		}
+		else if( valType === 'boolean' ){
+			value = Boolean(value);
 		}
 		return value;
 	}
@@ -52,10 +70,12 @@ class CustomStorage {
 	remove( key ){
 		if( this.type === 'userscript' ){
 			GM_deleteValue(key);
+			GM_deleteValue(`${key}--type`);
 		}
 		else {
 			key = `${this.prefix}${key}`;
 			localStorage.removeItem(key);
+			localStorage.removeItem(`${key}--type`);
 		}
 	}
 }
@@ -199,10 +219,10 @@ class ListInfo {
 	}
 
 	#determineModernStyle( ){
-		stylesheet = $('head style[type="text/css"]:first-of-type').text();
+		let stylesheet = $('head style[type="text/css"]:first-of-type').text();
 
-		styleColIndex = stylesheet.indexOf('background-color', stylesheet.indexOf('.list-unit .list-status-title {')) + 17;
-		styleCol = stylesheet.substr(styleColIndex, 8).replaceAll(/\s|\:|\;/g, '');
+		let styleColIndex = stylesheet.indexOf('background-color', stylesheet.indexOf('.list-unit .list-status-title {')) + 17;
+		let styleCol = stylesheet.substr(styleColIndex, 8).replaceAll(/\s|\:|\;/g, '');
 
 		switch(styleCol) {
 			case '#4065BA':
@@ -314,6 +334,21 @@ function createDOM( string ){
 	return new DOMParser().parseFromString(string, 'text/html');
 }
 
+function decodeHtml( html ){
+	txt = document.createElement("textarea");
+	txt.innerHTML = html;
+	return txt.value;
+}
+
+function round( value, precision ){
+	let multiplier = Math.pow(10, precision || 0);
+	return Math.round(value * multiplier) / multiplier;
+}
+
+function sleep( ms ){
+	return new Promise(resolve => { setTimeout(resolve, ms); });
+}
+
 /* Main Program */
 
 class UserInterface {
@@ -370,8 +405,11 @@ function main() {
 	List.determineStyle();
 	UI = new UserInterface();
 
-	/* handle settings from old versions */
 	var settings = defaultSettings;
+
+	/* Handle older settings */
+
+	/* Convert v8.0 -> v8.1 */
 
 	if(store.has('settings'))
 	{
@@ -386,11 +424,28 @@ function main() {
 		store.remove('last_run');
 	}
 
+	/* Convert v9.x -> v10.0 */
+
+	if(localStorage.getItem('burnt-theme') !== null)
+	{
+		localStorage.removeItem('burnt-theme');
+	}
+
+	if( store.has(`${List.type}_settings`) && !store.has(`${List.type}_settings--type`) ){
+		store.set(`${List.type}_settings`, JSON.parse(store.get(`${List.type}_settings`)));
+	}
+
+	if( store.has(`last_${List.type}_run`) && !store.has(`last_${List.type}_run--type`) ){
+		store.set(`last_${List.type}_run`, store.get(`last_${List.type}_run`));
+	}
+
+	/* Default settings handling */
+
 	if(store.has(`${List.type}_settings`))
 	{
 		try
 		{
-			settings = JSON.parse(store.get(`${List.type}_settings`));
+			settings = store.get(`${List.type}_settings`);
 		
 			/* Check for missing settings and fill them in. This prevents errors while maintaining user settings, especially in the case of a user updating from an older version. */
 			for(let [key, value] of Object.entries(defaultSettings))
@@ -416,12 +471,6 @@ function main() {
 			alert("Encountered an error while parsing your previous settings. Your settings have been reverted to defaults. To quickly recover your template settings, try selecting \"Last Run\" and then \"Autofill\". Other settings will need to be manually set. \n\nIf you've never run this tool before, you should never see this.");
 			settings = defaultSettings;
 		}
-	}
-
-	/* remove oddly formatted variable from v9.x */
-	if(localStorage.getItem('burnt-theme') !== null)
-	{
-		localStorage.removeItem('burnt-theme');
 	}
 
 	/* TOOL CODE */
@@ -630,6 +679,7 @@ textarea {
 		var(--colour) var(--percent),
 		transparent var(--percent)
 	);
+	white-space: nowrap;
 }
 
 .is-closed .main:not(.is-hidden) .status {
@@ -1296,18 +1346,6 @@ footer {
 
 	/* Common Functions */
 
-	function decodeHtml(html)
-	{
-		txt = document.createElement("textarea");
-		txt.innerHTML = html;
-		return txt.value;
-	}
-
-	function round(value, precision) {
-		let multiplier = Math.pow(10, precision || 0);
-		return Math.round(value * multiplier) / multiplier;
-	}
-
 	async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 		csrf = $('meta[name="csrf_token"]').attr('content');
 		template.value = newTemplate;
@@ -1415,7 +1453,7 @@ footer {
 	var failures = 0;
 	var faildelay = 0;
 	var statusPercent = 30;
-	function getListInfo()
+	function getListItems()
 	{
 		/* will take a list URL:
 		https://myanimelist.net/animelist/Valerio_Lyndon?status=2
@@ -1434,7 +1472,7 @@ footer {
 				statusText.textContent = `Fetching list data (${offset} of ?)...`;
 				statusPercent += 10;
 				statusBar.style.cssText = `--percent: ${statusPercent <= 85 ? statusPercent : '85'}%; --colour: var(--stat-loading);`;
-				getListInfo();
+				getListItems();
 			}
 			else
 			{
@@ -1458,23 +1496,22 @@ footer {
 				return;
 			}
 
-			setTimeout(getListInfo, faildelay);
+			setTimeout(getListItems, faildelay);
 		});
 	};
-	getListInfo();
+	getListItems();
 
 
 
 	/* Primary Functions */
 
-	var iteration = 0;
+	var iteration = -1;
 	var newData = [];
 	var percent = 0;
 	var timeout;
 	var timeThen;
-	async function processItem()
-	{
-		thisData = newData[iteration];
+	async function processItem( ){
+		let thisData = newData[iteration];
 		id = thisData[`${List.type}_id`];
 		
 		try
@@ -2175,55 +2212,34 @@ footer {
 		continueProcessing();
 	}
 
-	function continueProcessing()
-	{
+	function continueProcessing( ){
 		iteration++;
-
+		
 		/* update variables */
 
-		percent = iteration / newData.length * 100;
+		percent = iteration / newData.length * 100 || 100;
 
-		if(iteration === 1)
-		{
+		if( iteration === 0 ){
 			timeThen = performance.now() - delay.value;
 		}
 		timeSince = performance.now() - timeThen;
 		timeThen = performance.now();
-
 		idsRemaining = newData.length - iteration;
-		seconds = idsRemaining * (timeSince / 1000);
-		if(seconds <= 60)
-		{
-			timeRemaining = `${round(seconds)}s`;
-		}
-		else if(seconds > 60 && seconds < 3600)
-		{
-			timeRemaining = `${round(seconds / 60, 1)}m`;
-		}
-		else if(seconds > 3600)
-		{
-			timeRemaining = `${round(seconds / 60 / 60, 1)}h`;
-		}
-		else
-		{
-			timeRemaining = '?';
-		}
+		timeRemaining(idsRemaining, newData.length, timeSince);
 
 		/* update UI */
 
 		statusText.textContent = `Processed ${iteration} of ${newData.length}`;
 		statusBar.style.cssText = `--percent: ${percent}%; --colour: var(--stat-working);`;
-		timeText.textContent = `~ ${timeRemaining} left`;
 		
-		if(iteration === newData.length){
+		if( iteration >= newData.length ){
 			finishProcessing();
 			return;
 		}
 		timeout = setTimeout(processItem, delay.value);
 	}
 
-	function finishProcessing()
-	{
+	function finishProcessing( ){
 		window.removeEventListener('beforeunload', warnUserBeforeLeaving);
 
 		if(result.value.length > 0)
@@ -2262,12 +2278,36 @@ footer {
 		};
 	}
 
-	function beginProcessing()
-	{
+	var imagesTotal = 0;
+	var imagesDone = 0;
+	var imageDelay = 500;
+
+	function updateImageStatus( ){
+		imagesDone++;
+		let imagesRemaining = imagesTotal - imagesDone;
+		statusText.textContent = `Validating images (${imagesDone} of ~${imagesTotal})...`;
+		timeRemaining(imagesRemaining, imagesTotal, imageDelay);
+	}
+
+	function timeRemaining( remainingCount, delayInMs ){
+		let seconds = remainingCount * (delayInMs / 1000);
+		let formatted = '?';
+		if( seconds <= 60 ){
+			formatted = `${round(seconds)}s`;
+		}
+		else if( seconds > 60 && seconds < 3600 ){
+			formatted = `${round(seconds / 60, 1)}m`;
+		}
+		else if( seconds > 3600 ){
+			formatted = `${round(seconds / 60 / 60, 1)}h`;
+		}
+		timeText.textContent = `~ ${formatted} left`;
+	}
+
+	async function beginProcessing( ){
 		saveSettings();
 		window.addEventListener('beforeunload', warnUserBeforeLeaving);
 
-		let imageLoadDelay = 0;
 		exitBtn.disabled = "disabled";
 		importBtn.attr('disabled', 'disabled');
 		exportBtn.attr('disabled', 'disabled');
@@ -2290,81 +2330,98 @@ footer {
 				categories.push(parseInt(categoryId));
 			}
 		}
-		
+
 		result.value += `\/*\nGenerated by MyAnimeList-Tools v${ver}\nhttps://github.com/ValerioLyndon/MyAnimeList-Tools\n\nTemplate=${template.value.replace(/\*\//g, "*[DEL]/")}\nMatchTemplate=${matchTemplate.value}\n*\/\n\n`;
 
-		for(let k = 0; k < data.length; k++)
-		{
-			statusText.textContent = 'Checking your input for matches...';
-			let id = data[k][`${List.type}_id`];
-			let skip;
-			/* Check old CSS for any existing lines and set "skip" var to true if found. */
-			oldLines = existing.value.split("\n");
-			oldLinesCount = oldLines.length;
-			for(let j = 0; j < oldLinesCount; j++)
-			{
+		let beforeProcessing = [];
+		let oldLines = existing.value.replace(/\/\*[\s\S]*?Generated by MyAnimeList-Tools[\s\S]*?\*\/\s+/,'').split("\n");
+		imagesTotal = oldLines.length;
+		statusText.textContent = `Checking your input for matches...`;
+
+		for( let i = 0; i < data.length; i++ ){
+			let item = data[i];
+			let id = item[`${List.type}_id`];
+			
+			/* Skip item if category does not match selected user options */
+			if( chkCategory.checked ){
+				let skip = true;
+				let rewatchKey = List.isAnime ? 'is_rewatching' : 'is_rereading';
+				for( let categoryId of categories ){
+					/* if rewatching then set status to watching, since this is how it appears to the user */
+					if( item[rewatchKey] === 1 ){
+						item['status'] = 1;
+					}
+					if( item['status'] === categoryId ){
+						skip = false;
+						break;
+					}
+				}
+				if( skip ){
+					continue;
+				}
+			}
+
+
+			/* Check old CSS for any existing lines so they can be skipped later. */
+			let lineExists;
+			let lineText;
+			for( let j = 0; j < oldLines.length; j++ ){
+				lineText = oldLines[j];
 				let match = matchTemplate.value.replaceAll(/\[ID\]/g, id).replaceAll(/\[TYPE\]/g, List.type);
-				skip = oldLines[j].indexOf(match) !== -1 ? true : false;
-				if(skip)
-				{
+				lineExists = lineText.indexOf(match) === -1 ? false : true;
+				if( lineExists ){
 					break;
 				}
 			}
 
-			if(skip)
-			{
-				if(chkExisting.checked)
-				{
-					imageLoadDelay = 5000;
-					let urlStart = oldLines[j].indexOf("http");
-					let urlEnd = oldLines[j].indexOf(".jpg", urlStart);
-					if(urlEnd === -1)
-					{
-						urlEnd = oldLines[j].indexOf(".webp", urlStart);
+			/* Add to processing list or skip any existing lines.
+			If validating old images, that step will also occur here. */
+			if( lineExists ){
+				if( chkExisting.checked ){
+					let imgUrl = lineText.match(/http.*?\.(?:jpe?g|webp)/);
+					if( imgUrl.length === 0 ){
+						newData.push(item);
+						imagesTotal--;
+						continue;
 					}
-					let imgUrl = oldLines[j].substring(urlStart, urlEnd + 4);
-					let tempImg = document.createElement("img");
-					tempImg.oldLine = oldLines[j];
-					tempImg.animeId = id;
-					tempImg.data = data[k];
-					tempImg.onload = function(imgLoadEvent)
-					{
-						result.value += imgLoadEvent.target.oldLine + "\n";
-					};
-					tempImg.onerror = function(imgErrorEvent)
-					{
-						newData.push(imgErrorEvent.target.data);
-					};
-					tempImg.src = imgUrl;
+
+					/* Validate image by loading it in the HTML */
+					let imageLoad = new Promise((resolve)=>{
+						let tempImg = document.createElement('img');
+						tempImg.addEventListener('load', ()=>{
+							result.value += lineText + "\n";
+							updateImageStatus();
+							resolve(true);
+						});
+						tempImg.addEventListener('error', ()=>{
+							newData.push(item);
+							updateImageStatus();
+							resolve(false);
+						});
+						tempImg.src = imgUrl;
+					});
+
+					/* Add to Promise stack to await resolution */
+					beforeProcessing.push(imageLoad);
+					/* Add delay to prevent image loading spam */
+					await sleep(imageDelay);
 				}
-				else
-				{
-					result.value += oldLines[j] + "\n";
-				}
-			}
-			else if(chkCategory.checked)
-			{
-				let rewatchKey = List.isAnime ? 'is_rewatching' : 'is_rewatching';
-				for(let categoryId of categories)
-				{
-					/* if rewatching then set status to watching, since this is how it appears to the user */
-					if(data[k][rewatchKey] === 1)
-					{
-						data[k]['status'] = 1;
-					}
-					if(data[k]['status'] == categoryId)
-					{
-						newData.push(data[k]);
-					}
+				else {
+					result.value += lineText + "\n";
 				}
 			}
-			else
-			{
-				newData.push(data[k]);
+			/* If not in existing, add to list for processing */
+			else {
+				imagesTotal--;
+				newData.push(item);
 			}
 		}
 
-		timeout = setTimeout(processItem, imageLoadDelay);
+		/* Start processing items */
+		Promise.allSettled(beforeProcessing)
+		.then(()=>{
+			continueProcessing();
+		})
 	}
 
 	function saveSettings()
@@ -2437,7 +2494,7 @@ footer {
 			"clear_tags": chkClearTags.checked,
 			"check_existing": chkExisting.checked
 		};
-		store.set(`${List.type}_settings`, JSON.stringify(settings));
+		store.set(`${List.type}_settings`, settings);
 	}
 };
 
