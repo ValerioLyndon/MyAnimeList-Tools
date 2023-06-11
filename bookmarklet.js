@@ -207,6 +207,7 @@ class ListInfo {
 		this.customCssEle = this.isModern ? $('#custom-css') : $('head style:first-of-type');
 		this.customCss = this.customCssEle.text().trim();
 		this.customCssModified = this.customCss.replaceAll(/\/\*MYANIMELIST-TOOLS START\*\/(.|\n)*\/\*MYANIMELIST-TOOLS END\*\//g, '').trim();
+		this.csrf = $('meta[name="csrf_token"]').attr('content');
 	}
 
 	async determineStyle( ){
@@ -1347,7 +1348,6 @@ footer {
 	/* Common Functions */
 
 	async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
-		csrf = $('meta[name="csrf_token"]').attr('content');
 		template.value = newTemplate;
 		matchTemplate.value = newMatchTemplate;
 		if( newCss !== false ){
@@ -1367,11 +1367,12 @@ footer {
 			/* Send new CSS to MAL */
 			if( List.isModern ){
 				let styleUrl = `https://myanimelist.net/ownlist/style/theme/${List.style}`;
-				
-				let bg_attach = $(doc).find('#style_edit_theme_background_image_attachment').find('[selected]').val() || '';
-				let bg_vert = $(doc).find('#style_edit_theme_background_image_vertical_position').find('[selected]').val() || '';
-				let bg_hori = $(doc).find('#style_edit_theme_background_image_horizontal_position').find('[selected]').val() || '';
-				let bg_repeat = $(doc).find('#style_edit_theme_background_image_repeat').find('[selected]').val() || '';
+
+				let stylePage = await request(styleUrl);
+				let bg_attach = $(stylePage).find('#style_edit_theme_background_image_attachment').find('[selected]').val() || '';
+				let bg_vert = $(stylePage).find('#style_edit_theme_background_image_vertical_position').find('[selected]').val() || '';
+				let bg_hori = $(stylePage).find('#style_edit_theme_background_image_horizontal_position').find('[selected]').val() || '';
+				let bg_repeat = $(stylePage).find('#style_edit_theme_background_image_repeat').find('[selected]').val() || '';
 				
 				let formData = new FormData();
 				formData.append("style_edit_theme[show_cover_image]", "1");
@@ -1384,7 +1385,7 @@ footer {
 				formData.append("style_edit_theme[background_image_repeat]", bg_repeat);
 				formData.append("style_edit_theme[css]", finalCss);
 				formData.append("style_edit_theme[save]", "");
-				formData.append("csrf_token", csrf);
+				formData.append("csrf_token", List.csrf);
 				
 				let post = await fetch(styleUrl, {
 					method: "POST",
@@ -1414,7 +1415,7 @@ footer {
 				let formData = new URLSearchParams();
 				formData.append('cssText', finalCss);
 				formData.append('subForm', 'Update CSS');
-				formData.append('csrf_token', csrf);
+				formData.append('csrf_token', List.csrf);
 				
 				let post = await fetch(styleUrl, {
 					method: "POST",
@@ -2018,8 +2019,6 @@ footer {
 			
 			/* Update Notes & Tags */
 
-			let csrf = $('meta[name="csrf_token"]').attr('content');
-
 			if(chkTags.checked)
 			{
 				if(titleEn && chkEnglish.checked) { tags.push(titleEn); }
@@ -2062,7 +2061,7 @@ footer {
 
 				let formData = new URLSearchParams();
 				formData.append(animeOrMangaId, id);
-				formData.append("csrf_token", csrf);
+				formData.append("csrf_token", List.csrf);
 			
 				await fetch(tagsRequestUrl, {
 					method: "POST",
@@ -2116,7 +2115,7 @@ footer {
 				let notesRequestDict = {
 					"comments": notesStr,
 					"status": thisData['status'],
-					"csrf_token": csrf
+					"csrf_token": List.csrf
 				};
 
 				if(List.isAnime) {
@@ -2280,7 +2279,7 @@ footer {
 
 	var imagesTotal = 0;
 	var imagesDone = 0;
-	var imageDelay = 500;
+	var imageDelay = 50;
 
 	function updateImageStatus( ){
 		imagesDone++;
