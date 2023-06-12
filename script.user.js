@@ -25,7 +25,7 @@ MyAnimeList-Tools
 */
 
 const ver = '10.0-pre_a0';
-const verMod = '2023/Jun/10';
+const verMod = '2023/Jun/11';
 
 class CustomStorage {
 	constructor( type = 'localStorage' ){
@@ -366,6 +366,65 @@ function round( value, precision ){
 function sleep( ms ){
 	return new Promise(resolve => { setTimeout(resolve, ms); });
 }
+
+/* File Upload Integrations */
+
+class DropboxHandler {
+	codeVerifier;
+	codeChallenge;
+	token;
+
+	constructor( ){
+		/* create verifier code */
+		const verifierChars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-._~';
+		for( let i = 0; i < 128; i++ ){
+			let random = round(verifierChars.length * Math.random());
+			this.codeVerifier += verifierChars[random];
+		}
+
+		/* create challenge code */
+		this.createChallenge();
+	}
+	async createChallenge( verifier = this.verifier ){
+		const encoder = new TextEncoder();
+		const data = encoder.encode(verifier);
+		const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+		const hashArray = Array.from(new Uint8Array(hashBuffer));
+		const encoded = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+		this.codeChallenge = encoded;
+	}
+	
+	/* step 1 */
+	getCode( ){
+		window.open(`https://www.dropbox.com/oauth2/authorize?client_id=odribfnp0304xy2&response_type=code&code_challenge=${this.codeChallenge}&code_challenge_method=S256`, '_blank');
+	}
+	
+	/* step 2 */
+	async exchangeCode( code ){
+		let headerData = new Headers();
+		headerData.append('Access-Control-Allow-Origin', '*');
+		headerData.append('code', code);
+		headerData.append('grant_type', 'authorization_code');
+		headerData.append('code_verifier', this.verifier);
+		headerData.append('code_challenge_method', 'S256');
+		
+		let token = await fetch('https://api.dropboxapi.com/oauth2/token', {
+			'method': 'POST',
+			headers: headerData
+		})
+		.then((response)=>{
+			if( !response.ok ){
+				throw new Error(`${response.status} ${response.statusText}`);
+			}
+			return response.text();
+		})
+		.catch((err)=>{
+			alert(`Failed to validate token: ${err}`);
+		});
+		return token;
+	}
+}
+var Dropbox = new DropboxHandler();
 
 /* Main Program */
 
@@ -1103,17 +1162,23 @@ footer {
 		let popup = $(`
 			<div class="popup popup--small">
 				<p class="paragraph">
-					To link your Dropbox account, click the button below to grant the app access. It will only ask for access to it's own folder and nothing more.
+					To link your Dropbox account, click the button below to grant the app access. It will only ask for access to it's own folder, not your entire account. Once granted, it will give you a code.
 				</p>
 
-				<input id="auth-btn" class="btn" type="button" value="Authenticate with Dropbox">
+				<input id="auth-btn" class="btn" type="button" value="Get code from Dropbox">
 
 				<p class="paragraph">
-					Once Dropbox prompts you with a code, enter that code in this text box.
+					Take the code from Dropbox and enter it in this text box.
 				</p>
 
 				<input id="oauth-code" class="field" type="text" placeholder="Paste your Dropbox code here to allow access.">
 				
+				<p class="paragraph">
+					With the code entered, press this button to exchange it for a proper token. Once the field has changed, you should be good to go.
+				</p>
+
+				<input id="validate-btn" class="btn" type="button" value="Authenticate token">
+				<br />
 				<label class="chk">
 					<input id="enable-upload" type="checkbox"></input>
 					Enable uploading.
@@ -1133,9 +1198,32 @@ footer {
 		`);
 
 		let authBtn = $(popup).find('#auth-btn');
-
 		authBtn.click(()=>{
-			window.open('https://www.dropbox.com/oauth2/authorize?client_id=odribfnp0304xy2&response_type=code', '_blank');
+			Dropbox.getCode();
+		});
+
+		let oauthInput = $(popup).find('#oauth-code');
+		if( store.has('auth_dropbox') ){
+			oauthInput.val(store.get('auth_dropbox'));
+		}
+		oauthInput.on('input', ()=>{
+			let val = oauthInput.val();
+			if( val.length > 0 ){
+				store.set('auth_dropbox', val);
+			}
+			else {
+				store.remove('auth_dropbox');
+			}
+		});
+		
+		let validateBtn = $(popup).find('#validate-btn');
+		validateBtn.click(()=>{
+			Dropbox.exchangeCode(oauthInput.val())
+			.then((token)=>{
+				console.log(token);
+				oauthInput.val(token);
+				/*store.set('auth_dropbox', token);*/
+			});
 		});
 
 		let autoBtn = $(popup).find('#enable-upload');
@@ -1161,20 +1249,6 @@ footer {
 			}
 			else {
 				store.set('auto_import', 'false');
-			}
-		});
-
-		let oauthInput = $(popup).find('#oauth-code');
-		if( store.has('auth_dropbox') ){
-			oauthInput.val(store.get('auth_dropbox'));
-		}
-		oauthInput.on('input', ()=>{
-			let val = oauthInput.val();
-			if( val.length > 0 ){
-				store.set('auth_dropbox', val);
-			}
-			else {
-				store.remove('auth_dropbox');
 			}
 		});
 
@@ -2408,7 +2482,7 @@ footer {
 			})
 			.then((response)=>{
 				if( !response.ok ){
-					throw new Error(`status ${response.status} ${response.statusText}, body: ${response.body}`);
+					throw new Error(`${response.status} ${response.statusText}`);
 				}
 				Log.generic('File uploaded.', true);
 			})
