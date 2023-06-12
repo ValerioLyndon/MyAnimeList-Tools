@@ -1,5 +1,5 @@
-[color=transparent][size=0] [Script] List Tools — generate CSS and update Tags or Notes[/size][/color][quote][size=120][b]Latest update is v10.0[/b]
-[b][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v10.0/user.script.js][Install Userscript][/url][/b] — [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases/tag/v10.0]Changelog[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases]Past updates[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/issues]Planned updates[/url][/size][/quote]
+[color=transparent][size=0] [Script] List Tools — generate CSS and update Tags or Notes[/size][/color][quote][size=120][b]Latest update is v10.1[/b]
+[b][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v10.1/user.script.js][Install Userscript][/url][/b] — [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases/tag/v10.1]Changelog[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases]Past updates[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/issues]Planned updates[/url][/size][/quote]
 
 [quote][img align=right]https://i.imgur.com/X0t9a0X.png[/img][size=150][b]What can it do?[/b][/size]
 
@@ -28,7 +28,7 @@ This tool can be installed either of two ways: a userscript or a bookmarklet. Th
 [spoiler="Userscript Install — Recommended!"]A userscript is a script that can be run by any browser extension that supports them. Here's how to install it.
 [list=1][*]If you don't already have a userscript extension, you can install TamperMonkey from: [url=https://www.tampermonkey.net/index.php?browser=chrome][Here][/url]. 
 [*]With a userscript extension installed, visit the code URL:
-[url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v10.0/user.script.js][CODE][/url]
+[url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v10.1/user.script.js][CODE][/url]
 
 You should immediately be prompted by the extension if you want to install. Click through the install prompt to complete it.
 [*]To activate the tool, go to your list. On modern lists, you should see a new button in the user menu:
@@ -40,7 +40,7 @@ Click that button and you should see a popup that looks similar to this:
 [spoiler="Image"][img]https://i.postimg.cc/fLFGCpR1/v9-0.webp[/img][/spoiler][/list][/spoiler]
 [spoiler="Bookmarklet Install"]A bookmarklet is a browser bookmark that executes code when clicked instead of loading a new page. Thus, to install it we will create a new bookmark containing the code.
 [list=1][*]To create the bookmarklet, first open this page containing the code:
-[b][size=120][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v10.0/bookmarklet.js][CODE][/url][/size][/b]
+[b][size=120][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v10.1/bookmarklet.js][CODE][/url][/size][/b]
 Copy everything on that page, and paste it into the URL/location field of a new bookmark. I recommend saving the bookmark to your bookmark toolbar for easy access. See this GIF for an example:
 [spoiler="Image"][img]https://i.imgur.com/MaemlX2.gif[/img][/spoiler]
 [*]To activate the tool, go to your list. Then, click on the bookmark. You should see a popup that looks similar to this:
@@ -54,7 +54,7 @@ These settings are split into the different categories they relate to, those bei
 
 Once you have your settings correct, you can begin generating CSS and updating tags by clicking "Start" in the top left. This process can take a lot of time, depending on how many anime you have and what you set the delay at. At any time, you can click "Stop" without losing what is already generated/updated. You can also "Minimise" the program to keep navigating your list. Once the program is done, this button will change to "Done" automatically.
 
-On repeat uses, you can copy-paste your previously generated CSS into the large text box that says "Copy previously generated code here." The tool should automatically save your last-generated CSS to make this quicker, just click "Last Run" above the text field. This will save a lot of time on future uses and prevents re-generating everything.
+On repeat uses, you can copy-paste your previously generated CSS into the large text box that says "Copy previously generated code here." The tool automatically saves and autofills your last-generated CSS to make this quicker. This will save a lot of time on future uses and prevents re-generating everything.
 
 For help understanding any of the settings, see the bolded sections below.
 
