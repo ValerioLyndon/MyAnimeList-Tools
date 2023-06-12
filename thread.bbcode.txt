@@ -52,6 +52,10 @@ Copy everything on that page, and paste it into the URL/location field of a new 
 
 These settings are split into the different categories they relate to, those being: CSS Generation, Tag Updating, and Genre Updating. There are also some General Options that apply to all categories. You can use one, two, or all of these categories, it is for you to decide.
 
+Once you have your settings correct, you can begin generating CSS and updating tags by clicking "Start" in the top left. This process can take a lot of time, depending on how many anime you have and what you set the delay at. At any time, you can click "Stop" without losing what is already generated/updated. You can also "Minimise" the program to keep navigating your list. Once the program is done, this button will change to "Done" automatically.
+
+On repeat uses, you can copy-paste your previously generated CSS into the large text box that says "Copy previously generated code here." The tool should automatically save your last-generated CSS to make this quicker, just click "Last Run" above the text field. This will save a lot of time on future uses and prevents re-generating everything.
+
 For help understanding any of the settings, see the bolded sections below.
 
 [b]Delay:[/b]
@@ -71,9 +75,7 @@ You can also enable "Overwrite current tags". This will [b]completely remove[/b]
 [b]Notes:[/b]
 To turn on/off updating of notes, enable the "Update Notes" checkbox and then enable the checkboxes for whichever info you and to add to your tags.
 
-This will [b]completely remove[/b] your current notes, with no way to recover them. There is no toggle for this behaviour at this time, but let me know if you want one.[/spoiler]
-Once you have your settings correct, you can begin generating CSS and updating tags by clicking "Start" in the top left. This process can take a lot of time, depending on how many anime you have and what you set the delay at. At any time, you can click "Stop" without losing what is already generated/updated. You can also "Minimise" the program to keep navigating your list. Once the program is done, this button will change to "Done" automatically.[/list]
-On repeat uses, you can copy-paste your previously generated CSS into the large text box that says "Copy previously generated code here." The tool should automatically save your last-generated CSS to make this quicker, just click "Last Run" above the text field. This will save a lot of time on future uses and prevents re-generating everything.
+This will [b]completely remove[/b] your current notes, with no way to recover them. There is no toggle for this behaviour at this time, but let me know if you want one.
 
 [size=120][b]Notes on usage - [u]please read![/u][/b][/size]
 [list][*]This tool does not auto-update any of your CSS. After adding new entries to your list, or once information becomes old, you will have to re-run the tool manually and overwrite your previous CSS.
