@@ -7,7 +7,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '9.2-pre_b0';
+const ver = '10.0_b0';
 const verMod = '2023/Jun/11';
 
 class CustomStorage {

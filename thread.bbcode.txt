@@ -1,5 +1,5 @@
-[color=transparent][size=0] [Script] List Tools — generate CSS and update Tags or Notes[/size][/color][quote][size=120][b]Latest update is v9.2[/b]
-[b][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v9.2/user.script.js][Install Userscript][/url][/b] — [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases/tag/v9.2]Changelog[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases]Past updates[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/issues]Planned updates[/url][/size][/quote]
+[color=transparent][size=0] [Script] List Tools — generate CSS and update Tags or Notes[/size][/color][quote][size=120][b]Latest update is v10.0[/b]
+[b][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v10.0/user.script.js][Install Userscript][/url][/b] — [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases/tag/v10.0]Changelog[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases]Past updates[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/issues]Planned updates[/url][/size][/quote]
 
 [quote][img align=right]https://i.imgur.com/X0t9a0X.png[/img][size=150][b]What can it do?[/b][/size]
 
@@ -28,7 +28,7 @@ This tool can be installed either of two ways: a userscript or a bookmarklet. Th
 [spoiler="Userscript Install — Recommended!"]A userscript is a script that can be run by any browser extension that supports them. Here's how to install it.
 [list=1][*]If you don't already have a userscript extension, you can install TamperMonkey from: [url=https://www.tampermonkey.net/index.php?browser=chrome][Here][/url]. 
 [*]With a userscript extension installed, visit the code URL:
-[url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v9.2/user.script.js][CODE][/url]
+[url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v10.0/user.script.js][CODE][/url]
 
 You should immediately be prompted by the extension if you want to install. Click through the install prompt to complete it.
 [*]To activate the tool, go to your list. On modern lists, you should see a new button in the user menu:
@@ -40,7 +40,7 @@ Click that button and you should see a popup that looks similar to this:
 [spoiler="Image"][img]https://i.postimg.cc/fLFGCpR1/v9-0.webp[/img][/spoiler][/list][/spoiler]
 [spoiler="Bookmarklet Install"]A bookmarklet is a browser bookmark that executes code when clicked instead of loading a new page. Thus, to install it we will create a new bookmark containing the code.
 [list=1][*]To create the bookmarklet, first open this page containing the code:
-[b][size=120][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v9.2/bookmarklet.js][CODE][/url][/size][/b]
+[b][size=120][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v10.0/bookmarklet.js][CODE][/url][/size][/b]
 Copy everything on that page, and paste it into the URL/location field of a new bookmark. I recommend saving the bookmark to your bookmark toolbar for easy access. See this GIF for an example:
 [spoiler="Image"][img]https://i.imgur.com/MaemlX2.gif[/img][/spoiler]
 [*]To activate the tool, go to your list. Then, click on the bookmark. You should see a popup that looks similar to this:
@@ -52,19 +52,23 @@ Copy everything on that page, and paste it into the URL/location field of a new 
 
 These settings are split into the different categories they relate to, those being: CSS Generation, Tag Updating, and Genre Updating. There are also some General Options that apply to all categories. You can use one, two, or all of these categories, it is for you to decide.
 
-For help understanding any of the settings, see the respective spoilers below.
-[spoiler="Delay"][b]Delay:[/b]
-The Delay controls how many milliseconds the program pauses between generating entries. Setting this too low may trigger MAL's spam detection. If you're getting a lot of errors, you should try increasing this.[/spoiler]
-[spoiler="CSS Options"][b]Templates:[/b]
+For help understanding any of the settings, see the bolded sections below.
+
+[b]Delay:[/b]
+The Delay controls how many milliseconds the program pauses between generating entries. Setting this too low may trigger MAL's spam detection. If you're getting a lot of errors, you should try increasing this.
+
+[b]Templates:[/b]
 The CSS Template controls what CSS is created. See further down for guidance on creating your own templates or using premade templates made by others. The Match Template is used for identifying previously generated CSS lines when updating your CSS.
 
-][b]Validate Existing Images:[/b]
-This option is only for use when [b]re-[/b]generating cover image CSS with the [IMGURL] template. This option will make sure every image is still valid and up-to-date. You shouldn't need this very often, but it can be useful if a lot of your cover images are out of date.[/spoiler]
-[spoiler="Tag Options"][b]Tags:[/b]
+[b]Validate Existing Images:[/b]
+This option is only for use when [b]re-[/b]generating cover image CSS with the [IMGURL] template. This option will make sure every image is still valid and up-to-date. You shouldn't need this very often, but it can be useful if a lot of your cover images are out of date.
+
+[b]Tags:[/b]
 To turn on/off updating of tags, enable the "Update Tags" checkbox and then enable the checkboxes for whichever info you and to add to your tags.
 
-You can also enable "Overwrite current tags". This will [b]completely remove[/b] your current tags, with no way to recover them. Leave this disabled if you have any tags you wish to keep, but be aware that there is still a chance of loss even with this check disabled.[/spoiler]
-[spoiler="Note Options"][b]Notes:[/b]
+You can also enable "Overwrite current tags". This will [b]completely remove[/b] your current tags, with no way to recover them. Leave this disabled if you have any tags you wish to keep, but be aware that there is still a chance of loss even with this check disabled.
+
+[b]Notes:[/b]
 To turn on/off updating of notes, enable the "Update Notes" checkbox and then enable the checkboxes for whichever info you and to add to your tags.
 
 This will [b]completely remove[/b] your current notes, with no way to recover them. There is no toggle for this behaviour at this time, but let me know if you want one.[/spoiler]
@@ -76,7 +80,7 @@ On repeat uses, you can copy-paste your previously generated CSS into the large 
 [*]When generating CSS, keep in mind it can get very long very fast. This can mean hitting the CSS limit MAL imposes, which is approximately 65,535 characters. [b]If you hit this limit, anything beyond will get deleted![/b] To avoid these issues and circumvent the character limit, you can host the CSS on another website. I recommend reading Shishio's guide on hosting and importing CSS from Dropbox: [url=https://myanimelist.net/forum/?topicid=1911384][Guide][/url]. If you do decide to paste this code into your Custom CSS box, make sure to [b]place the code at the bottom[/b] so that if anything does get deleted, it's only the generated code and not anything important.[/list][/quote]
 
 [quote][size=150][b]Video Overview and Beginner's Guide[/b][/size]
-Fullscreen it! This isn't as hard as it seems. This video will show you the basics on starting and using the app, and then go through how to use it to generate synopses for your list and import it, which is a basic and popular function of the app. From there, you should be ready and can definitely try other features with less trouble!
+Fullscreen it! This isn't as hard as it seems. Shishio's video will show you the basics on starting and using the app, and then go through how to use it to generate synopses for your list and import it, which is a basic and popular function of the app. From there, you should be ready and can definitely try other features with less trouble!
 https://youtu.be/sGhXbCidSWs
 [yt]sGhXbCidSWs[/yt][/quote]
 
@@ -209,11 +213,9 @@ Here's an example template for cover images and what it will look like after gen
 [quote][size=150][b]FAQ[/b][/size]
 
 [img align=left]https://i.imgur.com/9inByaW.png[/img][b]Can this automatically update my CSS or upload to Dropbox/X website?[/b]
-[spoiler="Answer"]No, not right now. These are both features that are on the table, but I wouldn't expect.
-
-I may make a userscript version one day, which would enable automatically updating, but will require using a browser extension instead of bookmarks. As for uploading to Dropbox or other websites, it's a matter of understanding their API and incorporating it in a way that isn't a confusing mess for users. One day, perhaps.[/spoiler]
+[spoiler="Answer"]No. I have spent some hours attempting to implement this, but getting cross-origin file uploads working is a massive headache and, to my admittedly novice eyes, it does not seem possible.[/spoiler]
 [img align=left]https://i.imgur.com/9inByaW.png[/img][b]Can I sort my list by MAL score/popularity/etc?[/b]
-[spoiler="Answer"]No, that goes beyond the capability of this tool and is unlikely to be added.[/spoiler]
+[spoiler="Answer"]No, that goes beyond the capability of this tool.[/spoiler]
 [img align=left]https://i.imgur.com/9inByaW.png[/img][b]Can this tool get Romaji titles?[/b]
 [spoiler="Answer"]Not currently, as MAL does not list these on their anime pages. Use the default [TITLE] setting instead, these will be romaji in most cases.[/spoiler][/quote]
 
