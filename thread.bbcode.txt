@@ -1,5 +1,5 @@
-[color=transparent][size=0] [Script] List Tools — generate CSS and update Tags or Notes[/size][/color][quote][size=120][b]Latest update is v10.1[/b]
-[b][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v10.1/user.script.js][Install Userscript][/url][/b] — [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases/tag/v10.1]Changelog[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases]Past updates[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/issues]Planned updates[/url][/size][/quote]
+[color=transparent][size=0] [Script] List Tools — generate CSS and update Tags or Notes[/size][/color][quote][size=120][b]Latest update is v10.1 (June 2023)[/b]
+[b][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v10.1/script.user.js][Install Userscript][/url][/b] — [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases/tag/v10.1]Changelog[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases]Past updates[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/issues]Planned updates[/url][/size][/quote]
 
 [quote][img align=right]https://i.imgur.com/X0t9a0X.png[/img][size=150][b]What can it do?[/b][/size]
 
@@ -28,7 +28,7 @@ This tool can be installed either of two ways: a userscript or a bookmarklet. Th
 [spoiler="Userscript Install — Recommended!"]A userscript is a script that can be run by any browser extension that supports them. Here's how to install it.
 [list=1][*]If you don't already have a userscript extension, you can install TamperMonkey from: [url=https://www.tampermonkey.net/index.php?browser=chrome][Here][/url]. 
 [*]With a userscript extension installed, visit the code URL:
-[url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v10.1/user.script.js][CODE][/url]
+[url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v10.1/script.user.js][CODE][/url]
 
 You should immediately be prompted by the extension if you want to install. Click through the install prompt to complete it.
 [*]To activate the tool, go to your list. On modern lists, you should see a new button in the user menu:
