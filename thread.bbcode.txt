@@ -1,29 +1,54 @@
 [color=transparent][size=0] [Script] List Tools — generate CSS and update Tags or Notes[/size][/color][quote][size=120][b]Latest update is v10.1 (June 2023)[/b]
-[b][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v10.1/script.user.js][Install Userscript][/url][/b] — [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases/tag/v10.1]Changelog[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases]Past updates[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/issues]Planned updates[/url][/size][/quote]
+[b][url=https://raw.githubusercontent.com/ValerioLyndon/MyAnimeList-Tools/v10.1/script.user.js][Install Userscript][/url][/b] — [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases]Changelog[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/releases]Past updates[/url] • [url=https://github.com/ValerioLyndon/MyAnimeList-Tools/issues]Planned updates[/url][/size][/quote]
 
 [quote][img align=right]https://i.imgur.com/X0t9a0X.png[/img][size=150][b]What can it do?[/b][/size]
 
-Originally made by BurntJello, this tool enables some powerful possibilities for list designs. These possibilities can be utilised by both users and designers alike.
+This script fetches anime information which it uses to [b]generate CSS[/b], [b]update your tags[/b], and [b]update your notes[/b]. This enables some powerful possibilities for list designs for users and designers alike.
 
-This tool can [b]generate CSS[/b], [b]update your tags[/b], and [b]update your notes[/b] with information not usually available on lists, such as:
+Here some highlights of the information you have access to that isn't usually available on lists:
 [list][*]Synopsis
 [*]English or native titles (Japanese/Korean/etc)
-[*]Cover images
+[*]High quality cover images
 [*]MAL score and ranking
-[*]Genres
+[*]Duration
 [*]Authors
-[*]And half a dozen more. See [i]"Creating your own templates"[/i] for the full list![/list]
+[*]And half a dozen more. See [i]"Creating your own templates"[/i] for the full list.[/list]
 This allows you to do many things, such as:
 [list][*]Generate your own cover image CSS.
-[*]Have an easier time deciding your next watch by adding synopses, MAL ratings, or genres to each of your anime.
+[*]Have an easier time deciding your next watch by adding synopses, MAL ratings, or duration to each of your anime.
 [*]Add alternate titles right next to the defaults, or replace all your list titles with the English versions.
 [*]And more.[/list][/quote]
+
+[quote][size=150][b]Does anyone actually use this?[/b][/size]
+
+[url=https://myanimelist.net/forum/?topicid=1544259][img align=left]https://image.myanimelist.net/ui/OK6W_koKDTOqqqLDbIoPArf5iZShq9SfVl1PejQ7RAA[/img][/url][url=https://myanimelist.net/forum/?topicid=1544259][b]Endless Summer by Cateinya[/b][/url]
+
+Cateinya uses this tool to add synopses and genres on hover to the popular Endless Summer layout. If you want to generate CSS for use with Endless Summer, just import this template using the "Import Template" button.
+[code]{"template":"/* [TITLE] *[DEL]/ #tags-[ID]:before {content: \"[TITLE]\";}  #tags-[ID]:after {content:\"[GENRES]\";} #tags-[ID] .tags-[ID]:after {content: \"[DESC]\";}","matchtemplate":"#tags-[ID]:"}[/code]
+[url=https://myanimelist.net/animelist/Uji_Gintoki_Bowl][img align=right]https://i.imgur.com/ucpydXV.jpeg[/img][/url]
+[right][url=https://myanimelist.net/animelist/Uji_Gintoki_Bowl][b]Uji_Gintoki_Bowl[/b][/url]
+
+Gintoki uses the tool along with many other CSS tweaks to make a list design with just about all the information you could want right on their list page. The tool provides the Synposes and MAL scores in this equation.[/right]
+
+
+[url=https://myanimelist.net/animelist/Ruse125][img align=left]https://i.imgur.com/i614hIR.jpeg[/img][/url]
+[url=https://myanimelist.net/animelist/Ruse125][b]Ruse125[/b][/url]
+
+Ruse has a similar use, adding an "Info" button which displays the MAL score, rank, popularity, themes, duration, and synposis. It takes a while to even list them out, you won't be needing to change page on this list!
+
+
+
+
+
+
+
+[center]While most of these are personal use lists, you can achieve much the same with your own list. Apologies if I didn't mention you here, it's hard to track down old posts![/center][/quote]
 
 [quote][size=150][b]How do I use it?[/b][/size]
 
 [size=120][b]Installation[/b][/size]
 
-This tool can be installed either of two ways: a userscript or a bookmarklet. The userscript requires the use of a browser extension but is a more powerful option, where-as the bookmarklet requires no extensions but is more clunky.
+This tool can be installed either of two ways: a userscript or a bookmarklet. The userscript requires the use of a browser extension but is a more convenient option, where-as the bookmarklet requires no extensions but is more clunky.
 
 [spoiler="Userscript Install — Recommended!"]A userscript is a script that can be run by any browser extension that supports them. Here's how to install it.
 [list=1][*]If you don't already have a userscript extension, you can install TamperMonkey from: [url=https://www.tampermonkey.net/index.php?browser=chrome][Here][/url]. 
@@ -48,17 +73,18 @@ Copy everything on that page, and paste it into the URL/location field of a new 
 [/spoiler]
 [size=120][b]Usage[/b][/size]
 
-[img align=right]https://i.imgur.com/MZFbfBh.gif[/img]Once you've installed and opened the program, you will see the window can set your desired options and get started modifying your list.
+[img align=right]https://i.imgur.com/MZFbfBh.gif[/img]Once you've opened the program, you will see there are several different sections and options. The CSS input and output fields are to the right, but for many people you will be starting with the sidebar on the left. This sidebar contains all the options. You will see they are split into the different categories they relate to, those being: [b]CSS[/b] generation, [b]Tag[/b] updates, and [b]Note[/b] updates. There are also some General Options that apply to all categories. You can use as many or as few of these options as you want, it's your choice.
 
-These settings are split into the different categories they relate to, those being: CSS Generation, Tag Updating, and Genre Updating. There are also some General Options that apply to all categories. You can use one, two, or all of these categories, it is for you to decide.
+Once you have your settings how you want them, you can run the tool by clicking "Start" in the top left. This process can take a lot of time, depending on how many anime you have and what you set the delay at. At any time, you can click "Stop" without losing what is already generated/updated. You can also "Minimise" the program to keep navigating your list without losing progress.
 
-Once you have your settings correct, you can begin generating CSS and updating tags by clicking "Start" in the top left. This process can take a lot of time, depending on how many anime you have and what you set the delay at. At any time, you can click "Stop" without losing what is already generated/updated. You can also "Minimise" the program to keep navigating your list. Once the program is done, this button will change to "Done" automatically.
+Tag and Note updates will happen as the tool processes, while CSS will be created in the "Output" text field on the right of the tool. On repeat uses, you can copy-paste your previously generated CSS into the large "Input" text box. The tool will automatically save and autofill your last-generated CSS to make this quicker. This will save a lot of time on future uses and prevents re-generating everything.
 
-On repeat uses, you can copy-paste your previously generated CSS into the large text box that says "Copy previously generated code here." The tool automatically saves and autofills your last-generated CSS to make this quicker. This will save a lot of time on future uses and prevents re-generating everything.
+[b]Important notes on CSS generation - [u]please read![/u][/b]
+[list][*]This tool does not auto-update any of your CSS. After adding new entries to your list, or once information becomes old, you will have to re-run the tool manually and overwrite your previous CSS.
+[*]When generating CSS, keep in mind it can get very long very fast. This can mean hitting the CSS limit MAL imposes, which is approximately 65,535 characters. [b]If you hit this limit, anything beyond will get deleted![/b] To avoid these issues and circumvent the character limit, you can host the CSS on another website. I recommend reading Shishio's guide on hosting and importing CSS from Dropbox: [url=https://myanimelist.net/forum/?topicid=1911384][Guide][/url]. If you do decide to paste this code into your Custom CSS box, make sure to [b]place the code at the bottom[/b] so that if anything does get deleted, it's only the generated code and not anything important.[/list]
 
-For help understanding any of the settings, see the bolded sections below.
-
-[b]Delay:[/b]
+For help understanding any of the settings, see the spoiler below.
+[spoiler="Setting Help"][b]Delay:[/b]
 The Delay controls how many milliseconds the program pauses between generating entries. Setting this too low may trigger MAL's spam detection. If you're getting a lot of errors, you should try increasing this.
 
 [b]Templates:[/b]
@@ -75,13 +101,11 @@ You can also enable "Overwrite current tags". This will [b]completely remove[/b]
 [b]Notes:[/b]
 To turn on/off updating of notes, enable the "Update Notes" checkbox and then enable the checkboxes for whichever info you and to add to your tags.
 
-This will [b]completely remove[/b] your current notes, with no way to recover them. There is no toggle for this behaviour at this time, but let me know if you want one.
-
-[size=120][b]Notes on usage - [u]please read![/u][/b][/size]
-[list][*]This tool does not auto-update any of your CSS. After adding new entries to your list, or once information becomes old, you will have to re-run the tool manually and overwrite your previous CSS.
-[*]When generating CSS, keep in mind it can get very long very fast. This can mean hitting the CSS limit MAL imposes, which is approximately 65,535 characters. [b]If you hit this limit, anything beyond will get deleted![/b] To avoid these issues and circumvent the character limit, you can host the CSS on another website. I recommend reading Shishio's guide on hosting and importing CSS from Dropbox: [url=https://myanimelist.net/forum/?topicid=1911384][Guide][/url]. If you do decide to paste this code into your Custom CSS box, make sure to [b]place the code at the bottom[/b] so that if anything does get deleted, it's only the generated code and not anything important.[/list][/quote]
+This will [b]completely remove[/b] your current notes, with no way to recover them. There is no toggle for this behaviour at this time, but let me know if you want one.[/spoiler]
+And that's the main tour done! Have fun trying it out.[/quote]
 
 [quote][size=150][b]Video Overview and Beginner's Guide[/b][/size]
+
 Fullscreen it! This isn't as hard as it seems. Shishio's video will show you the basics on starting and using the app, and then go through how to use it to generate synopses for your list and import it, which is a basic and popular function of the app. From there, you should be ready and can definitely try other features with less trouble!
 https://youtu.be/sGhXbCidSWs
 [yt]sGhXbCidSWs[/yt][/quote]
@@ -100,12 +124,12 @@ Please keep in mind that not all templates will work with all premade layouts. T
 [spoiler="Add English/Native title"]This is a very basic template that appends the alternate title directly after the primary title.
 
 [b]Template:[/b] (choose either depending on what you want)
-[spoiler="English title"][code]{"template":".title .link[href^=\"/[TYPE]/[ID]/\"]::after {content: \" [TITLEENG]\"; }","matchtemplate":"/[TYPE]/[ID]/","css":".data.title .link::after {\n\tfont-size: 0.8em;\n\tcolor: #888;\n\tfont-style: italic;\n}"}[/code][/spoiler][spoiler="Native title"][code]{"template":".title .link[href^=\"/[TYPE]/[ID]/\"]::after {content: \" [TITLERAW]\"; }","matchtemplate":"/[TYPE]/[ID]/","css":".data.title .link::after {\n\tfont-size: 0.8em;\n\tcolor: #888;\n\tfont-style: italic;\n}"}[/code][/spoiler]
+[spoiler="English title"][code]{"template":".title .link[href^=\"/[TYPE]/[ID]/\"]::after {content: \" [TITLEEN]\"; }","matchtemplate":"/[TYPE]/[ID]/","css":".data.title .link::after {\n\tfont-size: 0.8em;\n\tcolor: #888;\n\tfont-style: italic;\n}"}[/code][/spoiler][spoiler="Native title"][code]{"template":".title .link[href^=\"/[TYPE]/[ID]/\"]::after {content: \" [TITLERAW]\"; }","matchtemplate":"/[TYPE]/[ID]/","css":".data.title .link::after {\n\tfont-size: 0.8em;\n\tcolor: #888;\n\tfont-style: italic;\n}"}[/code][/spoiler]
 [img]https://i.imgur.com/Tnfgmcq.png[/img][/spoiler]
 [spoiler="Replace titles with English/Native title"]This template replaces the title entirely with the alternate title.
 
 [b]Template:[/b] (choose either depending on what you want)
-[spoiler="English title"][code]{"template":".title .link[href^=\"/[TYPE]/[ID]/\"]::after {content: \"[TITLEENG]\"; }","matchtemplate":"/[TYPE]/[ID]/","css":".data.title .link {\n\tfont-size: 0 !important;\n}\n.data.title .link::after {\n\tdisplay: inline-block;\n\tfont-size: 12px;\n} .data.title .link:hover::after {\n\ttext-decoration: underline;\n}"}[/code][/spoiler][spoiler="Native title"][code]{"template":".title .link[href^=\"/[TYPE]/[ID]/\"]::after {content: \"[TITLERAW]\"; }","matchtemplate":"/[TYPE]/[ID]/","css":".data.title .link {\n\tfont-size: 0 !important;\n}\n.data.title .link::after {\n\tdisplay: inline-block;\n\tfont-size: 12px;\n} .data.title .link:hover::after {\n\ttext-decoration: underline;\n}"}[/code][/spoiler]
+[spoiler="English title"][code]{"template":".title .link[href^=\"/[TYPE]/[ID]/\"]::after {content: \"[TITLEEN]\"; }","matchtemplate":"/[TYPE]/[ID]/","css":".data.title .link {\n\tfont-size: 0 !important;\n}\n.data.title .link::after {\n\tdisplay: inline-block;\n\tfont-size: 12px;\n} .data.title .link:hover::after {\n\ttext-decoration: underline;\n}"}[/code][/spoiler][spoiler="Native title"][code]{"template":".title .link[href^=\"/[TYPE]/[ID]/\"]::after {content: \"[TITLERAW]\"; }","matchtemplate":"/[TYPE]/[ID]/","css":".data.title .link {\n\tfont-size: 0 !important;\n}\n.data.title .link::after {\n\tdisplay: inline-block;\n\tfont-size: 12px;\n} .data.title .link:hover::after {\n\ttext-decoration: underline;\n}"}[/code][/spoiler]
 [img]https://i.imgur.com/1GNSpGi.png[/img][/spoiler]
 [spoiler="Cover images"]This also happens to be the default template. It generates a list of HD cover images for your list which can be used in place of other cover generators. The template may have to be changed if you are using a premade layout.
 
@@ -156,7 +180,7 @@ Templates can be written as regular CSS. Each anime or manga will generate a lin
 [color=transparent]--[/color] Cover image URL (very small. not all anime have this image. usually 22px wide by 27-33 tall)
 [*][b][TITLE][/b]
 [color=transparent]--[/color] Default title
-[*][b][TITLEEN[/b]
+[*][b][TITLEEN][/b]
 [color=transparent]--[/color] English title (falls back to synonym or default titles when not applicable)
 [*][b][TITLEFR][/b]
 [color=transparent]--[/color] French title (falls back to synonym or default titles when not applicable)
@@ -225,14 +249,10 @@ Here's an example template for cover images and what it will look like after gen
 
 [size=120][b]Credits[/b][/size]
 [table][tr][th]Name[/th][th]Contributions[/th][/tr][tr][td][url=https://myanimelist.net/profile/BurntJelly]BurntJello[/url][/td][td]Original code.[/td][/tr][tr][td][url=https://myanimelist.net/profile/Cateinya]Cateinya[/url][/td][td]Modern list support and some mangalist support.[/td][/tr][tr][td][url=https://myanimelist.net/profile/Cry5talz]Cry5talz[/url][/td][td]Provided a fix for some MAL changes.[/td][/tr][tr][td][url=https://myanimelist.net/profile/Valerio_Lyndon]Valerio_Lyndon[/url][/td][td]All new features listed on this page.[/td][/tr][/table]
+This script is a fork of BurntJello's MyAnimeList-Tools. Despite the visual differences and new features, much of the core code is still based on their work.
+
 [size=120][b]Links[/b][/size]
 - [url=https://github.com/ValerioLyndon/MyAnimeList-Tools]Code on GitHub[/url]
 -- [i]I am open to code contributions if you so desire.[/i]
 - [url=https://burntjello.webs.com/m/MyAnimeListTools/]BurntJello's original webpage[/url]
--- [i]Here you can find BurntJello's original code, without my fixes and changes applied.[/i]
-
-[size=120][b]List Layouts[/b][/size]
-
-Here's some list layouts that use this tool to enhance their features.
-• [url=https://myanimelist.net/forum/?topicid=1544259]Endless Summer[/url] by Cateinya
-• [url=https://myanimelist.net/blog.php?eid=770336]Full-Card Layout[/url] by BurntJelly[/quote]
+-- [i]Here you can find BurntJello's original code, without my fixes and changes applied.[/i][/quote]
