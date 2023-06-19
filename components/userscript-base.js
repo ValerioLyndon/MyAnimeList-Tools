@@ -51,10 +51,10 @@ if( List.isOwner ){
 		$('#mal_cs_otherlinks div:last-of-type').append(button);
 	}
 
-	$('<head>').append('<style>').text(`
+	$('head').append($('<style>').text(`
 		.burnt-trigger-icon {
 			top: 15px;
 			left: 15px;
 		}
-	`);
+	`));
 }

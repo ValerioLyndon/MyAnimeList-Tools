@@ -8,7 +8,7 @@ MyAnimeList-Tools
 */
 
 const ver = '10.1_b0';
-const verMod = '2023/Jun/12';
+const verMod = '2023/Jun/18';
 
 class CustomStorage {
 	constructor( type = 'localStorage' ){

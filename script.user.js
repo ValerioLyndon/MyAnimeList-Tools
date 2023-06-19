@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      10.1_a0
+// @version      10.1_a1
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,8 +24,8 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '10.1_a0';
-const verMod = '2023/Jun/12';
+const ver = '10.1_a1';
+const verMod = '2023/Jun/18';
 
 class CustomStorage {
 	constructor( type = 'localStorage' ){
@@ -2551,10 +2551,10 @@ if( List.isOwner ){
 		$('#mal_cs_otherlinks div:last-of-type').append(button);
 	}
 
-	$('<head>').append('<style>').text(`
+	$('head').append($('<style>').text(`
 		.burnt-trigger-icon {
 			top: 15px;
 			left: 15px;
 		}
-	`);
+	`));
 }
