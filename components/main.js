@@ -129,7 +129,7 @@ class ListInfo {
 
 	async determineStyle( ){
 		if( this.isModern ){
-			this.style = await this.#determineModernStyle();
+			this.style = this.#determineModernStyle();
 		}
 		else {
 			this.style = await this.#determineClassicStyle();
@@ -137,19 +137,104 @@ class ListInfo {
 	}
 
 	#determineModernStyle( ){
-		let stylesheet = $('head style[type="text/css"]:first-of-type').text();
+		/* function is slightly over-engineered to prevent failure,
+		hence the node loop and thorough error checking. */
 
-		let styleColIndex = stylesheet.indexOf('background-color', stylesheet.indexOf('.list-unit .list-status-title {')) + 17;
-		let styleCol = stylesheet.substr(styleColIndex, 8).replaceAll(/\s|\:|\;/g, '');
+		let stylesheets = document.querySelectorAll('head style[type="text/css"]:not([class]):not([id])');
 
-		switch(styleCol) {
+		let css = false;
+		for( let i = 0; i < stylesheets.length; i++ ){
+			let text = stylesheets[i].textContent;
+			if( text.includes('#advanced-options') && text.includes('/**') ){
+				css = text;
+				break;
+			}
+		}
+		if( !css ){
+			Log.error('Failed to determine modern list style: could not find style element.');
+			return false;
+		}
+
+		/* check for advanced presets */
+
+		if( css.includes('original theme css') || css.includes('*******************************************************************************') ){
+			if( css.includes('TokyoRevengers_credit_01/1_1_Hahaido.') ){
+				return 11;
+			}
+			if( css.includes('TokyoRevengers_credit_01/2_1_Hahaido.') ){
+				return 12;
+			}
+			if( css.includes('TokyoRevengers_credit_01/4_1_Hahaido.') ){
+				return 13;
+			}
+			if( css.includes('TokyoRevengers_credit_01/5_1_Hahaido.') ){
+				return 14;
+			}
+			if( css.includes('TokyoRevengers_credit_02/8_1_Half_Bl00d.') ){
+				return 15;
+			}
+			if( css.includes('TokyoRevengers_credit_02/9_1_Half_Bl00d.') ){
+				return 16;
+			}
+			if( css.includes('TokyoRevengers_credit_02/10_1_Half_Bl00d.') ){
+				return 17;
+			}
+			if( css.includes('TokyoRevengers_credit_01/14_2_Cateinya.') ){
+				return 18;
+			}
+			if( css.includes('TokyoRevengers_credit_01/15_1_Cateinya.') ){
+				return 19;
+			}
+			if( css.includes('Background photo created by evening_tao') ){
+				return 20;
+			}
+			if( css.includes('Mirai Remix') ){
+				return 21;
+			}
+			if( css.includes('Redesign by Shishio-kun') ){
+				return 22;
+			}
+			if( /\.list-unit\s+\.list-status-title\s*{[^}]+background-color:\s*#241616/i.test(css) ){
+				return 23;
+			}
+			if( /\.list-unit\s+\.list-status-title\s*{[^}]+background-color:\s*#4e2f31/i.test(css) ){
+				return 24;
+			}
+			if( css.includes('Designed & developed by Half_Bl00d.') ){
+				return 25;
+			}
+			if( css.includes('BLACKOUT') ){
+				return 26;
+			}
+			if( css.includes('Night Shift Layout by Cateinya') ){
+				return 27;
+			}
+			if( /--statusbar[^;]*#284042/i.test(css) ){
+				return 29;
+			}
+			if( /--statusbar[^;]*#FD8060/i.test(css) ){
+				return 30;
+			}
+
+			Log.error('Failed to determine modern list style: style is an unrecognised advanced design.');
+			return false;
+		}
+
+		/* check for simple presets */
+
+		let search = css.match(/\.list-unit\s+\.list-status-title\s*{[^}]+background-color:\s*([^;]+);/i);
+		if( !search || search.length < 2 ){
+			Log.error('Failed to determine modern list style: could not match regex.');
+			return false;
+		}
+		let colour = search[1];
+
+		switch( colour ){
 			case '#4065BA':
-				if(stylesheet.indexOf('logo_mal_blue.png') !== -1)
-				{
+				if( css.includes('logo_mal_blue.png') ){
 					return 2;
 				}
-				else
-				{
+				else {
 					return 1;
 				}
 			case '#244291':
@@ -168,8 +253,10 @@ class ListInfo {
 				return 9;
 			case '#DB1C03':
 				return 10;
+			case '#F9E0DC':
+				return 28;
 			default:
-				Log.error('Failed to determine modern list style.');
+				Log.error(`Failed to determine modern list style: style is an unrecognised simple design. Code ${colour}.`);
 				return false;
 		}
 	}
@@ -181,7 +268,7 @@ class ListInfo {
 	async #determineClassicStyle( ){
 		let userStylesPage = await request('https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv');
 		if( !userStylesPage ){
-			Log.errror('Could not access your classic list style page.');
+			Log.error('Could not access your classic list style page.');
 			return false;
 		}
 
