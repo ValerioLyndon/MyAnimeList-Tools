@@ -7,8 +7,8 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '10.2_b0';
-const verMod = '2023/Jun/18';
+const ver = '11.0-pre_b0';
+const verMod = '2023/Aug/17';
 
 class CustomStorage {
 	constructor( type = 'localStorage' ){
@@ -83,77 +83,12 @@ class CustomStorage {
 var store = new CustomStorage('localStorage');
 
 /* functionality vars */
-var defaultSettings = {
-	"select_categories": false,
-	"checked_categories": {
-		"1": false,
-		"2": false,
-		"3": false,
-		"4": false,
-		"6": false
-	},
-	"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
-	"delay": "3000",
-	"match_template": "/[TYPE]/[ID]/",
-	"check_existing": false,
-	"update_tags": false,
-	"checked_tags": {
-		"english_title": false,
-		"french_title": false,
-		"spanish_title": false,
-		"german_title": false,
-		"native_title": false,
-		"season": false,
-		"year": false,
-		"genres": false,
-		"themes": false,
-		"demographic": false,
-		"authors": false,
-		"score": false,
-		"rank": false,
-		"popularity": false,
-		"studio": false,
-		"producers": false,
-		"licensors": false,
-		"serialization": false,
-		"aired": false,
-		"published": false,
-		"rating": false,
-		"duration": false,
-		"total_duration": false
-	},
-	"clear_tags": false,
-	"update_notes": false,
-	"checked_notes": {
-		"synopsis": false,
-		"english_title": false,
-		"french_title": false,
-		"spanish_title": false,
-		"german_title": false,
-		"native_title": false,
-		"season": false,
-		"year": false,
-		"genres": false,
-		"themes": false,
-		"demographic": false,
-		"authors": false,
-		"score": false,
-		"rank": false,
-		"popularity": false,
-		"studio": false,
-		"producers": false,
-		"licensors": false,
-		"serialization": false,
-		"aired": false,
-		"published": false,
-		"rating": false,
-		"duration": false,
-		"total_duration": false
-	},
-	"live_preview": false
-};
 
-class Logger {
+function isDict( unknown ){
+	return (unknown instanceof Object && !(unknown instanceof Array)) ? true : false;
+}
+
+var Log = new class Logger {
 	constructor( parent = null ){
 		this.parent = parent;
 		this.errorCount = 0;
@@ -198,7 +133,7 @@ class Logger {
 	}
 }
 
-class ListInfo {
+var List = new class ListInfo {
 	constructor( ){
 		this.type = window.location.pathname.split('/')[1].substring(0,5);
 		this.isAnime = (this.type === 'anime');
@@ -389,8 +324,159 @@ class ListInfo {
 	}
 }
 
-var Log = new Logger();
-var List = new ListInfo();
+var Settings = new class {
+	settings = {
+		"select_categories": false,
+		"checked_categories": {
+			"1": false,
+			"2": false,
+			"3": false,
+			"4": false,
+			"6": false
+		},
+		"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
+		"delay": "3000",
+		"match_template": "/[TYPE]/[ID]/",
+		"check_existing": false,
+		"update_tags": false,
+		"checked_tags": {
+			"english_title": false,
+			"french_title": false,
+			"spanish_title": false,
+			"german_title": false,
+			"native_title": false,
+			"season": false,
+			"year": false,
+			"genres": false,
+			"themes": false,
+			"demographic": false,
+			"authors": false,
+			"score": false,
+			"rank": false,
+			"popularity": false,
+			"studio": false,
+			"producers": false,
+			"licensors": false,
+			"serialization": false,
+			"aired": false,
+			"published": false,
+			"rating": false,
+			"duration": false,
+			"total_duration": false
+		},
+		"clear_tags": false,
+		"update_notes": false,
+		"checked_notes": {
+			"synopsis": false,
+			"english_title": false,
+			"french_title": false,
+			"spanish_title": false,
+			"german_title": false,
+			"native_title": false,
+			"season": false,
+			"year": false,
+			"genres": false,
+			"themes": false,
+			"demographic": false,
+			"authors": false,
+			"score": false,
+			"rank": false,
+			"popularity": false,
+			"studio": false,
+			"producers": false,
+			"licensors": false,
+			"serialization": false,
+			"aired": false,
+			"published": false,
+			"rating": false,
+			"duration": false,
+			"total_duration": false
+		},
+		"live_preview": false
+	};
+	
+	constructor( ){
+		this.updateOlderFormats();
+		/* Read settings from storage and validate */
+		if( store.has(`${List.type}_settings`) ){
+			try {
+				let workspace = store.get(`${List.type}_settings`);
+			
+				/* Check for missing settings and fill them in. This prevents errors while maintaining user settings, especially in the case of a user updating from an older version. */
+				for( let [key, value] of Object.entries(this.settings) ){
+					if( !(key in this.settings) ){
+						workspace[key] = this.settings[key];
+					}
+					if( isDict(value) ){
+						for( let subkey in this.settings[key] ){
+							if( !(subkey in workspace[key]) ){
+								workspace[key][subkey] = this.settings[key][subkey];
+							}
+						}
+					}
+				}
+				this.settings = workspace;
+			}
+			catch( e ){
+				alert("Encountered an error while parsing your previous settings. Your settings have been reverted to defaults. To quickly recover your template settings, try selecting \"Last Run\" and then \"Autofill\". Other settings will need to be manually set. \n\nIf you've never run this tool before, you should never see this.");
+			}
+		}
+	}
+
+	get( keys, dict = this.settings ){
+		let key = keys.shift(); /* removes and returns first object */
+		let value = dict[key];
+		if( keys.length > 0 && isDict(value) ){
+			return this.get(keys, value);
+		}
+		return value; /* returns undefined if key is not found */
+	}
+
+	set( keys, value, dict = this.settings ){
+		let key = keys.shift();
+		if( keys.length > 0 ){
+			dict[key] = isDict(dict[key]) ? dict[key] : {};
+			dict[key] = this.set( keys, value, dict[key] );
+		}
+		else {
+			dict[key] = value;
+		}
+		return dict;
+	}
+
+	save( ){
+		store.set(`${List.type}_settings`, this.settings);
+	}
+
+	updateOlderFormats( ){
+		/* Convert v8.0 -> v8.1 */
+
+		if( store.has('settings') ){
+			store.set('anime_settings', store.get('settings'));
+			store.set('manga_settings', store.get('settings'));
+			store.remove('settings');
+		}
+		if( store.has('last_run') ){
+			store.set('last_anime_run', store.get('last_run'));
+			store.set('last_manga_run', store.get('last_run'));
+			store.remove('last_run');
+		}
+
+		/* Convert v9.x -> v10.0 */
+
+		if( localStorage.getItem('burnt-theme') !== null){
+			localStorage.removeItem('burnt-theme');
+		}
+
+		if( store.has(`${List.type}_settings`) && !store.has(`${List.type}_settings--type`) ){
+			store.set(`${List.type}_settings`, JSON.parse(store.get(`${List.type}_settings`)));
+		}
+
+		if( store.has(`last_${List.type}_run`) && !store.has(`last_${List.type}_run--type`) ){
+			store.set(`last_${List.type}_run`, store.get(`last_${List.type}_run`));
+		}
+	}
+}
 
 /* wrapper for common fetch requests to remove some boilerplate */
 async function request( url, result = 'html' ){
@@ -495,79 +581,12 @@ function main() {
 	UI = new UserInterface();
 
 	var output = '';
-	var settings = defaultSettings;
 
 	function write( newText ){
 		output += newText;
 		if( writeToOutput.is(':checked') ){
 			result.value = output;
 			result.scrollTop = result.scrollHeight;
-		}
-	}
-
-	/* Handle older settings */
-
-	/* Convert v8.0 -> v8.1 */
-
-	if(store.has('settings'))
-	{
-		store.set('anime_settings', store.get('settings'));
-		store.set('manga_settings', store.get('settings'));
-		store.remove('settings');
-	}
-	if(store.has('last_run'))
-	{
-		store.set('last_anime_run', store.get('last_run'));
-		store.set('last_manga_run', store.get('last_run'));
-		store.remove('last_run');
-	}
-
-	/* Convert v9.x -> v10.0 */
-
-	if(localStorage.getItem('burnt-theme') !== null)
-	{
-		localStorage.removeItem('burnt-theme');
-	}
-
-	if( store.has(`${List.type}_settings`) && !store.has(`${List.type}_settings--type`) ){
-		store.set(`${List.type}_settings`, JSON.parse(store.get(`${List.type}_settings`)));
-	}
-
-	if( store.has(`last_${List.type}_run`) && !store.has(`last_${List.type}_run--type`) ){
-		store.set(`last_${List.type}_run`, store.get(`last_${List.type}_run`));
-	}
-
-	/* Default settings handling */
-
-	if(store.has(`${List.type}_settings`))
-	{
-		try
-		{
-			settings = store.get(`${List.type}_settings`);
-		
-			/* Check for missing settings and fill them in. This prevents errors while maintaining user settings, especially in the case of a user updating from an older version. */
-			for(let [key, value] of Object.entries(defaultSettings))
-			{
-				if(!(key in settings))
-				{
-					settings[key] = defaultSettings[key];
-				}
-				if(value instanceof Object)
-				{
-					for(let subkey in defaultSettings[key])
-					{
-						if (!(subkey in settings[key]))
-						{
-							settings[key][subkey] = defaultSettings[key][subkey];
-						}
-					}
-				}
-			}
-		}
-		catch(e)
-		{
-			alert("Encountered an error while parsing your previous settings. Your settings have been reverted to defaults. To quickly recover your template settings, try selecting \"Last Run\" and then \"Autofill\". Other settings will need to be manually set. \n\nIf you've never run this tool before, you should never see this.");
-			settings = defaultSettings;
 		}
 	}
 
@@ -950,17 +969,20 @@ footer {
 	timeText.className = 'status__time';
 	statusBar.append(timeText);
 
-	function field(value, title, desc, parent = cssGroup) {
+	function field(setting, title, desc, parent = cssGroup) {
 		lbl = document.createElement('label');
 		lbl.textContent = title;
 		lbl.className = 'label';
 
 		input = document.createElement('input');
 		input.type = 'text';
-		input.value = value;
+		input.value = Settings.get(setting);
 		input.title = desc;
 		input.className = 'field';
 		input.spellcheck = false;
+		input.addEventListener('input', ()=>{
+			Settings.set(setting, input.value);
+		});
 
 		lbl.append(input);
 		$(parent).append(lbl);
@@ -977,7 +999,10 @@ footer {
 
 		let chk = document.createElement("input");
 		chk.type = "checkbox";
-		chk.checked = setting;
+		chk.checked = Settings.get(setting);
+		chk.addEventListener('input', ()=>{
+			Settings.set(setting, chk.checked);
+		});
 
 		lbl.prepend(chk);
 		$(parent).append(lbl);
@@ -991,10 +1016,10 @@ footer {
 	let globalGroup = $('<div class="group"></div>');
 	$(sidebar).append(globalGroup);
 
-	delay = field(settings['delay'], "Delay between items", "Delay (ms) between requests to avoid spamming the server.", globalGroup);
+	delay = field(['delay'], "Delay between items", "Delay (ms) between requests to avoid spamming the server.", globalGroup);
 	delay.style.width = "50px";
 
-	chkCategory = chk(settings['select_categories'], "Update only specific categories.", globalGroup, 'Want to only update entries in certain categories instead of everything at once?');
+	chkCategory = chk(['select_categories'], "Update only specific categories.", globalGroup, 'Want to only update entries in certain categories instead of everything at once?');
 	chkCategory.addEventListener('input', () => { toggleChks(chkCategory, categoryDrawer); });
 
 	let categoryDrawer = $('<div class="drawer"></div>');
@@ -1002,11 +1027,11 @@ footer {
 
 	let watchOrRead = List.type == 'anime' ? "Watching" : "Reading";
 	let categoryChks = {
-		"1": chk(settings['checked_categories']['1'], watchOrRead, categoryDrawer),
-		"2": chk(settings['checked_categories']['2'], "Completed", categoryDrawer),
-		"3": chk(settings['checked_categories']['3'], "On Hold", categoryDrawer),
-		"4": chk(settings['checked_categories']['4'], "Dropped", categoryDrawer),
-		"6": chk(settings['checked_categories']['6'], "Planned", categoryDrawer)
+		"1": chk(['checked_categories', '1'], watchOrRead, categoryDrawer),
+		"2": chk(['checked_categories', '2'], "Completed", categoryDrawer),
+		"3": chk(['checked_categories', '3'], "On Hold", categoryDrawer),
+		"4": chk(['checked_categories', '4'], "Dropped", categoryDrawer),
+		"6": chk(['checked_categories', '6'], "Planned", categoryDrawer)
 	};
 
 
@@ -1016,8 +1041,8 @@ footer {
 	let cssGroup = $('<div class="group"></div>');
 	$(sidebar).append(cssGroup);
 
-	template = field(settings['css_template'], "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEEN], [TITLEFR], [TITLEES], [TITLEDE], [TITLERAW], [GENRES], [THEMES], [DEMOGRAPHIC], [RANK], [POPULARITY], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
-	matchTemplate = field(settings['match_template'], "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
+	template = field(['css_template'], "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEEN], [TITLEFR], [TITLEES], [TITLEDE], [TITLERAW], [GENRES], [THEMES], [DEMOGRAPHIC], [RANK], [POPULARITY], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
+	matchTemplate = field(['match_template'], "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
 
 	function toggleChks(checkbox, drawerSelector) {
 		if(checkbox.checked)
@@ -1030,7 +1055,7 @@ footer {
 		}
 	}
 
-	chkExisting = chk(settings['check_existing'], "Validate existing images", cssGroup, "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load. Not recommended while adding new anime or updating tags!");
+	chkExisting = chk(['check_existing'], "Validate existing images", cssGroup, "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load. Not recommended while adding new anime or updating tags!");
 
 	$(cssGroup).append($('<div class="spacer"></div>'));
 
@@ -1135,8 +1160,8 @@ footer {
 		`);
 		$(gui).append(exportOverlay);
 
-		$(exportOverlay).find('#export-template').val(template.value);
-		$(exportOverlay).find('#export-match').val(matchTemplate.value);
+		$(exportOverlay).find('#export-template').val(Settings.get('css_template'));
+		$(exportOverlay).find('#export-match').val(Settings.get(['match_template']));
 
 		$(exportOverlay).find('#export-btn').on('click',()=>{
 			let newTemplate = $(exportOverlay).find('#export-template').val();
@@ -1178,45 +1203,45 @@ footer {
 	let tagGroup = $('<div class="group"></div>');
 	$(sidebar).append(tagGroup);
 
-	chkTags = chk(settings['update_tags'], "Update Tags", tagGroup, 'Update your tags with the new information.');
+	chkTags = chk(['update_tags'], "Update Tags", tagGroup, 'Update your tags with the new information.');
 
 	chkTags.addEventListener('input', () => { toggleChks(chkTags,tagDrawer); });
 
 	let tagDrawer = $('<div class="drawer"></div>');
 	$(tagGroup).append(tagDrawer);
 
-	chkEnglish = chk(settings['checked_tags']['english_title'], "English title", tagDrawer);
-	chkFrench = chk(settings['checked_tags']['french_title'], "French title", tagDrawer);
-	chkSpanish = chk(settings['checked_tags']['spanish_title'], "Spanish title", tagDrawer);
-	chkGerman = chk(settings['checked_tags']['german_title'], "German title", tagDrawer);
-	chkNative = chk(settings['checked_tags']['native_title'], "Native title", tagDrawer);
-	chkSeason = chk(settings['checked_tags']['season'], "Season", tagDrawer);
-	chkYear = chk(settings['checked_tags']['year'], "Year", tagDrawer);
-	chkGenres = chk(settings['checked_tags']['genres'], "Genres", tagDrawer);
-	chkThemes = chk(settings['checked_tags']['themes'], "Themes", tagDrawer);
-	chkDemographic = chk(settings['checked_tags']['demographic'], "Demographic", tagDrawer);
-	chkScore = chk(settings['checked_tags']['score'], "Score", tagDrawer);
-	chkRank = chk(settings['checked_tags']['rank'], "Rank", tagDrawer);
-	chkPopularity = chk(settings['checked_tags']['popularity'], "Popularity", tagDrawer);
+	chkEnglish = chk(['checked_tags', 'english_title'], "English title", tagDrawer);
+	chkFrench = chk(['checked_tags', 'french_title'], "French title", tagDrawer);
+	chkSpanish = chk(['checked_tags', 'spanish_title'], "Spanish title", tagDrawer);
+	chkGerman = chk(['checked_tags', 'german_title'], "German title", tagDrawer);
+	chkNative = chk(['checked_tags', 'native_title'], "Native title", tagDrawer);
+	chkSeason = chk(['checked_tags', 'season'], "Season", tagDrawer);
+	chkYear = chk(['checked_tags', 'year'], "Year", tagDrawer);
+	chkGenres = chk(['checked_tags', 'genres'], "Genres", tagDrawer);
+	chkThemes = chk(['checked_tags', 'themes'], "Themes", tagDrawer);
+	chkDemographic = chk(['checked_tags', 'demographic'], "Demographic", tagDrawer);
+	chkScore = chk(['checked_tags', 'score'], "Score", tagDrawer);
+	chkRank = chk(['checked_tags', 'rank'], "Rank", tagDrawer);
+	chkPopularity = chk(['checked_tags', 'popularity'], "Popularity", tagDrawer);
 	/*Anime Only */
-	chkStudio = chk(settings['checked_tags']['studio'], "Studio", tagDrawer);
-	chkProducers = chk(settings['checked_tags']['producers'], "Producers", tagDrawer);
-	chkLicensors = chk(settings['checked_tags']['licensors'], "Licensors", tagDrawer);
-	chkAired = chk(settings['checked_tags']['aired'], "Aired", tagDrawer);
-	chkRating = chk(settings['checked_tags']['rating'], "Rating", tagDrawer);
-	chkDuration = chk(settings['checked_tags']['duration'], "Duration (Episode)", tagDrawer);
-	chkTotalDuration = chk(settings['checked_tags']['total_duration'], "Duration (Total)", tagDrawer);
+	chkStudio = chk(['checked_tags', 'studio'], "Studio", tagDrawer);
+	chkProducers = chk(['checked_tags', 'producers'], "Producers", tagDrawer);
+	chkLicensors = chk(['checked_tags', 'licensors'], "Licensors", tagDrawer);
+	chkAired = chk(['checked_tags', 'aired'], "Aired", tagDrawer);
+	chkRating = chk(['checked_tags', 'rating'], "Rating", tagDrawer);
+	chkDuration = chk(['checked_tags', 'duration'], "Duration (Episode)", tagDrawer);
+	chkTotalDuration = chk(['checked_tags', 'total_duration'], "Duration (Total)", tagDrawer);
 	/*Manga only*/
-	chkPublished = chk(settings['checked_tags']['published'], "Published", tagDrawer);
-	chkAuthors = chk(settings['checked_tags']['authors'], "Authors", tagDrawer);
-	chkSerialization = chk(settings['checked_tags']['serialization'], "Serialization", tagDrawer);
+	chkPublished = chk(['checked_tags', 'published'], "Published", tagDrawer);
+	chkAuthors = chk(['checked_tags', 'authors'], "Authors", tagDrawer);
+	chkSerialization = chk(['checked_tags', 'serialization'], "Serialization", tagDrawer);
 
 
 	$(sidebar).append($('<b class="group-title">Note Options</b>'));
 	let noteGroup = $('<div class="group"></div>');
 	$(sidebar).append(noteGroup);
 
-	chkNotes = chk(settings['update_notes'], "Update Notes", noteGroup, 'Update your comments/notes section with the new information.');
+	chkNotes = chk(['update_notes'], "Update Notes", noteGroup, 'Update your comments/notes section with the new information.');
 
 	chkNotes.addEventListener('input', () => {
 		if(chkNotes.checked) {
@@ -1226,37 +1251,37 @@ footer {
 	});
 
 	$(gui).find(tagDrawer).append($('<br />'));
-	chkClearTags = chk(settings['clear_tags'], "Overwrite current tags", tagDrawer, "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.");
+	chkClearTags = chk(['clear_tags'], "Overwrite current tags", tagDrawer, "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.");
 
 	let notesDrawer = $('<div class="drawer"></div>');
 	$(noteGroup).append(notesDrawer);
 
-	chkSynopsisNotes = chk(settings['checked_notes']['synopsis'], "Synopsis", notesDrawer);
-	chkEnglishNotes = chk(settings['checked_notes']['english_title'], "English title", notesDrawer);
-	chkFrenchNotes = chk(settings['checked_notes']['french_title'], "French title", notesDrawer);
-	chkSpanishNotes = chk(settings['checked_notes']['spanish_title'], "Spanish title", notesDrawer);
-	chkGermanNotes = chk(settings['checked_notes']['german_title'], "German title", notesDrawer);
-	chkNativeNotes = chk(settings['checked_notes']['native_title'], "Native title", notesDrawer);
-	chkSeasonNotes = chk(settings['checked_notes']['season'], "Season", notesDrawer);
-	chkYearNotes = chk(settings['checked_notes']['year'], "Year", notesDrawer);
-	chkGenresNotes = chk(settings['checked_notes']['genres'], "Genres", notesDrawer);
-	chkThemesNotes = chk(settings['checked_notes']['themes'], "Themes", notesDrawer);
-	chkDemographicNotes = chk(settings['checked_notes']['demographic'], "Demographic", notesDrawer);
-	chkScoreNotes = chk(settings['checked_notes']['score'], "Score", notesDrawer);
-	chkRankNotes = chk(settings['checked_notes']['rank'], "Rank", notesDrawer);
-	chkPopularityNotes = chk(settings['checked_notes']['popularity'], "Popularity", notesDrawer);
+	chkSynopsisNotes = chk(['checked_notes', 'synopsis'], "Synopsis", notesDrawer);
+	chkEnglishNotes = chk(['checked_notes', 'english_title'], "English title", notesDrawer);
+	chkFrenchNotes = chk(['checked_notes', 'french_title'], "French title", notesDrawer);
+	chkSpanishNotes = chk(['checked_notes', 'spanish_title'], "Spanish title", notesDrawer);
+	chkGermanNotes = chk(['checked_notes', 'german_title'], "German title", notesDrawer);
+	chkNativeNotes = chk(['checked_notes', 'native_title'], "Native title", notesDrawer);
+	chkSeasonNotes = chk(['checked_notes', 'season'], "Season", notesDrawer);
+	chkYearNotes = chk(['checked_notes', 'year'], "Year", notesDrawer);
+	chkGenresNotes = chk(['checked_notes', 'genres'], "Genres", notesDrawer);
+	chkThemesNotes = chk(['checked_notes', 'themes'], "Themes", notesDrawer);
+	chkDemographicNotes = chk(['checked_notes', 'demographic'], "Demographic", notesDrawer);
+	chkScoreNotes = chk(['checked_notes', 'score'], "Score", notesDrawer);
+	chkRankNotes = chk(['checked_notes', 'rank'], "Rank", notesDrawer);
+	chkPopularityNotes = chk(['checked_notes', 'popularity'], "Popularity", notesDrawer);
 	/*Anime Only */
-	chkStudioNotes = chk(settings['checked_notes']['studio'], "Studio", notesDrawer);
-	chkProducersNotes = chk(settings['checked_notes']['producers'], "Producers", notesDrawer);
-	chkLicensorsNotes = chk(settings['checked_notes']['licensors'], "Licensors", notesDrawer);
-	chkAiredNotes = chk(settings['checked_notes']['aired'], "Aired", notesDrawer);
-	chkRatingNotes = chk(settings['checked_notes']['rating'], "Rating", notesDrawer);
-	chkDurationNotes = chk(settings['checked_notes']['duration'], "Duration (Episode)", notesDrawer);
-	chkTotalDurationNotes = chk(settings['checked_notes']['total_duration'], "Duration (Total)", notesDrawer);
+	chkStudioNotes = chk(['checked_notes', 'studio'], "Studio", notesDrawer);
+	chkProducersNotes = chk(['checked_notes', 'producers'], "Producers", notesDrawer);
+	chkLicensorsNotes = chk(['checked_notes', 'licensors'], "Licensors", notesDrawer);
+	chkAiredNotes = chk(['checked_notes', 'aired'], "Aired", notesDrawer);
+	chkRatingNotes = chk(['checked_notes', 'rating'], "Rating", notesDrawer);
+	chkDurationNotes = chk(['checked_notes', 'duration'], "Duration (Episode)", notesDrawer);
+	chkTotalDurationNotes = chk(['checked_notes', 'total_duration'], "Duration (Total)", notesDrawer);
 	/*Manga only*/
-	chkPublishedNotes = chk(settings['checked_notes']['published'], "Published", notesDrawer);
-	chkAuthorsNotes = chk(settings['checked_notes']['authors'], "Authors", notesDrawer);
-	chkSerializationNotes = chk(settings['checked_notes']['serialization'], "Serialization", notesDrawer);
+	chkPublishedNotes = chk(['checked_notes', 'published'], "Published", notesDrawer);
+	chkAuthorsNotes = chk(['checked_notes', 'authors'], "Authors", notesDrawer);
+	chkSerializationNotes = chk(['checked_notes', 'serialization'], "Serialization", notesDrawer);
 
 	/* HIDE IRRELEVANT */
 	if(List.isAnime)
@@ -1423,9 +1448,12 @@ footer {
 	$(topR).append(wrapper);
 	let writeToOutput = $('<input type="checkbox" value="Live Preview" class="btn" title="Outputs text as it is generated.">');
 	wrapper.prepend(writeToOutput);
-	if( settings['live_preview'] ){
-		writeToOutput.checked = settings['live_preview'];
+	if( Settings.get(['live_preview']) ){
+		writeToOutput.checked = Settings.get(['live_preview']);
 	}
+	writeToOutput.on('input', ()=>{
+		Settings.set(['live_preview'], writeToOutput.is(':checked'));
+	});
 
 	result = document.createElement("textarea");
 	result.className = 'in-out__text';
@@ -1445,7 +1473,9 @@ footer {
 
 	async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 		template.value = newTemplate;
+		Settings.set(['css_template'], newTemplate);
 		matchTemplate.value = newMatchTemplate;
+		Settings.set(['match_template'], newMatchTemplate);
 		if( newCss !== false ){
 			if( !List.style ){
 				alert('Failed to import CSS: Not able to determine style ID.');
@@ -1622,11 +1652,10 @@ footer {
 			let doc = createDOM(str);
 		
 			/* get current tags */
-			if(!chkTags.checked || chkClearTags.checked) {
+			if( !Settings.get(['update_tags']) || Settings.get(['clear_tags']) ){
 				tags = [];
 			}
-			else if(chkTags.checked)
-			{
+			else if( Settings.get(['update_tags']) ){
 				tags = thisData['tags'].split(',');
 				
 				/* remove extra whitespace */
@@ -1870,7 +1899,7 @@ footer {
 					startAt = authors[j].indexOf("\">") + 2;
 					endAt = authors[j].indexOf("</a>");
 					if(endAt == -1) { authors = null; break; }
-					authors[j] = authors[j].substring(startAt, endAt).trim().replaceAll(',','');
+					authors[j] = authors[j].substring(startAt, endAt).trim().replaceAll(',',', ');
 					authors[j] = decodeHtml(authors[j]);
 					removeTagIfExist(authors[j]);
 				}
@@ -2115,8 +2144,7 @@ footer {
 			
 			/* Update Notes & Tags */
 
-			if(chkTags.checked)
-			{
+			if( Settings.get(['update_tags']) ){
 				if(titleEn && chkEnglish.checked) { tags.push(titleEn); }
 				if(titleFr && chkFrench.checked) { tags.push(titleFr); }
 				if(titleEs && chkSpanish.checked) { tags.push(titleEs); }
@@ -2262,7 +2290,7 @@ footer {
 			}
 			
 			/* Generate CSS */
-			cssLine = template.value
+			cssLine = Settings.get(['css_template'])
 				.replaceAll('[DEL]', '')
 				.replaceAll('[ID]', id)
 				.replaceAll('[TYPE]', List.type)
@@ -2314,7 +2342,7 @@ footer {
 		percent = iteration / newData.length * 100 || 0;
 
 		if( iteration === 0 ){
-			timeThen = performance.now() - delay.value;
+			timeThen = performance.now() - Settings.get(['delay']);
 		}
 		timeSince = performance.now() - timeThen;
 		timeThen = performance.now();
@@ -2330,7 +2358,7 @@ footer {
 			finishProcessing();
 			return;
 		}
-		timeout = setTimeout(processItem, delay.value);
+		timeout = setTimeout(processItem, Settings.get(['delay']));
 	}
 
 	function finishProcessing( ){
@@ -2353,7 +2381,7 @@ footer {
 		exitBtn.onclick = ()=>
 		{
 			UI.destruct();
-			if(chkTags.checked || chkNotes.checked)
+			if(Settings.get(['update_tags']) || Settings.get(['update_notes']))
 			{
 				alert("Refesh the page for tag and note updates to show.");
 			}
@@ -2401,7 +2429,7 @@ footer {
 	}
 
 	async function beginProcessing( ){
-		saveSettings();
+		Settings.save();
 		window.addEventListener('beforeunload', warnUserBeforeLeaving);
 
 		exitBtn.disabled = "disabled";
@@ -2419,19 +2447,19 @@ footer {
 			finishProcessing();
 		};
 		let categories = [];
-		for([categoryId, chk] of Object.entries(categoryChks))
+		for([categoryId, check] of Object.entries(Settings.get(['checked_categories'])))
 		{
-			if(chk.checked)
+			if(check.checked)
 			{
 				categories.push(parseInt(categoryId));
 			}
 		}
 
 		result.value = 'Your CSS will be output here once processing is complete. If you want to see items as they are added, turn on Live Preview.';
-		write(`\/*\nGenerated by MyAnimeList-Tools v${ver}\nhttps://github.com/ValerioLyndon/MyAnimeList-Tools\n\nTemplate=${template.value.replace(/\*\//g, "*[DEL]/")}\nMatchTemplate=${matchTemplate.value}\n*\/\n\n`);
+		write(`\/*\nGenerated by MyAnimeList-Tools v${ver}\nhttps://github.com/ValerioLyndon/MyAnimeList-Tools\n\nTemplate=${Settings.get(['css_template']).replace(/\*\//g, "*[DEL]/")}\nMatchTemplate=${Settings.get(['match_template'])}\n*\/\n\n`);
 
 		let beforeProcessing = [];
-		let oldLines = existing.value.replace(/\/\*[\s\S]*?Generated by MyAnimeList-Tools[\s\S]*?\*\/\s+/,'').split("\n");
+		let oldLines = existing.value.replace(/\/\*[\s\S]*?Generated by MyAnimeList-Tools[\s\S]*?\*\/\s+/,', ').split("\n");
 		imagesTotal = oldLines.length;
 		statusText.textContent = `Checking your input for matches...`;
 
@@ -2440,7 +2468,7 @@ footer {
 			let id = item[`${List.type}_id`];
 			
 			/* Skip item if category does not match selected user options */
-			if( chkCategory.checked ){
+			if( Settings.get(['select_categories']) ){
 				let skip = true;
 				let rewatchKey = List.isAnime ? 'is_rewatching' : 'is_rereading';
 				for( let categoryId of categories ){
@@ -2519,80 +2547,6 @@ footer {
 		.then(()=>{
 			continueProcessing();
 		})
-	}
-
-	function saveSettings()
-	{
-		settings = {
-			"select_categories": chkCategory.checked,
-			"checked_categories": {
-				"1": categoryChks["1"].checked,
-				"2": categoryChks["2"].checked,
-				"3": categoryChks["3"].checked,
-				"4": categoryChks["4"].checked,
-				"6": categoryChks["6"].checked
-			},
-			"css_template": template.value,
-			"delay": delay.value,
-			"match_template": matchTemplate.value,
-			"update_tags": chkTags.checked,
-			"update_notes": chkNotes.checked,
-			"checked_tags": {
-				"english_title": chkEnglish.checked,
-				"french_title": chkFrench.checked,
-				"spanish_title": chkSpanish.checked,
-				"german_title": chkGerman.checked,
-				"native_title": chkNative.checked,
-				"season": chkSeason.checked,
-				"year": chkYear.checked,
-				"genres": chkGenres.checked,
-				"themes": chkThemes.checked,
-				"demograpic": chkDemographic.checked,
-				"authors": chkAuthors.checked,
-				"score": chkScore.checked,
-				"rank": chkRank.checked,
-				"popularity": chkPopularity.checked,
-				"studio": chkStudio.checked,
-				"producers": chkProducers.checked,
-				"licensors": chkLicensors.checked,
-				"serialization": chkSerialization.checked,
-				"aired": chkAired.checked,
-				"published": chkPublished.checked,
-				"rating": chkRating.checked,
-				"duration": chkDuration.checked,
-				"total_duration": chkTotalDuration.checked
-			},
-			"checked_notes": {
-				"synopsis": chkSynopsisNotes.checked,
-				"english_title": chkEnglishNotes.checked,
-				"french_title": chkFrenchNotes.checked,
-				"spanish_title": chkSpanishNotes.checked,
-				"german_title": chkGermanNotes.checked,
-				"native_title": chkNativeNotes.checked,
-				"season": chkSeasonNotes.checked,
-				"year": chkYearNotes.checked,
-				"genres": chkGenresNotes.checked,
-				"themes": chkThemesNotes.checked,
-				"demograpic": chkDemographicNotes.checked,
-				"authors": chkAuthorsNotes.checked,
-				"score": chkScoreNotes.checked,
-				"rank": chkRankNotes.checked,
-				"popularity": chkPopularityNotes.checked,
-				"studio": chkStudioNotes.checked,
-				"producers": chkProducersNotes.checked,
-				"licensors": chkLicensorsNotes.checked,
-				"serialization": chkSerializationNotes.checked,
-				"aired": chkAiredNotes.checked,
-				"published": chkPublishedNotes.checked,
-				"rating": chkRatingNotes.checked,
-				"duration": chkDurationNotes.checked,
-				"total_duration": chkTotalDurationNotes.checked
-			},
-			"clear_tags": chkClearTags.checked,
-			"check_existing": chkExisting.checked,
-			"live_preview": writeToOutput.is(':checked')
-		};
-		store.set(`${List.type}_settings`, settings);
 	}
 };
 
