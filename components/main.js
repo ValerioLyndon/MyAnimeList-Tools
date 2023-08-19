@@ -453,7 +453,7 @@ class UserInterface {
 		document.body.append(this.#attachmentPoint);
 
 		this.close();
-		this.css(`
+		this.style(`
 			.root {
 				display: contents;
 			}
@@ -461,6 +461,9 @@ class UserInterface {
 				visibility: hidden;
 				pointer-events: none;
 			}
+		`);
+		this.style(`
+/*<<<css>>>*/
 		`);
 	}
 
@@ -477,7 +480,7 @@ class UserInterface {
 		this.dead = true;
 	}
 
-	css( css ){
+	style( css ){
 		let html = document.createElement('style');
 		html.className = 'css';
 		html.textContent = css;
@@ -509,10 +512,6 @@ function main() {
 	/* TOOL CODE */
 
 	/* Create GUI */
-
-	UI.css(`
-/*<<<css>>>*/
-	`);
 
 	UI.open();
 
@@ -639,14 +638,11 @@ function main() {
 	let categoryDrawer = $('<div class="drawer"></div>');
 	$(globalGroup).append(categoryDrawer);
 
-	let watchOrRead = List.type == 'anime' ? "Watching" : "Reading";
-	let categoryChks = {
-		"1": chk(['checked_categories', '1'], watchOrRead, categoryDrawer),
-		"2": chk(['checked_categories', '2'], "Completed", categoryDrawer),
-		"3": chk(['checked_categories', '3'], "On Hold", categoryDrawer),
-		"4": chk(['checked_categories', '4'], "Dropped", categoryDrawer),
-		"6": chk(['checked_categories', '6'], "Planned", categoryDrawer)
-	};
+	chk(['checked_categories', '1'], List.type == 'anime' ? "Watching" : "Reading", categoryDrawer);
+	chk(['checked_categories', '2'], "Completed", categoryDrawer);
+	chk(['checked_categories', '3'], "On Hold", categoryDrawer);
+	chk(['checked_categories', '4'], "Dropped", categoryDrawer);
+	chk(['checked_categories', '6'], "Planned", categoryDrawer);
 
 
 	/* CSS Options */
@@ -658,18 +654,16 @@ function main() {
 	template = field(['css_template'], "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEEN], [TITLEFR], [TITLEES], [TITLEDE], [TITLERAW], [GENRES], [THEMES], [DEMOGRAPHIC], [RANK], [POPULARITY], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
 	matchTemplate = field(['match_template'], "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
 
-	function toggleChks(checkbox, drawerSelector) {
-		if(checkbox.checked)
-		{
+	function toggleChks( checkbox, drawerSelector ){
+		if( checkbox.checked ){
 			$(gui).find(drawerSelector).removeClass('is-closed');
 		}
-		else
-		{
+		else {
 			$(gui).find(drawerSelector).addClass('is-closed');
 		}
 	}
 
-	chkExisting = chk(['check_existing'], "Validate existing images", cssGroup, "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load. Not recommended while adding new anime or updating tags!");
+	chk(['check_existing'], "Validate existing images", cssGroup, "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load. Not recommended while adding new anime or updating tags!");
 
 	$(cssGroup).append($('<div class="spacer"></div>'));
 
@@ -824,31 +818,33 @@ function main() {
 	let tagDrawer = $('<div class="drawer"></div>');
 	$(tagGroup).append(tagDrawer);
 
-	chkEnglish = chk(['checked_tags', 'english_title'], "English title", tagDrawer);
-	chkFrench = chk(['checked_tags', 'french_title'], "French title", tagDrawer);
-	chkSpanish = chk(['checked_tags', 'spanish_title'], "Spanish title", tagDrawer);
-	chkGerman = chk(['checked_tags', 'german_title'], "German title", tagDrawer);
-	chkNative = chk(['checked_tags', 'native_title'], "Native title", tagDrawer);
-	chkSeason = chk(['checked_tags', 'season'], "Season", tagDrawer);
-	chkYear = chk(['checked_tags', 'year'], "Year", tagDrawer);
-	chkGenres = chk(['checked_tags', 'genres'], "Genres", tagDrawer);
-	chkThemes = chk(['checked_tags', 'themes'], "Themes", tagDrawer);
-	chkDemographic = chk(['checked_tags', 'demographic'], "Demographic", tagDrawer);
-	chkScore = chk(['checked_tags', 'score'], "Score", tagDrawer);
-	chkRank = chk(['checked_tags', 'rank'], "Rank", tagDrawer);
-	chkPopularity = chk(['checked_tags', 'popularity'], "Popularity", tagDrawer);
-	/*Anime Only */
-	chkStudio = chk(['checked_tags', 'studio'], "Studio", tagDrawer);
-	chkProducers = chk(['checked_tags', 'producers'], "Producers", tagDrawer);
-	chkLicensors = chk(['checked_tags', 'licensors'], "Licensors", tagDrawer);
-	chkAired = chk(['checked_tags', 'aired'], "Aired", tagDrawer);
-	chkRating = chk(['checked_tags', 'rating'], "Rating", tagDrawer);
-	chkDuration = chk(['checked_tags', 'duration'], "Duration (Episode)", tagDrawer);
-	chkTotalDuration = chk(['checked_tags', 'total_duration'], "Duration (Total)", tagDrawer);
-	/*Manga only*/
-	chkPublished = chk(['checked_tags', 'published'], "Published", tagDrawer);
-	chkAuthors = chk(['checked_tags', 'authors'], "Authors", tagDrawer);
-	chkSerialization = chk(['checked_tags', 'serialization'], "Serialization", tagDrawer);
+	chk(['checked_tags', 'english_title'], "English title", tagDrawer);
+	chk(['checked_tags', 'french_title'], "French title", tagDrawer);
+	chk(['checked_tags', 'spanish_title'], "Spanish title", tagDrawer);
+	chk(['checked_tags', 'german_title'], "German title", tagDrawer);
+	chk(['checked_tags', 'native_title'], "Native title", tagDrawer);
+	chk(['checked_tags', 'season'], "Season", tagDrawer);
+	chk(['checked_tags', 'year'], "Year", tagDrawer);
+	chk(['checked_tags', 'genres'], "Genres", tagDrawer);
+	chk(['checked_tags', 'themes'], "Themes", tagDrawer);
+	chk(['checked_tags', 'demographic'], "Demographic", tagDrawer);
+	chk(['checked_tags', 'score'], "Score", tagDrawer);
+	chk(['checked_tags', 'rank'], "Rank", tagDrawer);
+	chk(['checked_tags', 'popularity'], "Popularity", tagDrawer);
+	if( List.isAnime ){
+		chk(['checked_tags', 'studio'], "Studio", tagDrawer);
+		chk(['checked_tags', 'producers'], "Producers", tagDrawer);
+		chk(['checked_tags', 'licensors'], "Licensors", tagDrawer);
+		chk(['checked_tags', 'aired'], "Aired", tagDrawer);
+		chk(['checked_tags', 'rating'], "Rating", tagDrawer);
+		chk(['checked_tags', 'duration'], "Duration (Episode)", tagDrawer);
+		chk(['checked_tags', 'total_duration'], "Duration (Total)", tagDrawer);
+	}
+	else {
+		chk(['checked_tags', 'published'], "Published", tagDrawer);
+		chk(['checked_tags', 'authors'], "Authors", tagDrawer);
+		chk(['checked_tags', 'serialization'], "Serialization", tagDrawer);
+	}
 
 
 	$(sidebar).append($('<b class="group-title">Note Options</b>'));
@@ -865,66 +861,38 @@ function main() {
 	});
 
 	$(gui).find(tagDrawer).append($('<br />'));
-	chkClearTags = chk(['clear_tags'], "Overwrite current tags", tagDrawer, "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.");
+	chk(['clear_tags'], "Overwrite current tags", tagDrawer, "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.");
 
 	let notesDrawer = $('<div class="drawer"></div>');
 	$(noteGroup).append(notesDrawer);
 
-	chkSynopsisNotes = chk(['checked_notes', 'synopsis'], "Synopsis", notesDrawer);
-	chkEnglishNotes = chk(['checked_notes', 'english_title'], "English title", notesDrawer);
-	chkFrenchNotes = chk(['checked_notes', 'french_title'], "French title", notesDrawer);
-	chkSpanishNotes = chk(['checked_notes', 'spanish_title'], "Spanish title", notesDrawer);
-	chkGermanNotes = chk(['checked_notes', 'german_title'], "German title", notesDrawer);
-	chkNativeNotes = chk(['checked_notes', 'native_title'], "Native title", notesDrawer);
-	chkSeasonNotes = chk(['checked_notes', 'season'], "Season", notesDrawer);
-	chkYearNotes = chk(['checked_notes', 'year'], "Year", notesDrawer);
-	chkGenresNotes = chk(['checked_notes', 'genres'], "Genres", notesDrawer);
-	chkThemesNotes = chk(['checked_notes', 'themes'], "Themes", notesDrawer);
-	chkDemographicNotes = chk(['checked_notes', 'demographic'], "Demographic", notesDrawer);
-	chkScoreNotes = chk(['checked_notes', 'score'], "Score", notesDrawer);
-	chkRankNotes = chk(['checked_notes', 'rank'], "Rank", notesDrawer);
-	chkPopularityNotes = chk(['checked_notes', 'popularity'], "Popularity", notesDrawer);
-	/*Anime Only */
-	chkStudioNotes = chk(['checked_notes', 'studio'], "Studio", notesDrawer);
-	chkProducersNotes = chk(['checked_notes', 'producers'], "Producers", notesDrawer);
-	chkLicensorsNotes = chk(['checked_notes', 'licensors'], "Licensors", notesDrawer);
-	chkAiredNotes = chk(['checked_notes', 'aired'], "Aired", notesDrawer);
-	chkRatingNotes = chk(['checked_notes', 'rating'], "Rating", notesDrawer);
-	chkDurationNotes = chk(['checked_notes', 'duration'], "Duration (Episode)", notesDrawer);
-	chkTotalDurationNotes = chk(['checked_notes', 'total_duration'], "Duration (Total)", notesDrawer);
-	/*Manga only*/
-	chkPublishedNotes = chk(['checked_notes', 'published'], "Published", notesDrawer);
-	chkAuthorsNotes = chk(['checked_notes', 'authors'], "Authors", notesDrawer);
-	chkSerializationNotes = chk(['checked_notes', 'serialization'], "Serialization", notesDrawer);
-
-	/* HIDE IRRELEVANT */
-	if(List.isAnime)
-	{
-		chkPublished.parentNode.style.display = 'none';
-		chkAuthors.parentNode.style.display = 'none';
-		chkSerialization.parentNode.style.display = 'none';
-
-		chkPublishedNotes.parentNode.style.display = 'none';
-		chkAuthorsNotes.parentNode.style.display = 'none';
-		chkSerializationNotes.parentNode.style.display = 'none';
+	chk(['checked_notes', 'synopsis'], "Synopsis", notesDrawer);
+	chk(['checked_notes', 'english_title'], "English title", notesDrawer);
+	chk(['checked_notes', 'french_title'], "French title", notesDrawer);
+	chk(['checked_notes', 'spanish_title'], "Spanish title", notesDrawer);
+	chk(['checked_notes', 'german_title'], "German title", notesDrawer);
+	chk(['checked_notes', 'native_title'], "Native title", notesDrawer);
+	chk(['checked_notes', 'season'], "Season", notesDrawer);
+	chk(['checked_notes', 'year'], "Year", notesDrawer);
+	chk(['checked_notes', 'genres'], "Genres", notesDrawer);
+	chk(['checked_notes', 'themes'], "Themes", notesDrawer);
+	chk(['checked_notes', 'demographic'], "Demographic", notesDrawer);
+	chk(['checked_notes', 'score'], "Score", notesDrawer);
+	chk(['checked_notes', 'rank'], "Rank", notesDrawer);
+	chk(['checked_notes', 'popularity'], "Popularity", notesDrawer);
+	if( List.isAnime ){
+		chk(['checked_notes', 'studio'], "Studio", notesDrawer);
+		chk(['checked_notes', 'producers'], "Producers", notesDrawer);
+		chk(['checked_notes', 'licensors'], "Licensors", notesDrawer);
+		chk(['checked_notes', 'aired'], "Aired", notesDrawer);
+		chk(['checked_notes', 'rating'], "Rating", notesDrawer);
+		chk(['checked_notes', 'duration'], "Duration (Episode)", notesDrawer);
+		chk(['checked_notes', 'total_duration'], "Duration (Total)", notesDrawer);
 	}
-	else
-	{
-		chkStudio.parentNode.style.display = 'none';
-		chkProducers.parentNode.style.display = 'none';
-		chkLicensors.parentNode.style.display = 'none';
-		chkAired.parentNode.style.display = 'none';
-		chkRating.parentNode.style.display = 'none';
-		chkDuration.parentNode.style.display = 'none';
-		chkTotalDuration.parentNode.style.display = 'none';
-
-		chkStudioNotes.parentNode.style.display = 'none';
-		chkProducersNotes.parentNode.style.display = 'none';
-		chkLicensorsNotes.parentNode.style.display = 'none';
-		chkAiredNotes.parentNode.style.display = 'none';
-		chkRatingNotes.parentNode.style.display = 'none';
-		chkDurationNotes.parentNode.style.display = 'none';
-		chkTotalDurationNotes.parentNode.style.display = 'none';
+	else {
+		chk(['checked_notes', 'published'], "Published", notesDrawer);
+		chk(['checked_notes', 'authors'], "Authors", notesDrawer);
+		chk(['checked_notes', 'serialization'], "Serialization", notesDrawer);
 	}
 
 	$(sidebar).append($('<hr>'));
@@ -1759,29 +1727,29 @@ function main() {
 			/* Update Notes & Tags */
 
 			if( Settings.get(['update_tags']) ){
-				if(titleEn && chkEnglish.checked) { tags.push(titleEn); }
-				if(titleFr && chkFrench.checked) { tags.push(titleFr); }
-				if(titleEs && chkSpanish.checked) { tags.push(titleEs); }
-				if(titleDe && chkGerman.checked) { tags.push(titleDe); }
-				if(titleNative && chkNative.checked) { tags.push(titleNative); }
-				if(season && chkSeason.checked) { tags.push(season); }
-				if(year && chkYear.checked) { tags.push(year); }
-				if(studios && chkStudio.checked) { tags.push(studios); }
-				if(producers && chkProducers.checked) { tags.push(producers); }
-				if(licensors && chkLicensors.checked) { tags.push(licensors); }
-				if(serializations && chkSerialization.checked) { tags.push(serializations); }
-				if(genres && chkGenres.checked) { tags.push(genres); }
-				if(themes && chkThemes.checked) { tags.push(themes); }
-				if(demographic && chkDemographic.checked) { tags.push(demographic); }
-				if(authors && chkAuthors.checked) { tags.push(authors); }
-				if(chkAired.checked) { tags.push(airedTag); }
-				if(chkPublished.checked) { tags.push(publishedTag); }
-				if(chkScore.checked) { tags.push(scoreTag); }
-				if(chkRank.checked) { tags.push(rankTag); }
-				if(chkPopularity.checked) { tags.push(popularityTag); }
-				if(chkRating.checked) { tags.push(ratingTag); }
-				if(chkDuration.checked) { tags.push(durationTag); }
-				if(chkTotalDuration.checked) { tags.push(totalDurationTag); }
+				if(titleEn && Settings.get(['checked_tags','english_title'])) { notes.push(titleEn); }
+				if(titleFr && Settings.get(['checked_tags','french_title'])) { notes.push(titleFr); }
+				if(titleEs && Settings.get(['checked_tags','spanish_title'])) { notes.push(titleEs); }
+				if(titleDe && Settings.get(['checked_tags','german_title'])) { notes.push(titleDe); }
+				if(titleNative && Settings.get(['checked_tags','native_title'])) { notes.push(titleNative); }
+				if(season && Settings.get(['checked_tags','season'])) { notes.push(season); }
+				if(year && Settings.get(['checked_tags','year'])) { notes.push(year); }
+				if(studios && Settings.get(['checked_tags','studio'])) { notes.push(studios); }
+				if(producers && Settings.get(['checked_tags','producers'])) { notes.push(producers); }
+				if(licensors && Settings.get(['checked_tags','licensors'])) { notes.push(licensors); }
+				if(serializations && Settings.get(['checked_tags','serialization'])) { notes.push(serializations); }
+				if(genres && Settings.get(['checked_tags','genres'])) { notes.push(genres); }
+				if(themes && Settings.get(['checked_tags','themes'])) { notes.push(themes); }
+				if(demographic && Settings.get(['checked_tags','demographic'])) { notes.push(demographic); }
+				if(authors && Settings.get(['checked_tags','authbors'])) { notes.push(authors); }
+				if(Settings.get(['checked_tags','aired'])) { notes.push(airedTag); }
+				if(Settings.get(['checked_tags','published'])) { notes.push(publishedTag); }
+				if(Settings.get(['checked_tags','score'])) { notes.push(scoreTag); }
+				if(Settings.get(['checked_tags','rank'])) { notes.push(rankTag); }
+				if(Settings.get(['checked_tags','popularity'])) { notes.push(popularityTag); }
+				if(Settings.get(['checked_tags','rating'])) { notes.push(ratingTag); }
+				if(Settings.get(['checked_tags','duration'])) { notes.push(durationTag); }
+				if(Settings.get(['checked_tags','total_duration'])) { notes.push(totalDurationTag); }
 				
 				let tagsRequestUrl;
 				let animeOrMangaId;
@@ -1819,34 +1787,33 @@ function main() {
 				});
 			}
 
-			if(chkNotes.checked)
-			{
+			if( Settings.get(['update_notes']) ){
 				let notes = [];
 
-				if(titleEn && chkEnglishNotes.checked) { notes.push(titleEn); }
-				if(titleFr && chkFrenchNotes.checked) { notes.push(titleFr); }
-				if(titleEs && chkSpanishNotes.checked) { notes.push(titleEs); }
-				if(titleDe && chkGermanNotes.checked) { notes.push(titleDe); }
-				if(titleNative && chkNativeNotes.checked) { notes.push(titleNative); }
-				if(season && chkSeasonNotes.checked) { notes.push(season); }
-				if(year && chkYearNotes.checked) { notes.push(year); }
-				if(studios && chkStudioNotes.checked) { notes.push(studios); }
-				if(producers && chkProducersNotes.checked) { notes.push(producers); }
-				if(licensors && chkLicensorsNotes.checked) { notes.push(licensors); }
-				if(serializations && chkSerializationNotes.checked) { notes.push(serializations); }
-				if(genres && chkGenresNotes.checked) { notes.push(genres); }
-				if(themes && chkThemesNotes.checked) { notes.push(themes); }
-				if(demographic && chkDemographicNotes.checked) { notes.push(demographic); }
-				if(authors && chkAuthorsNotes.checked) { notes.push(authors); }
-				if(chkAiredNotes.checked) { notes.push(airedTag); }
-				if(chkPublishedNotes.checked) { notes.push(publishedTag); }
-				if(chkScoreNotes.checked) { notes.push(scoreTag); }
-				if(chkRankNotes.checked) { notes.push(rankTag); }
-				if(chkPopularityNotes.checked) { notes.push(popularityTag); }
-				if(chkRatingNotes.checked) { notes.push(ratingTag); }
-				if(chkDurationNotes.checked) { notes.push(durationTag); }
-				if(chkTotalDurationNotes.checked) { notes.push(totalDurationTag); }
-				if(chkSynopsisNotes.checked) { notes.push(synopsis); }
+				if(titleEn && Settings.get(['checked_notes','english_title'])) { notes.push(titleEn); }
+				if(titleFr && Settings.get(['checked_notes','french_title'])) { notes.push(titleFr); }
+				if(titleEs && Settings.get(['checked_notes','spanish_title'])) { notes.push(titleEs); }
+				if(titleDe && Settings.get(['checked_notes','german_title'])) { notes.push(titleDe); }
+				if(titleNative && Settings.get(['checked_notes','native_title'])) { notes.push(titleNative); }
+				if(season && Settings.get(['checked_notes','season'])) { notes.push(season); }
+				if(year && Settings.get(['checked_notes','year'])) { notes.push(year); }
+				if(studios && Settings.get(['checked_notes','studio'])) { notes.push(studios); }
+				if(producers && Settings.get(['checked_notes','producers'])) { notes.push(producers); }
+				if(licensors && Settings.get(['checked_notes','licensors'])) { notes.push(licensors); }
+				if(serializations && Settings.get(['checked_notes','serialization'])) { notes.push(serializations); }
+				if(genres && Settings.get(['checked_notes','genres'])) { notes.push(genres); }
+				if(themes && Settings.get(['checked_notes','themes'])) { notes.push(themes); }
+				if(demographic && Settings.get(['checked_notes','demographic'])) { notes.push(demographic); }
+				if(authors && Settings.get(['checked_notes','authbors'])) { notes.push(authors); }
+				if(Settings.get(['checked_notes','aired'])) { notes.push(airedTag); }
+				if(Settings.get(['checked_notes','published'])) { notes.push(publishedTag); }
+				if(Settings.get(['checked_notes','score'])) { notes.push(scoreTag); }
+				if(Settings.get(['checked_notes','rank'])) { notes.push(rankTag); }
+				if(Settings.get(['checked_notes','popularity'])) { notes.push(popularityTag); }
+				if(Settings.get(['checked_notes','rating'])) { notes.push(ratingTag); }
+				if(Settings.get(['checked_notes','duration'])) { notes.push(durationTag); }
+				if(Settings.get(['checked_notes','total_duration'])) { notes.push(totalDurationTag); }
+				if(Settings.get(['checked_notes','synopsis'])) { notes.push(synopsis); }
 
 				let notesStr = notes.join("\n\n");
 				let notesRequestUrl = '';
@@ -2106,7 +2073,7 @@ function main() {
 			let lineText;
 			for( let j = 0; j < oldLines.length; j++ ){
 				lineText = oldLines[j];
-				let match = matchTemplate.value.replaceAll(/\[ID\]/g, id).replaceAll(/\[TYPE\]/g, List.type);
+				let match = Settings.get(['match_template']).replaceAll(/\[ID\]/g, id).replaceAll(/\[TYPE\]/g, List.type);
 				lineExists = lineText.indexOf(match) === -1 ? false : true;
 				if( lineExists ){
 					break;
@@ -2116,7 +2083,7 @@ function main() {
 			/* Add to processing list or skip any existing lines.
 			If validating old images, that step will also occur here. */
 			if( lineExists ){
-				if( chkExisting.checked ){
+				if( Settings.get(['check_existing']).checked ){
 					let imgUrl = lineText.match(/http.*?\.(?:jpe?g|webp)/);
 					if( imgUrl.length === 0 ){
 						newData.push(item);
