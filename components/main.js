@@ -1,23 +1,63 @@
-/* functionality vars */
+/* Re-usable Functions and Classes */
+
+function warnUserBeforeLeaving( e ){
+	e.preventDefault();
+	return (e.returnValue = "");
+}
 
 function isDict( unknown ){
 	return (unknown instanceof Object && !(unknown instanceof Array)) ? true : false;
 }
 
-var Log = new class Logger {
-	constructor( parent = null ){
-		this.parent = parent;
+/* Gets height of element whether it is inserted in the DOM yet or not. */
+class NodeDimensions {
+	static $dummy = $('<div style="position: fixed; left: -9999px; display: none;">');
+	static height( node ){
+		node = node instanceof $ ? node[0] : node;
+		if( node.parentElement ){
+			return node.scrollHeight;
+		}
+		UI.$window.append(this.$dummy);
+		this.$dummy.css('display', 'block');
+		this.$dummy.append(node);
+		let height = node.scrollHeight;
+		this.$dummy.css('display', 'none');
+		return height;
+	}
+}
+
+class Logger {
+	constructor( ){
+		this.$parent = false;
 		this.errorCount = 0;
 		this.warningCount = 0;
 	}
 
-	createMsgBox( msg = '', type = 'ERROR' ){
-		let errorBox = document.createElement('div');
-		errorBox.className = 'log-line';
-		errorBox.insertAdjacentHTML('afterbegin', `<b>[${type}]</b> ${msg}`);
-		if( this.parent instanceof HTMLElement ){
-			this.parent.append(errorBox);
+	initialise( ){
+		if( !UI ){
+			return false;
 		}
+		if( this.$parent ){
+			return true;
+		}
+		
+		this.$parent = $('<div class="l-column o-half-gap l-scrollable">');
+		UI.newWindow(
+			new Header('Process Log', 'Information, warnings, and errors are output here when something of note occurs.').$main,
+			this.$parent
+		);
+		return true;
+	}
+
+	createMsgBox( msg = '', type = 'ERROR' ){
+		if( !this.initialise() ){
+			alert(`A log of type [${type}] occured during loading:\n${msg}`);
+			return;
+		}
+		let errorBox = document.createElement('div');
+		errorBox.className = 'c-log';
+		errorBox.insertAdjacentHTML('afterbegin', `<b>[${type}]</b> ${msg}`);
+		this.$parent.prepend(errorBox);
 	}
 	
 	/* tellUser can be one of: true (show to user), false (only to console), or string (show custom string to user) */
@@ -49,7 +89,7 @@ var Log = new class Logger {
 	}
 }
 
-var List = new class ListInfo {
+class ListInfo {
 	constructor( ){
 		this.type = window.location.pathname.split('/')[1].substring(0,5);
 		this.isAnime = (this.type === 'anime');
@@ -240,8 +280,12 @@ var List = new class ListInfo {
 	}
 }
 
-var Settings = new class {
+class UserSettings {
 	settings = {
+		/* application */
+		"live_preview": false,
+
+		/* multi-component */
 		"select_categories": false,
 		"checked_categories": {
 			"1": false,
@@ -250,10 +294,16 @@ var Settings = new class {
 			"4": false,
 			"6": false
 		},
-		"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
 		"delay": "3000",
+
+		/* css */
+		"update_css": true,
+		"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
 		"match_template": "/[TYPE]/[ID]/",
 		"check_existing": false,
+		"use_last_run": "yes",
+
+		/* tags */
 		"update_tags": false,
 		"checked_tags": {
 			"english_title": false,
@@ -281,6 +331,8 @@ var Settings = new class {
 			"total_duration": false
 		},
 		"clear_tags": false,
+
+		/* notes */
 		"update_notes": false,
 		"checked_notes": {
 			"synopsis": false,
@@ -307,8 +359,7 @@ var Settings = new class {
 			"rating": false,
 			"duration": false,
 			"total_duration": false
-		},
-		"live_preview": false
+		}
 	};
 	
 	constructor( ){
@@ -339,8 +390,11 @@ var Settings = new class {
 		}
 	}
 
-	get( keys, dict = this.settings ){
-		let key = keys.shift(); /* removes and returns first object */
+	get( originalKeys, dict = this.settings ){
+		/* clones array to prevent modifying original var */
+		let keys = Object.assign([], originalKeys);
+		/* removes and returns first object */
+		let key = keys.shift();
 		let value = dict[key];
 		if( keys.length > 0 && isDict(value) ){
 			return this.get(keys, value);
@@ -348,20 +402,37 @@ var Settings = new class {
 		return value; /* returns undefined if key is not found */
 	}
 
-	set( keys, value, dict = this.settings ){
+	set( originalKeys, value, dict = this.settings ){
+		/* clones array to prevent modifying original var */
+		let keys = Object.assign([], originalKeys);
+		/* removes and returns first object */
 		let key = keys.shift();
 		if( keys.length > 0 ){
 			dict[key] = isDict(dict[key]) ? dict[key] : {};
-			dict[key] = this.set( keys, value, dict[key] );
+			dict[key] = this.set(keys, value, dict[key]);
 		}
 		else {
 			dict[key] = value;
+			this.save();
 		}
 		return dict;
 	}
 
 	save( ){
 		store.set(`${List.type}_settings`, this.settings);
+	}
+
+	clear( ){
+		store.remove(`${List.type}_settings`);
+		store.remove(`last_${List.type}_run`);
+		store.remove(`manual_${List.type}_run`);
+		if( UI ){
+			UI.destruct();
+			initialise();
+		}
+		else {
+			alert('Please exit and restart the tool to complete the clearing of your settings.');
+		}
 	}
 
 	updateOlderFormats( ){
@@ -443,620 +514,552 @@ function sleep( ms ){
 /* Main Program */
 
 class UserInterface {
+	alive = true;
 	#attachmentPoint = document.createElement('div');
 	#shadowRoot = this.#attachmentPoint.attachShadow({mode: 'open'});
-	content = document.createElement('div');
-	dead = false;
+	root = document.createElement('div');
+	$container = $('<div class="l-center c-container">');
+	$windowList = $('<div class="c-window-list js-focus">');
+	$window = $('<main class="l-column c-window">');
 
 	constructor( ){
-		this.#shadowRoot.append(this.content);
-		document.body.append(this.#attachmentPoint);
+		this.#shadowRoot.append(this.root);
+		this.root.className = 'root is-closed';
+		$(this.root).append(this.$container);
+		this.$container.append(this.$windowList);
+		this.$windowList.append(this.$window);
 
-		this.close();
-		this.style(`
-			.root {
-				display: contents;
-			}
-			.root.is-closed {
-				visibility: hidden;
-				pointer-events: none;
-			}
-		`);
 		this.style(`
 /*<<<css>>>*/
 		`);
+		this.setTheme();
+
+		document.body.append(this.#attachmentPoint);
 	}
 
 	open( ){
-		this.content.className = 'root is-open';
+		if( this.alive ){
+			this.root.classList.remove('is-closed');
+		}
 	}
 
 	close( ){
-		this.content.className = 'root is-closed';
+		this.root.classList.add('is-closed');
 	}
 
 	destruct( ){
-		this.#attachmentPoint.remove();
-		this.dead = true;
+		if( this.alive ){
+			this.alive = false;
+			this.close();
+			setTimeout(()=>{
+				this.#attachmentPoint.remove();
+			}, 200);
+		}
 	}
 
 	style( css ){
 		let html = document.createElement('style');
 		html.className = 'css';
 		html.textContent = css;
-		this.content.append(html);
+		this.#shadowRoot.append(html);
 		return html;
 	}
-}
-var UI;
 
-function warnUserBeforeLeaving( e ){
-	e.preventDefault();
-	return (e.returnValue = "");
-}
+	getThemePreference( ){
+		let preference = store.get('theme');
+		return preference !== undefined ?
+			preference :
+			window.matchMedia('(prefers-color-scheme: light)').matches ?
+				'light' :
+				'dark';
+	}
 
-function main() {
-	List.determineStyle();
-	UI = new UserInterface();
-
-	var output = '';
-
-	function write( newText ){
-		output += newText;
-		if( writeToOutput.is(':checked') ){
-			result.value = output;
-			result.scrollTop = result.scrollHeight;
+	setTheme( theme ){
+		if( !['light', 'dark'].includes(theme) ){
+			theme = this.getThemePreference();
 		}
+		this.root.classList.remove('light', 'dark');
+		this.root.classList.add(theme);
+		store.set('theme', theme);
 	}
 
-	/* TOOL CODE */
+	swapTheme( ){
+		let theme = this.getThemePreference() === 'light' ? 'dark' : 'light';
+		this.setTheme(theme);
+	}
 
-	/* Create GUI */
+	unfocus( ){
+		this.$windowList.addClass('is-unfocused');
+	}
 
-	UI.open();
+	refocus( ){
+		this.$windowList.removeClass('is-unfocused');
+	}
 
-	let gui = document.createElement("main");
-	gui.className = 'popup main';
+	newWindow( ...children ){
+		let $window = $(`<aside class="l-column c-window">`);
+		$window.append(...children);
+		this.$windowList.append($window);
+		return $window;
+	}
+}
 
-	let bg = document.createElement('div');
-	bg.className = 'dim-background';
-	let overlay = bg.cloneNode(true);
+class PrimaryUI extends UserInterface {
+	constructor( ){
+		super();
+		this.$container.addClass('c-container--blurred');
+	}
 
-	UI.content.append(bg);
-	UI.content.append(gui);
+	open( ){
+		super.open();
+		document.body.style.overflow = 'hidden';
+	}
 
-	let sidebar = document.createElement('div');
-	sidebar.className = 'main__sidebar';
-	gui.append(sidebar);
+	close( ){
+		super.close();
+		document.body.style.overflow = '';
+	}
+}
 
-	let workspace = document.createElement('div');
-	workspace.className = 'main__workspace';
-	gui.append(workspace);
+class SubsidiaryUI extends UserInterface {
+	constructor( parentUI, title, subtitle = false ){
+		super();
+		this.parentUI = parentUI;
 
-	let guiB = document.createElement('div');
-	guiB.id = 'logs';
-	gui.append(guiB);
-	Log.parent = guiB;
+		this.nav = new SplitRow();
+		this.nav.$left.append(
+			new Header(title, subtitle).$main
+		);
+		this.nav.$right.append(
+			$(`<input class="c-button" type="button" value="Back">`).on('click', ()=>{
+				this.destruct();
+			})
+		);
+		this.$window.append(this.nav.$main, new Hr());
+		this.$container.addClass('is-subsidiary');
+	}
 
-	let actionBtn = document.createElement("input");
-	sidebar.append(actionBtn);
-	actionBtn.classList.add('btn');
-	actionBtn.type = "button";
-	actionBtn.value = "Loading...";
-	actionBtn.disabled = 'disabled';
-	actionBtn.onclick = ()=>{ beginProcessing(); };
+	open( ){
+		super.open();
+		this.parentUI.open();
+		this.parentUI.unfocus();
+	}
 
-	let closeBtn = $('<input value="Minimise" class="btn" type="button" title="Closes the program window while it keeps running in the background.">')
-	.on('click',()=>{
-		UI.close();
-	});
-	$(sidebar).append(closeBtn);
+	close( ){
+		super.close();
+		this.parentUI.refocus();
+	}
 
-	let hideBtn = $('<input id="hideBtn" class="btn" type="button" value="Hide" title="Hide the status bar. The program will keep running in the background." />')
-	.on('click',()=>{
-		gui.classList.add('is-hidden');
-	});
-	$(sidebar).append(hideBtn);
+	destruct( ){
+		super.destruct();
+		this.parentUI.refocus();
+	}
+}
 
-	let exitBtn = document.createElement("input");
-	sidebar.append(exitBtn);
-	exitBtn.classList.add('btn');
-	exitBtn.type = "button";
-	exitBtn.value = "Exit";
-	exitBtn.title = 'Completely exit the program.';
-	exitBtn.onclick = ()=>{ UI.destruct(); };
 
-	statusBar = document.createElement("div");
-	statusBar.className = "status";
-	statusBar.onclick = ()=>{
-		UI.open();
-	};
-	sidebar.append(statusBar);
 
-	statusText = document.createElement('span');
-	statusText.textContent = 'Setting up...';
-	statusBar.style.cssText = '--percent: 20%; --colour: var(--stat-loading);';
-	statusBar.append(statusText);
+/* Common user interface constructors */
 
-	timeText = document.createElement('span');
-	timeText.className = 'status__time';
-	statusBar.append(timeText);
+class SplitRow {
+	constructor( leftCls = 'l-expand l-row', rightCls = 'l-fit l-row' ){
+		this.$main = $('<div class="l-split">');
+		this.$left = $(`<div class="${leftCls}">`);
+		this.$right = $(`<div class="${rightCls}">`);
+		this.$main.append(this.$left,this.$right);
+	}
+}
 
-	function field(setting, title, desc, parent = cssGroup) {
-		lbl = document.createElement('label');
-		lbl.textContent = title;
-		lbl.className = 'label';
+class GroupRow extends SplitRow {
+	constructor( name, settingsFunc, additionalActions = [] ){
+		super();
 
-		input = document.createElement('input');
-		input.type = 'text';
-		input.value = Settings.get(setting);
-		input.title = desc;
-		input.className = 'field';
-		input.spellcheck = false;
-		input.addEventListener('input', ()=>{
-			Settings.set(setting, input.value);
+		this.$left.addClass('o-align-center');
+		this.$left.append(
+			name
+		);
+		let $button = new Button('Settings')
+		.on('click', ()=>{
+			settingsFunc();
 		});
+		this.$right.append(
+			...additionalActions,
+			$button
+		);
+		this.$main.addClass('c-component');
+		Worker.disableWhileRunning.push(...additionalActions, $button);
+	}
+}
 
-		lbl.append(input);
-		$(parent).append(lbl);
-		return input;
+class OptionalGroupRow extends GroupRow {
+	constructor( name, settingArray, settingsFunc, additionalActions = [] ){
+		super('', settingsFunc, additionalActions);
+		this.enabled = false;
+
+		this.check = new Check(settingArray, name);
+		this.check.$main.addClass('o-block-gap');
+		this.check.$box.on('input', ()=>{ this.checkStatus(); });
+		this.checkStatus();
+
+		this.$left.append(
+			this.check.$main
+		);
+		Worker.disableWhileRunning.push(this.check.$box);
 	}
 
-	function chk(setting, title, parent = sidebar, desc = false) {
-		let lbl = document.createElement('label');
-		lbl.textContent = title;
-		if(desc) {
-			lbl.title = desc;
-		}
-		lbl.className = 'chk';
-
-		let chk = document.createElement("input");
-		chk.type = "checkbox";
-		chk.checked = Settings.get(setting);
-		chk.addEventListener('input', ()=>{
-			Settings.set(setting, chk.checked);
-		});
-
-		lbl.prepend(chk);
-		$(parent).append(lbl);
-		return chk;
-	}
-
-
-	/* Options section */
-
-	$(sidebar).append($('<hr><b class="group-title">Global Options</b>'));
-	let globalGroup = $('<div class="group"></div>');
-	$(sidebar).append(globalGroup);
-
-	delay = field(['delay'], "Delay between items", "Delay (ms) between requests to avoid spamming the server.", globalGroup);
-	delay.style.width = "50px";
-
-	chkCategory = chk(['select_categories'], "Update only specific categories.", globalGroup, 'Want to only update entries in certain categories instead of everything at once?');
-	chkCategory.addEventListener('input', () => { toggleChks(chkCategory, categoryDrawer); });
-
-	let categoryDrawer = $('<div class="drawer"></div>');
-	$(globalGroup).append(categoryDrawer);
-
-	chk(['checked_categories', '1'], List.type == 'anime' ? "Watching" : "Reading", categoryDrawer);
-	chk(['checked_categories', '2'], "Completed", categoryDrawer);
-	chk(['checked_categories', '3'], "On Hold", categoryDrawer);
-	chk(['checked_categories', '4'], "Dropped", categoryDrawer);
-	chk(['checked_categories', '6'], "Planned", categoryDrawer);
-
-
-	/* CSS Options */
-
-	$(sidebar).append($('<hr><b class="group-title">CSS Options</b>'));
-	let cssGroup = $('<div class="group"></div>');
-	$(sidebar).append(cssGroup);
-
-	template = field(['css_template'], "Template", "CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEEN], [TITLEFR], [TITLEES], [TITLEDE], [TITLERAW], [GENRES], [THEMES], [DEMOGRAPHIC], [RANK], [POPULARITY], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]");
-	matchTemplate = field(['match_template'], "Match Template", "Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.");
-
-	function toggleChks( checkbox, drawerSelector ){
-		if( checkbox.checked ){
-			$(gui).find(drawerSelector).removeClass('is-closed');
+	checkStatus( ){
+		if( this.check.$box.is(':checked') ){
+			this.$main.removeClass('is-disabled');
 		}
 		else {
-			$(gui).find(drawerSelector).addClass('is-closed');
+			this.$main.addClass('is-disabled');
+		}
+	}
+}
+
+class Hr {
+	static $node = $('<hr class="c-hr">');
+	constructor( ){
+		return Hr.$node.clone();
+	}
+}
+
+class Paragraph {
+	constructor( text ){
+		return $('<p class="c-paragraph">'+text.split('\n\n').join('</p><p class="c-paragraph">')+'</p>');
+	}
+}
+
+class Drawer {
+	constructor( children = [], open = false ){
+		this.$main = $('<div class="c-drawer">');
+		this.$main.append(...children);
+		if( open ){
+			this.open();
+		}
+		else {
+			this.close();
 		}
 	}
 
-	chk(['check_existing'], "Validate existing images", cssGroup, "Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load. Not recommended while adding new anime or updating tags!");
+	open( ){
+		let height = NodeDimensions.height(this.$main);
+		this.$main.css('height', height+'px');
+		this.$main.removeClass('is-hidden');
+	}
 
-	$(cssGroup).append($('<div class="spacer"></div>'));
+	close( ){
+		this.$main.addClass('is-hidden');
+		this.$main.css('height', '0px');
+	}
+}
 
-	/* Import/Export section */
-
-	importBtn = $('<input type="button" value="Import Template" class="btn" title="Import a CSS template to get started quickly.">');
-	importBtn.on('click',()=>{
-		$(gui).append(overlay);
-
-		importOverlay = $(`
-			<div class="popup popup--small">
-				<p class="paragraph">
-					Input a template here. This will update the tool settings and may add some additional code to your MAL Custom CSS. You may wish to backup your Custom CSS before doing this.
-				</p>
-
-				<label class="label">
-					<input class="field" id="import-field" type="text" spellcheck="false"></input>
-				</label>
-
-				<br />
-
-				<input id="import-btn" type="button" value="Import" class="btn">
-				<input id="close" type="button" value="Close" class="btn">
-			</div>
-		`);
-
-		$(gui).append(importOverlay);
-
-		$(importOverlay).find('#import-btn').on('click',()=>{
-			value = $(importOverlay).find('#import-field').val();
-
-			if(value.length < 1)
-			{
-				alert('Nothing detected in import field.');
-			}
-			else
-			{
-				try
-				{
-					importedTemplate = JSON.parse(value);
-
-					if(!("template" in importedTemplate) || !("matchtemplate" in importedTemplate))
-					{
-						alert(`Import failed due to incorrect syntax or missing information.`);
-					}
-					else
-					{
-						let cssToImport = 'css' in importedTemplate ? importedTemplate['css'] : false;
-						setTemplate(importedTemplate['template'], importedTemplate['matchtemplate'], cssToImport);
-						importOverlay.remove();
-						overlay.remove();
-					}
-				}
-				catch(e)
-				{
-					alert(`Import failed. If you are using an official template, report this problem to the developer with the following information.\n\nError message for reference:\n${e}\n\nValue for reference:\n${value}`);
-				}
-			}
-		});
+class CheckGroup {
+	constructor( settingArray, title, desc = false, checkArray ){
+		this.$main = $(`<div class="c-option c-option--vertical">`);
 		
-		$(importOverlay).find('#close').on('click',()=>{
-			importOverlay.remove();
-			overlay.remove();
-		});
-	});
-	$(cssGroup).append(importBtn);
+		let checks = [];
+		for( let check of checkArray ){
+			check.$main.prepend('∟');
+			checks.push(check.$main);
+		}
 
-	exportBtn = $('<input type="button" value="Export" class="btn" title="Create a CSS template for others to use.">');
-	exportBtn.on('click',()=>{
-		$(gui).append(overlay);
-
-		exportOverlay = $(`
-			<div class="popup popup--small">
-				<p class="paragraph">
-					CSS designers can use this to create a template for others to quickly import. The template and match template are required, but you may leave the CSS Styling field blank if desired.
-				</p>
-				
-				<label class="label">
-					Template
-					<input class="field" id="export-template" type="text" spellcheck="false"></input>
-				</label>
-				
-				<label class="label">
-					Match Template
-					<input class="field" id="export-match" type="text" spellcheck="false"></input>
-				</label>
-				
-				<label class="label">
-					CSS Styling
-					<textarea class="field" id="export-css" type="text" spellcheck="false" style="resize: vertical; height: 150px;"></textarea>
-				</label>
-				
-				<label class="label">
-					<input class="field" id="export" type="text" placeholder="Template will be generated here and copied to your clipboard." readonly="readonly">
-				</label>
-
-				<br />
-
-				<input class="btn" id="export-btn" type="button" value="Generate Template" title="Generates text and copies to your clipboard.">
-				<input class="btn" id="close" type="button" value="Close">
-			</div>
-		`);
-		$(gui).append(exportOverlay);
-
-		$(exportOverlay).find('#export-template').val(Settings.get('css_template'));
-		$(exportOverlay).find('#export-match').val(Settings.get(['match_template']));
-
-		$(exportOverlay).find('#export-btn').on('click',()=>{
-			let newTemplate = $(exportOverlay).find('#export-template').val();
-			let newMatchTemplate = $(exportOverlay).find('#export-match').val();
-
-			if(newTemplate.length < 1 || newMatchTemplate < 1)
-			{
-				alert('Please fill out both the Template and Match Template fields.');
+		let toggle = new Check(settingArray, title, desc);
+		toggle.$box.on('click', ()=>{
+			if( toggle.$box.is(':checked') ){
+				drawer.open();
 			}
-			else
-			{
-				let createdTemplate = {
-					"template": newTemplate,
-					"matchtemplate": newMatchTemplate
-				};
-				let css = $(exportOverlay).find('#export-css').val();
-				if(css.trim().length > 0)
-				{
-					createdTemplate['css'] = css;
-				}
-				let exportField = $(exportOverlay).find('#export');
-				exportField.val(JSON.stringify(createdTemplate));
-				
-				exportField.trigger('select');
-				navigator.clipboard.writeText(exportField.text());
+			else {
+				drawer.close();
 			}
 		});
+		let drawer = new Drawer(checks, toggle.$box.is(':checked'));
 		
-		$(exportOverlay).find('#close').on('click',()=>{
-			exportOverlay.remove();
-			overlay.remove();
+		this.$main.append(toggle.$main, drawer.$main);
+	}
+}
+
+class Check {
+	constructor( settingArray, title, desc = false ){
+		this.$main = $(`<label class="c-check">${title}</label>`);
+		if( desc ){
+			this.$main.attr('title', desc);
+		}
+		this.$box = $('<input class="c-check__box" type="checkbox">')
+			.prop('checked', Settings.get(settingArray))
+			.on('change', ()=>{
+				Settings.set(settingArray, this.$box.is(':checked'));
+			});
+
+		this.$main.prepend(this.$box);
+	}
+}
+
+class Field {
+	constructor( settingArray = false, title = '', desc = false, style = 'block' ){
+		this.$main = $(`<label class="c-field">${title}</label>`);
+		if( desc ){
+			this.$main.attr('title', desc);
+		}
+
+		this.$box = $(`<input class="c-field__box" type="text" spellcheck="no">`);
+		if( settingArray ){
+			this.$box.on('input', ()=>{
+				Settings.set(settingArray, this.$box.val());
+			});
+			this.$box.val(Settings.get(settingArray));
+		}
+		
+		if( style === 'inline' ){
+			this.$main.addClass('c-field--inline');
+		}
+		this.$main.append(this.$box);
+	}
+}
+
+class Radio {
+	constructor( settingArray, title = '', options = {} ){
+		this.$main = $(`<div class="c-radio">${title}</div>`);
+		let $options = $('<div class="c-radio__row">');
+		let value = Settings.get(settingArray);
+		let htmlId = settingArray.join('');
+
+		for( let [newValue, meta] of Object.entries(options) ){
+			let $input = $(`<input type="radio" name="${htmlId}" id="${htmlId+newValue}" />`);
+			$input.on('input', ()=>{ Settings.set(settingArray, newValue); });
+			let $station = $(`<label class="c-radio__station" for="${htmlId+newValue}">${meta['name']}</label>`);
+
+			if( value === newValue ){
+				$input.prop('checked', true);
+			}
+			if( 'desc' in meta ){
+				$station.attr('title', meta['desc']);
+			}
+			if( 'func' in meta ){
+				$input.on('click', ()=>{ meta['func'](); });
+			}
+
+			$options.append($input, $station);
+		}
+		this.$main.append($options);
+	}
+}
+
+class Textarea {
+	constructor( settingArray = false, title = '', attributes = {}, lines = 3 ){
+		this.$main = $(`<label class="c-field">${title}</label>`);
+
+		this.$box = $(`<textarea class="c-field__box c-field__box--multiline" spellcheck="no" style="--lines: ${lines}">`);
+		if( settingArray ){
+			this.$box.on('input', ()=>{
+				Settings.set(settingArray, this.$box.val());
+			});
+			this.$box.val(Settings.get(settingArray));
+		}
+		for( let [name,value] of Object.entries(attributes) ){
+			this.$box.attr(name,value);
+		}
+		
+		this.$main.append(this.$box);
+	}
+}
+
+class Header {
+	constructor( title, subtitle = false ){
+		subtitle = subtitle ? `<p class="c-subtitle">${subtitle}</p>` : '';
+		this.$main = $(`<hgroup class="l-column o-text-gap">
+			<h2 class="c-title">${title}</h2>
+			${subtitle}
+		</hgroup>`);
+	}
+}
+
+class Button {
+	constructor( value, attributes = {} ){
+		let button = $(`<input class="c-button" type="button" value="${value}">`);
+		for( let [name,value] of Object.entries(attributes) ){
+			button.attr(name,value);
+		}
+		return button;
+	}
+}
+
+
+
+/* Global Vars */
+
+var Log = new Logger();
+var List = new ListInfo();
+var Settings;
+var UI;
+var cssComponent;
+
+
+
+/* Runtime */
+
+class Worker {
+	static disableWhileRunning = [];
+	/* buttons are added to this list to be later disabled upon process start */
+	static reenableAfterDone = [];
+	/* similarly, these buttons are re-enabled after finish */
+	static $actionBtn;
+	static running = false;
+}
+
+class CSSComponent {
+	constructor( ){
+		this.$preview = false;
+		this.result = '';
+		this.write(`\/*\nGenerated by MyAnimeList-Tools v${ver}\nhttps://github.com/ValerioLyndon/MyAnimeList-Tools\n\nTemplate=${Settings.get(['css_template']).replace(/\*\//g, "*[DEL]/")}\nMatchTemplate=${Settings.get(['match_template'])}\n*\/\n`);
+	}
+
+	write( line ){
+		this.result += line + '\n';
+		if( this.$preview ){
+			this.$preview.val(this.result);
+			this.$preview.scrollTop(NodeDimensions.height(this.$preview));
+		}
+	}
+}
+
+var Status = new class {
+	percent = 0;
+	type = 'loading';
+
+	constructor( ){
+		this.$bar = $('<div class="c-status">');
+		this.$text = $('<span class="c-status__text">');
+		this.$time = $('<span class="c-status__time">');
+		this.$bar.append(this.$text, this.$time);
+
+		this.$fixedBar = this.$bar.clone();
+		this.$fixedBar.addClass('is-fixed o-interactable');
+		this.$fixedBar.on('click', ()=>{
+			UI.open();
+			this.hideFixed();
 		});
+
+		this.bars = [this.$bar, this.$fixedBar];
+		this.texts = [this.$bar, this.$fixedBar];
+		this.times = [this.$bar, this.$fixedBar];
+	}
+
+	update( text, type = this.type, percent = this.percent ){
+		this.type = type;
+		this.percent = percent;
+		for( let blurb of this.texts ){
+			blurb.text(text);
+		}
+		for( let bar of this.bars ){
+			bar.css({
+				'--percent': `${percent}%`,
+				'--colour': `var(--stat-${type})`
+			});
+		}
+	}
+
+	estimate( remaining = 0, msSinceLast = 0 ){
+		if( remaining === 0 && msSinceLast === 0 ){
+			this.$time.text('');
+			return;
+		}
+
+		let seconds = remaining * (msSinceLast / 1000);
+		let formatted = '?';
+		if( seconds <= 60 ){
+			formatted = `${round(seconds)}s`;
+		}
+		else if( seconds > 60 && seconds < 3600 ){
+			formatted = `${round(seconds / 60, 1)}m`;
+		}
+		else if( seconds > 3600 ){
+			formatted = `${round(seconds / 60 / 60, 1)}h`;
+		}
+		for( let time of this.times ){
+			time.text(`~ ${formatted} left`);
+		}
+	}
+
+	showFixed( ){
+		this.$fixedBar.removeClass('is-aside');
+	}
+
+	hideFixed( ){
+		this.$fixedBar.addClass('is-aside');
+	}
+}
+
+
+function initialise() {
+	List.determineStyle();
+	Settings = new UserSettings();
+	UI = new PrimaryUI();
+	cssComponent = new CSSComponent();
+
+	/* Control Row */
+	let $actionBtn = new Button('Loading...', {'disabled':'disabled'}).one('click', ()=>{
+		beginProcessing();
 	});
-	$(cssGroup).append(exportBtn);
+	let $hideBtn = new Button('Minimise', {title:'Closes the program window while it keeps running in the background.'}).on('click', ()=>{
+		UI.close();
+		$(UI.root).append(Status.$fixedBar);
+	});
+	let $exitBtn = new Button('Exit', {title:'Completely exit the program.'}).on('click', ()=>{
+		UI.destruct();
+	});
+	let controls = new SplitRow();
+	controls.$left.append(Status.$bar);
+	controls.$right.append($actionBtn, $hideBtn, $exitBtn);
 
-	/* CHECK BOXES - TAGS/NOTES */
+	/* Components Row */
+	let $components = $('<div class="l-column">');
+	$components.append(
+		new Header('Components', 'Enable, disable, and configure what tools run on your list.').$main,
+		new GroupRow('Global Defaults', ()=>{ buildGlobalSettings(); }).$main,
+		new OptionalGroupRow('CSS Generator', ['update_css'], ()=>{ buildCssSettings(); }, [
+			new Button('Import').on('click', ()=>{
+				buildCssImport();
+			}),
+			new Button('Export').on('click', ()=>{
+				buildCssExport();
+			})
+		]).$main,
+		new OptionalGroupRow('Tags Updater', ['update_tags'], ()=>{ buildTagSettings(); }).$main,
+		new OptionalGroupRow('Notes Updater', ['update_notes'], ()=>{ buildNoteSettings(); }).$main
+	);
 
-	$(sidebar).append($('<b class="group-title">Tag Options</b>'));
-	let tagGroup = $('<div class="group"></div>');
-	$(sidebar).append(tagGroup);
-
-	chkTags = chk(['update_tags'], "Update Tags", tagGroup, 'Update your tags with the new information.');
-
-	chkTags.addEventListener('input', () => { toggleChks(chkTags,tagDrawer); });
-
-	let tagDrawer = $('<div class="drawer"></div>');
-	$(tagGroup).append(tagDrawer);
-
-	chk(['checked_tags', 'english_title'], "English title", tagDrawer);
-	chk(['checked_tags', 'french_title'], "French title", tagDrawer);
-	chk(['checked_tags', 'spanish_title'], "Spanish title", tagDrawer);
-	chk(['checked_tags', 'german_title'], "German title", tagDrawer);
-	chk(['checked_tags', 'native_title'], "Native title", tagDrawer);
-	chk(['checked_tags', 'season'], "Season", tagDrawer);
-	chk(['checked_tags', 'year'], "Year", tagDrawer);
-	chk(['checked_tags', 'genres'], "Genres", tagDrawer);
-	chk(['checked_tags', 'themes'], "Themes", tagDrawer);
-	chk(['checked_tags', 'demographic'], "Demographic", tagDrawer);
-	chk(['checked_tags', 'score'], "Score", tagDrawer);
-	chk(['checked_tags', 'rank'], "Rank", tagDrawer);
-	chk(['checked_tags', 'popularity'], "Popularity", tagDrawer);
-	if( List.isAnime ){
-		chk(['checked_tags', 'studio'], "Studio", tagDrawer);
-		chk(['checked_tags', 'producers'], "Producers", tagDrawer);
-		chk(['checked_tags', 'licensors'], "Licensors", tagDrawer);
-		chk(['checked_tags', 'aired'], "Aired", tagDrawer);
-		chk(['checked_tags', 'rating'], "Rating", tagDrawer);
-		chk(['checked_tags', 'duration'], "Duration (Episode)", tagDrawer);
-		chk(['checked_tags', 'total_duration'], "Duration (Total)", tagDrawer);
+	/* Footer Row */
+	let $switchBtn = new Button('Switch Theme').on('click', ()=>{
+		UI.swapTheme();
+	});
+	let $clearBtn = new Button('Clear Settings', {title:'Clears any stored settings from previous runs.'});
+	if( store.has(`${List.type}_settings`) || store.has(`last_${List.type}_run`) || store.has(`manual_${List.type}_run`) ){
+		$clearBtn.on('click', ()=> {
+			Settings.clear();
+		});
 	}
 	else {
-		chk(['checked_tags', 'published'], "Published", tagDrawer);
-		chk(['checked_tags', 'authors'], "Authors", tagDrawer);
-		chk(['checked_tags', 'serialization'], "Serialization", tagDrawer);
+		$clearBtn.attr('disabled', 'disabled');
 	}
+	let footer = new SplitRow();
+	footer.$left.append($(`<footer class="c-footer">MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</footer>`));
+	footer.$right.append(
+		$switchBtn,
+		$clearBtn
+	);
 
-
-	$(sidebar).append($('<b class="group-title">Note Options</b>'));
-	let noteGroup = $('<div class="group"></div>');
-	$(sidebar).append(noteGroup);
-
-	chkNotes = chk(['update_notes'], "Update Notes", noteGroup, 'Update your comments/notes section with the new information.');
-
-	chkNotes.addEventListener('input', () => {
-		if(chkNotes.checked) {
-			alert('Be warned! This setting will *entirely overwrite* your current notes. Do not use if you want to keep your notes.');
-		}
-		toggleChks(chkNotes,notesDrawer);
-	});
-
-	$(gui).find(tagDrawer).append($('<br />'));
-	chk(['clear_tags'], "Overwrite current tags", tagDrawer, "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.");
-
-	let notesDrawer = $('<div class="drawer"></div>');
-	$(noteGroup).append(notesDrawer);
-
-	chk(['checked_notes', 'synopsis'], "Synopsis", notesDrawer);
-	chk(['checked_notes', 'english_title'], "English title", notesDrawer);
-	chk(['checked_notes', 'french_title'], "French title", notesDrawer);
-	chk(['checked_notes', 'spanish_title'], "Spanish title", notesDrawer);
-	chk(['checked_notes', 'german_title'], "German title", notesDrawer);
-	chk(['checked_notes', 'native_title'], "Native title", notesDrawer);
-	chk(['checked_notes', 'season'], "Season", notesDrawer);
-	chk(['checked_notes', 'year'], "Year", notesDrawer);
-	chk(['checked_notes', 'genres'], "Genres", notesDrawer);
-	chk(['checked_notes', 'themes'], "Themes", notesDrawer);
-	chk(['checked_notes', 'demographic'], "Demographic", notesDrawer);
-	chk(['checked_notes', 'score'], "Score", notesDrawer);
-	chk(['checked_notes', 'rank'], "Rank", notesDrawer);
-	chk(['checked_notes', 'popularity'], "Popularity", notesDrawer);
-	if( List.isAnime ){
-		chk(['checked_notes', 'studio'], "Studio", notesDrawer);
-		chk(['checked_notes', 'producers'], "Producers", notesDrawer);
-		chk(['checked_notes', 'licensors'], "Licensors", notesDrawer);
-		chk(['checked_notes', 'aired'], "Aired", notesDrawer);
-		chk(['checked_notes', 'rating'], "Rating", notesDrawer);
-		chk(['checked_notes', 'duration'], "Duration (Episode)", notesDrawer);
-		chk(['checked_notes', 'total_duration'], "Duration (Total)", notesDrawer);
-	}
-	else {
-		chk(['checked_notes', 'published'], "Published", notesDrawer);
-		chk(['checked_notes', 'authors'], "Authors", notesDrawer);
-		chk(['checked_notes', 'serialization'], "Serialization", notesDrawer);
-	}
-
-	$(sidebar).append($('<hr>'));
-
-	/* Dark/light mode switch */
-
-	let chosenTheme = store.get('theme');
-	if(chosenTheme)
-	{
-		gui.classList.remove('light', 'dark');
-		gui.classList.add(chosenTheme);
-	}
-	else if(window.matchMedia('(prefers-color-scheme: light)').matches)
-	{
-		gui.classList.add('light');
-	}
-	else
-	{
-		gui.classList.add('dark');
-	}
-
-	let switchTheme = $('<input class="btn" type="button" value="Switch Theme">')
-	.on('click',()=>{
-		let theme = gui.classList.contains('dark') ? 'light' : 'dark';
-		gui.classList.remove('light', 'dark');
-		gui.classList.add(theme);
-		store.set('theme', theme);
-	});
-	$(sidebar).append(switchTheme);
-
-	/* Settings section */
-
-	clearBtn = $('<input type="button" value="Clear Settings" class="btn" title="Clears any stored settings from previous runs.">');
-	if(store.has(`${List.type}_settings`) || store.has(`last_${List.type}_run`))
-	{
-		clearBtn.on('click',()=>{
-			store.remove(`${List.type}_settings`);
-			store.remove(`last_${List.type}_run`);
-			alert('Please exit and restart the tool to complete the clearing of your settings.');
-		});
-	}
-	else
-	{
-		clearBtn.attr('disabled', 'disabled');
-	}
-	$(sidebar).append(clearBtn);
-
-	/* "Copyright" section */
-
-	$(sidebar).append($(`<footer>MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</footer>`));
-
-	/* Textareas */
-
-	textareaL = document.createElement('div');
-	textareaL.className = 'in-out';
-	workspace.append(textareaL);
-
-	topL = $('<div class="in-out__top"></div>');
-	$(textareaL).append(topL);
-	$(topL).append($('<b>Input</b>'));
-
-	autofill = $('<input type="button" value="Autofill" class="btn btn-right" title="Autofill the template fields based on any previously generated code found in the input.">')
-	.on('click',()=>{
-		code = existing.value;
-
-		if(code.length < 1)
-		{
-			alert('Please insert code into the input field.');
-			return;
-		}
-		if(code.indexOf('*/') === -1)
-		{
-			alert('Code is missing template information. It is either incorrectly formatted or not generated by this tool.');
-			return;
-		}
-
-		newTemplate = false;
-		newMatchTemplate = false;
-
-		/* Reduce code to first comment block, which should be the tool-generated comment */
-		code = code.split('*/')[0];
-		codeByLine = code.split('\n');
-
-		for(i = 0; i < codeByLine.length; i++)
-		{
-			line = codeByLine[i];
-			if(line.startsWith('Template='))
-			{
-				newTemplate = line.substring(9);
-			}
-			else if(line.startsWith('MatchTemplate='))
-			{
-				newMatchTemplate = line.substring(14);
-			}
-		}
-
-		if(newTemplate && newMatchTemplate)
-		{
-			setTemplate(newTemplate, newMatchTemplate);
-		}
-		else
-		{
-			alert('Code is missing template information. It is either incorrectly formatted or not generated by this tool.');
-			return;
-		}
-	});
-	$(topL).append(autofill);
-
-	existing = document.createElement("textarea");
-	existing.className = 'in-out__text';
-	existing.title = "Copy previously generated CSS here. The program will use the Match Template to find and skip any duplicate entries.";
-	existing.placeholder = "Copy previously generated CSS here. The program will use the Match Template to find and skip any duplicate entries.";
-	existing.spellcheck = false;
-	if( store.has(`last_${List.type}_run`) ){
-		existing.value = store.get(`last_${List.type}_run`);
-	}
-	textareaL.append(existing);
-
-	textareaR = document.createElement('div');
-	textareaR.className = 'in-out';
-	workspace.append(textareaR);
-
-	topR = $('<div class="in-out__top"></div>');
-	$(textareaR).append(topR);
-	$(topR).append($('<b>Output</b>'));
-
-	copyOutput = $('<input type="button" value="Copy to Clipboard" class="btn btn-right" title="Copies output to clipboard.">');
-	$(topR).append(copyOutput);
-	copyOutput.on('click',()=>{
-		result.select();
-		navigator.clipboard.write(output);
-	});
-
-	let wrapper = $('<label class="label btn-right">Live Preview</label>');
-	$(topR).append(wrapper);
-	let writeToOutput = $('<input type="checkbox" value="Live Preview" class="btn" title="Outputs text as it is generated.">');
-	wrapper.prepend(writeToOutput);
-	if( Settings.get(['live_preview']) ){
-		writeToOutput.checked = Settings.get(['live_preview']);
-	}
-	writeToOutput.on('input', ()=>{
-		Settings.set(['live_preview'], writeToOutput.is(':checked'));
-	});
-
-	result = document.createElement("textarea");
-	result.className = 'in-out__text';
-	result.title = "Newly generated CSS will be output here.";
-	result.placeholder = "Newly generated CSS will be output here.";
-	result.readOnly = "readonly";
-	result.spellcheck = false;
-	textareaR.append(result);
-
-	toggleChks(chkCategory, categoryDrawer);
-	toggleChks(chkTags, tagDrawer);
-	toggleChks(chkNotes, notesDrawer);
-
-
+	/* Add all rows to UI */
+	UI.$window.append(controls.$main, new Hr(), $components, new Hr(), footer.$main);
+	UI.open();
+	
+	Worker.disableWhileRunning.push($clearBtn, $exitBtn);
+	Worker.reenableAfterDone.push($clearBtn, $exitBtn);
+	Worker.$actionBtn = $actionBtn;
 
 	/* Common Functions */
 
 	async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
-		template.value = newTemplate;
 		Settings.set(['css_template'], newTemplate);
-		matchTemplate.value = newMatchTemplate;
 		Settings.set(['match_template'], newMatchTemplate);
 		if( newCss !== false ){
 			if( !List.style ){
@@ -1178,30 +1181,27 @@ function main() {
 			if(json.length === 300)
 			{
 				offset += 300;
-				statusText.textContent = `Fetching list data (${offset} of ?)...`;
 				statusPercent += 10;
-				statusBar.style.cssText = `--percent: ${statusPercent <= 85 ? statusPercent : '85'}%; --colour: var(--stat-loading);`;
+				Status.update(`Fetching list data (${offset} of ?)...`, 'loading', statusPercent <= 85 ? statusPercent : '85');
 				getListItems();
 			}
 			else
 			{
-				statusText.textContent = `Successfully loaded ${data.length} items.`;
-				statusBar.style.cssText = '--percent: 100%; --colour: var(--stat-loading);';
-				actionBtn.value = 'Start';
-				actionBtn.removeAttribute('disabled');
+				Status.update(`Successfully loaded ${data.length} items.`, 'loading', 100);
+				Worker.$actionBtn.val('Start');
+				Worker.$actionBtn.removeAttr('disabled');
 			}
 		}).fail(()=>
 		{
 			failures++;
 			faildelay += 3000;
 
-			statusText.textContent = `Data fetch failed, retrying in ${faildelay}ms...`;
+			Status.update(`Data fetch failed, retrying in ${faildelay}ms...`);
 
 			if(failures > 3)
 			{
-				actionBtn.value = 'Failed';
-				statusText.textContent = `Failed to fetch list info.`;
-				statusBar.style.cssText = '--percent: 100%; --colour: var(--stat-bad);';
+				Worker.$actionBtn.val('Failed');
+				Status.update(`Failed to fetch list info.`, 'bad', 100);
 				return;
 			}
 
@@ -1905,7 +1905,7 @@ function main() {
 				.replaceAll('[DURATIONTOTAL]', totalDuration)
 				.replaceAll('[DESC]', synopsisCss);
 			
-			write(cssLine + '\n');
+			cssComponent.write(cssLine);
 		}
 		catch(e)
 		{
@@ -1928,12 +1928,11 @@ function main() {
 		timeSince = performance.now() - timeThen;
 		timeThen = performance.now();
 		idsRemaining = newData.length - iteration;
-		timeRemaining(idsRemaining, newData.length, timeSince);
 
 		/* update UI */
 
-		statusText.textContent = `Processed ${iteration} of ${newData.length}`;
-		statusBar.style.cssText = `--percent: ${percent}%; --colour: var(--stat-working);`;
+		Status.estimate(idsRemaining, timeSince);
+		Status.update(`Processed ${iteration} of ${newData.length}`, 'working', percent);
 		
 		if( iteration >= newData.length ){
 			finishProcessing();
@@ -1943,44 +1942,25 @@ function main() {
 	}
 
 	function finishProcessing( ){
+		Worker.running = false;
 		window.removeEventListener('beforeunload', warnUserBeforeLeaving);
 
-		if(output.length > 0)
-		{
-			store.set(`last_${List.type}_run`, output);
+		/* temporary true values until modules are implemented into runtime */
+		buildResults( true, true, true, data.length );
+
+		if( cssComponent.result > 0 ){
+			store.set(`last_${List.type}_run`, cssComponent.result);
 		}
-		result.value = output;
-		actionBtn.value = "Done";
-		actionBtn.disabled = "disabled";
-		statusText.textContent = `Completed with ${Log.errorCount} errors`;
-		statusBar.style.cssText = `--percent: ${percent}%; --colour: var(--stat-working);`;
-		timeText.textContent = '';
-		exportBtn.removeAttr('disabled');
-		clearBtn.removeAttr('disabled');
-		exitBtn.disabled = false;
-		exitBtn.value = "Exit";
-		exitBtn.onclick = ()=>
-		{
-			UI.destruct();
-			if(Settings.get(['update_tags']) || Settings.get(['update_notes']))
-			{
-				alert("Refesh the page for tag and note updates to show.");
-			}
-			
-			errorPercent = Log.errorCount / i * 100;
-			if(Log.errorCount < 1 && Log.warningCount > 0)
-			{
-				alert(`${Log.warningCount} warning(s) occurred while processing.\n\nIt is likely that all updates were successful. However, if you notice missing images, try running the tool again.`);
-			}
-			else if(Log.errorCount > 0 && Log.warningCount < 1)
-			{
-				alert(`${Log.errorCount} error(s) occurred while processing.\n\nOut of ${iteration} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
-			}
-			else if(Log.errorCount > 0 && Log.warningCount > 0)
-			{
-				alert(`${Log.errorCount} error(s) and ${Log.warningCount} warning(s) occurred while processing.\n\nOut of ${iteration} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors, using your updated CSS as input.`);
-			}
-		};
+		Worker.$actionBtn.val('Open Results');
+		Worker.$actionBtn.off();
+		Worker.$actionBtn.on('click',()=>{
+			buildResults( true, true, true, data.length );
+		});
+		Status.update(`Completed with ${Log.errorCount} errors`, 'working', 100);
+		Status.estimate();
+		for( let $btn of Worker.reenableAfterDone ){
+			$btn.removeAttr('disabled');
+		}
 	}
 
 	var imagesTotal = 0;
@@ -1990,43 +1970,33 @@ function main() {
 	function updateImageStatus( ){
 		imagesDone++;
 		let imagesRemaining = imagesTotal - imagesDone;
-		statusText.textContent = `Validating images (${imagesDone} of ~${imagesTotal})...`;
-		timeRemaining(imagesRemaining, imagesTotal, imageDelay);
-	}
-
-	function timeRemaining( remainingCount, delayInMs ){
-		let seconds = remainingCount * (delayInMs / 1000);
-		let formatted = '?';
-		if( seconds <= 60 ){
-			formatted = `${round(seconds)}s`;
-		}
-		else if( seconds > 60 && seconds < 3600 ){
-			formatted = `${round(seconds / 60, 1)}m`;
-		}
-		else if( seconds > 3600 ){
-			formatted = `${round(seconds / 60 / 60, 1)}h`;
-		}
-		timeText.textContent = `~ ${formatted} left`;
+		let percent = imagesDone / imagesTotal * 100 || 0;
+		Status.update(`Validating images (${imagesDone} of ~${imagesTotal})...`, 'loading', percent);
+		Status.estimate(imagesRemaining, imageDelay);
 	}
 
 	async function beginProcessing( ){
+		Worker.running = true;
 		Settings.save();
 		window.addEventListener('beforeunload', warnUserBeforeLeaving);
 
-		exitBtn.disabled = "disabled";
-		importBtn.attr('disabled', 'disabled');
-		exportBtn.attr('disabled', 'disabled');
-		clearBtn.attr('disabled', 'disabled');
-		autofill.attr('disabled', 'disabled');
-		writeToOutput.attr('disabled', 'disabled');
-		actionBtn.value = "Stop";
-		actionBtn.onclick = ()=>{
-			actionBtn.value = 'Stopping...';
-			actionBtn.disabled = 'disabled';
+		if( Settings.get(['live_preview']) ){
+			let previewText = new Textarea(false, 'CSS Output', {'readonly':'readonly'}, 12);
+			cssComponent.$preview = previewText.$box;
+			UI.newWindow(previewText.$main);
+		}
+
+		for( let $btn of Worker.disableWhileRunning ){
+			$btn.attr('disabled','disabled');
+		}
+
+		Worker.$actionBtn.val('Stop');
+		Worker.$actionBtn.one('click', ()=>{
+			$actionBtn.val('Stopping...');
 			newData = [];
 			clearTimeout(timeout);
 			finishProcessing();
-		};
+		});
 		let categories = [];
 		for([categoryId, check] of Object.entries(Settings.get(['checked_categories'])))
 		{
@@ -2036,13 +2006,21 @@ function main() {
 			}
 		}
 
-		result.value = 'Your CSS will be output here once processing is complete. If you want to see items as they are added, turn on Live Preview.';
-		write(`\/*\nGenerated by MyAnimeList-Tools v${ver}\nhttps://github.com/ValerioLyndon/MyAnimeList-Tools\n\nTemplate=${Settings.get(['css_template']).replace(/\*\//g, "*[DEL]/")}\nMatchTemplate=${Settings.get(['match_template'])}\n*\/\n\n`);
-
 		let beforeProcessing = [];
-		let oldLines = existing.value.replace(/\/\*[\s\S]*?Generated by MyAnimeList-Tools[\s\S]*?\*\/\s+/,', ').split("\n");
+
+		/* get last run */
+		let useLastRun = Settings.get(['use_last_run']);
+		let lastRun = Settings.get([`last_${List.type}_run`]);
+		let customRun = Settings.get([`manual_${List.type}_run`]);
+		let chosenRun = useLastRun === 'yes' && lastRun ?
+			lastRun :
+			useLastRun === 'custom' && customRun ?
+				customRun :
+				'';
+
+		let oldLines = chosenRun.replace(/\/\*[\s\S]*?Generated by MyAnimeList-Tools[\s\S]*?\*\/\s+/,', ').split("\n");
 		imagesTotal = oldLines.length;
-		statusText.textContent = `Checking your input for matches...`;
+		Status.update(`Checking your input for matches...`, 'loading', 0);
 
 		for( let i = 0; i < data.length; i++ ){
 			let item = data[i];
@@ -2083,7 +2061,7 @@ function main() {
 			/* Add to processing list or skip any existing lines.
 			If validating old images, that step will also occur here. */
 			if( lineExists ){
-				if( Settings.get(['check_existing']).checked ){
+				if( Settings.get(['check_existing']) ){
 					let imgUrl = lineText.match(/http.*?\.(?:jpe?g|webp)/);
 					if( imgUrl.length === 0 ){
 						newData.push(item);
@@ -2095,7 +2073,7 @@ function main() {
 					let imageLoad = new Promise((resolve)=>{
 						let tempImg = document.createElement('img');
 						tempImg.addEventListener('load', ()=>{
-							write(lineText + "\n");
+							cssComponent.write(lineText + "\n");
 							updateImageStatus();
 							resolve(true);
 						});
@@ -2113,7 +2091,7 @@ function main() {
 					await sleep(imageDelay);
 				}
 				else {
-					write(lineText + "\n");
+					cssComponent.write(lineText + "\n");
 				}
 			}
 			/* If not in existing, add to list for processing */
@@ -2130,3 +2108,418 @@ function main() {
 		})
 	}
 };
+
+function buildGlobalSettings( ){
+	let popupUI = new SubsidiaryUI(UI, 'Global Settings', 'These settings apply to all components, where applicable.');
+
+	let delay = new Field(['delay'], 'Delay between items:', 'Delay (ms) between requests to avoid spamming the server.', 'inline');
+	delay.$box.css('width', '50px');
+
+	let $options = $('<div class="l-column o-justify-start">');
+	$options.append(
+		delay.$main,
+		new CheckGroup(['select_categories'], 'Update only specific categories.', 'Want to only update entries in certain categories instead of everything at once?', [
+			new Check(['checked_categories', '1'], List.type == 'anime' ? "Watching" : "Reading"),
+			new Check(['checked_categories', '2'], "Completed"),
+			new Check(['checked_categories', '3'], "On Hold"),
+			new Check(['checked_categories', '4'], "Dropped"),
+			new Check(['checked_categories', '6'], "Planned")
+		]).$main
+	);
+
+	popupUI.$window.append($options);
+	popupUI.open();
+}
+
+function buildCssSettings( ){
+	let popupUI = new SubsidiaryUI(UI, 'CSS Generation Settings', 'Automatically generate CSS for use on your list.');
+
+	let $options = $('<div class="l-row o-wrap">');
+
+	/* Elements */
+
+	let tmpl = new Field(['css_template'], 'Template', 'CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEEN], [TITLEFR], [TITLEES], [TITLEDE], [TITLERAW], [GENRES], [THEMES], [DEMOGRAPHIC], [RANK], [POPULARITY], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]');
+	tmpl.$main.addClass('c-option--max');
+
+	let useLastRun = Settings.get(['use_last_run']);
+	let btnAttrs = useLastRun !== 'custom' ? {'disabled':'disabled'} : {};
+	let runSettingsBtn = new Button('Manual input.', btnAttrs).on('click', ()=>{
+		buildCssRun(popupUI);
+	});
+	let validate = new Check(['check_existing'], 'Validate existing images', 'Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load. Not recommended while adding new anime or updating tags!');
+	let $col = $('<div class="l-column">');
+	$col.append(
+		validate.$main,
+		runSettingsBtn
+	);
+	let drawer = new Drawer(
+		[$col],
+		useLastRun !== 'no'
+	);
+	let radio = new Radio(['use_last_run'], 'Skip previously generated items?', {
+		'yes': {
+			'name': 'Automatic',
+			'desc': 'Automatically remembers your last run and skips entries you generated before.',
+			'func': ()=>{
+				drawer.open();
+				runSettingsBtn.attr('disabled', 'disabled');
+			}
+		},
+		'custom': {
+			'name': 'Manual',
+			'desc': 'Manually input your previous CSS to have full control.',
+			'func': ()=>{
+				drawer.open();
+				runSettingsBtn.removeAttr('disabled');
+			}
+		},
+		'no': {
+			'name': 'Never',
+			'desc': 'Generate items from scratch every single time.',
+			'func': ()=>{
+				drawer.close();
+				runSettingsBtn.attr('disabled', 'disabled');
+			}
+		}
+	});
+
+	/* Structure */
+
+	$options.append(
+		new Paragraph('For premade templates and help creating your own, see the <a href="/*$$$thread$$$*/" target="_blank">forum thread</a>.'),
+		tmpl.$main,
+		new Field(['match_template'], 'Match Template', 'Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.').$main,
+		new Check(['live_preview'], 'Live preview', 'Outputs lines to the UI as the tool works. Useful for confirming things are working before you step away, but may cause extra system load.').$main,
+		radio.$main,
+		drawer.$main
+	);
+
+	popupUI.$window.append($options);
+	popupUI.open();
+}
+
+function buildCssRun( parentUI ){
+	let popupUI = new SubsidiaryUI(parentUI, 'Manage last run.');
+
+	/* vars */
+
+	let key = `manual_${List.type}_run`;
+	let previous = store.get(key);
+
+	/* elements */
+
+	let $form = $('<div class="l-column">');
+
+	$autofillBtn = new Button('Parse Template', {'title':'Parse the template information found in the generated code you\'ve inserted.'})
+	.on('click',()=>{
+		let code = text.val();
+
+		if( code.length < 1 ){
+			alert('Please insert code into the text field.');
+			return;
+		}
+		if( code.indexOf('*/') === -1 ){
+			alert('Code is missing template information. It is either incorrectly formatted or not generated by this tool.');
+			return;
+		}
+
+		newTemplate = false;
+		newMatchTemplate = false;
+
+		/* Reduce code to first comment block, which should be the tool-generated comment */
+		code = code.split('*/')[0];
+		const codeByLine = code.split('\n');
+
+		let newTemplate;
+		let newMatchTemplate;
+		for( let i = 0; i < codeByLine.length; i++ ){
+			let line = codeByLine[i];
+			if( line.startsWith('Template=') ){
+				newTemplate = line.substring(9);
+			}
+			else if( line.startsWith('MatchTemplate=') ){
+				newMatchTemplate = line.substring(14);
+			}
+		}
+
+		if( !newTemplate || !newMatchTemplate ){
+			alert('Code is missing template information. It is either incorrectly formatted or not generated by this tool.');
+		}
+		setTemplate(newTemplate, newMatchTemplate)
+		.then((successful)=>{
+			if( !successful ){
+				alert(`Failed while attempting to set template. This may be due to developer error.`);
+			}
+		});
+	});
+
+	let text = new Textarea(false, 'Existing lines.', {}, 20);
+	if( previous ){
+		text.$box.text(previous);
+	}
+	text.$box.on('input', ()=>{
+		store.set(key, text.$box.val());
+	});
+
+	/* structure */
+
+	$form.append(
+		new Paragraph('Copy and paste previously generated CSS here. The program will use the Match Template to find and skip any duplicate entries which will speed up process times. If you want this to be done automatically, select "Automatic" in the previous menu.'),
+		text.$main,
+		new Paragraph('If your generated code has different templates, you can easily parse and apply them with this button.'),
+		$autofillBtn
+	);
+	
+	popupUI.$window.append($form);
+	popupUI.open();
+}
+
+function buildCssImport( ){
+	let popupUI = new SubsidiaryUI(UI, 'Import CSS Template');
+
+	/* Elements */
+
+	let $form = $('<div class="l-column">');
+	let $blurb = new Paragraph('Input a template here. This will update the tool settings and may add some additional code to your MAL Custom CSS. You may wish to backup your Custom CSS before doing this.');
+	let field = new Field(false, 'Data to Import');
+	field.$box.attr('placeholder', '{css:"",template:"","match_template:""}');
+	let $button = new Button('Import').on('click', ()=>{
+		value = field.$box.val();
+
+		if( value.length < 1 ){
+			alert('Nothing detected in import field.');
+			return false;
+		}
+		try {
+			importedTemplate = JSON.parse(value);
+		}
+		catch(e){
+			alert(`Import failed. If you are using an official template, report this problem to the developer with the following information.\n\nError message for reference:\n${e}\n\nValue for reference:\n${value}`);
+			return false;
+		}
+
+		if( !("template" in importedTemplate) || !("matchtemplate" in importedTemplate) ){
+			alert(`Import failed due to incorrect syntax or missing information.`);
+			return false;
+		}
+		else {
+			let cssToImport = 'css' in importedTemplate ? importedTemplate['css'] : false;
+			setTemplate(importedTemplate['template'], importedTemplate['matchtemplate'], cssToImport)
+			.then((successful)=> {
+				if( successful ){
+					popupUI.destruct();
+					return true;
+				}
+
+				alert(`Import failed while attempting to set template. This may be due to developer error.`);
+				return false;
+			});
+		}
+	});
+
+	/* Structure */
+
+	$form.append(
+		$blurb,
+		field.$main,
+		$button
+	);
+	popupUI.$window.append($form);
+
+	popupUI.open();
+}
+
+function buildCssExport( ){
+	let popupUI = new SubsidiaryUI(UI, 'Export CSS Template');
+
+	/* Elements */
+
+	let $row = $('<div class="l-row">');
+	let $form = $('<div class="l-column">');
+	let tmplField = new Field(false, 'Template');
+	tmplField.$box.val(Settings.get(['css_template']));
+	let matchField = new Field(false, 'Match Template');
+	matchField.$box.val(Settings.get(['match_template']));
+	let cssField = new Textarea(false, 'CSS Styling');
+	let outputField = new Field();
+	outputField.$box.attr('readonly','readonly');
+	let $button = new Button('Generate Template', {title:'Generates text and copies to your clipboard.'}).on('click', ()=>{
+		let output = {
+			"template": tmplField.$box.val(),
+			"matchtemplate": matchField.$box.val()
+		};
+
+		if( output['template'].length < 1 || output['matchtemplate'] < 1 ){
+			alert('Please fill out both the Template and Match Template fields.');
+			return false;
+		}
+
+		let css = cssField.$box.val();
+		if( css.trim().length > 0 ){
+			output['css'] = css;
+		}
+		
+		outputField.$box.val(JSON.stringify(output));
+		
+		outputField.$box.trigger('select');
+		navigator.clipboard.writeText(outputField.$box.val());
+	});
+
+	/* Structure */
+
+	$row.append(
+		$button,
+		outputField.$main
+	);
+	$form.append(
+		new Paragraph('CSS designers can use this to create a template for others to quickly import. The template and match template are required, but you may leave the CSS Styling field blank if desired.'),
+		tmplField.$main,
+		matchField.$main,
+		cssField.$main,
+		$row
+	);
+	popupUI.$window.append($form);
+
+	popupUI.open();
+}
+
+function generateChecks( tagsNotNotes ){
+	let checked = tagsNotNotes ? 'checked_tags' : 'checked_notes';
+	let arr = [
+		new Check([checked, 'english_title'], "English title"),
+		new Check([checked, 'french_title'], "French title"),
+		new Check([checked, 'spanish_title'], "Spanish title"),
+		new Check([checked, 'german_title'], "German title"),
+		new Check([checked, 'native_title'], "Native title"),
+		new Check([checked, 'season'], "Season"),
+		new Check([checked, 'year'], "Year"),
+		new Check([checked, 'genres'], "Genres"),
+		new Check([checked, 'themes'], "Themes"),
+		new Check([checked, 'demographic'], "Demographic"),
+		new Check([checked, 'score'], "Score"),
+		new Check([checked, 'rank'], "Rank"),
+		new Check([checked, 'popularity'], "Popularity")
+	];
+	if( List.isAnime ){	
+		arr = arr.concat(arr, [
+			new Check([checked, 'studio'], "Studio"),
+			new Check([checked, 'producers'], "Producers"),
+			new Check([checked, 'licensors'], "Licensors"),
+			new Check([checked, 'aired'], "Aired"),
+			new Check([checked, 'rating'], "Rating"),
+			new Check([checked, 'duration'], "Duration (Episode)"),
+			new Check([checked, 'total_duration'], "Duration (Total)")
+		]);
+	}
+	else {
+		arr = arr.concat(arr, [
+			new Check([checked, 'published'], "Published"),
+			new Check([checked, 'authors'], "Authors"),
+			new Check([checked, 'serialization'], "Serialization")
+		]);
+	}
+	return arr;
+}
+
+function buildTagSettings( ){
+	let popupUI = new SubsidiaryUI(UI, 'Tag Updater Settings', 'Automatically add info to your tags.');
+
+	/* Elements */
+	
+	let $options = $('<div class="l-column o-justify-start">');
+	let $checkGrid = $('<div class="c-check-grid">');
+	let checks = generateChecks(true);
+	let $blurb = new Paragraph('Enable options here to automatically add them to your tags. Please <a href="https://myanimelist.net/panel.php?go=export" target="_blank">export</a> a copy of your list first if you have any tags you wish to keep as this action can be highly destructive.');
+
+	/* Structure */
+	
+	for( let chk of checks ){
+		$checkGrid.append(chk.$main);
+	}
+	$options.append(
+		new Check(['clear_tags'], "Overwrite current tags", "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.").$main,
+		$blurb,
+		$checkGrid
+	);
+	popupUI.$window.append($options);
+
+	popupUI.open();
+}
+
+function buildNoteSettings( ){
+	let popupUI = new SubsidiaryUI(UI, 'Note Updater Settings', 'Automatically add info to your notes.');
+
+	/* Elements */
+
+	let $options = $('<div class="l-column o-justify-start">');
+	let $checkGrid = $('<div class="c-check-grid">');
+	let checks = generateChecks(false);
+	checks.push(new Check(['checked_notes', 'synopsis'], "Synopsis"));
+	let $blurb = new Paragraph('Enable options here to automatically add them to your notes/comments. THIS ACTION WILL WIPE YOUR NOTES. Please <a href="https://myanimelist.net/panel.php?go=export" target="_blank">export</a> a copy of your list first if you have any notes you wish to keep.');
+
+	/* Structure */
+	
+	for( let chk of checks ){
+		$checkGrid.append(chk.$main);
+	}
+	$options.append(
+		$blurb,
+		$checkGrid
+	);
+	popupUI.$window.append($options);
+
+	popupUI.open();
+}
+
+function buildResults( css, tags, notes, count ){
+	let popupUI = new SubsidiaryUI(UI, 'Job\'s Done!');
+	popupUI.nav.$right.append(
+		new Button('Exit')
+		.on('click', ()=>{
+			popupUI.destruct();
+			UI.destruct();
+		})
+	);
+
+	let $info = $('<div class="l-column">');
+
+	let helpText = `Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors.`;
+	let resultText = 'Tool completed with no issues.';
+	let errorPercent = Log.errorCount / count * 100;
+	if( Log.errorCount < 1 && Log.warningCount > 0 ){
+		resultText = `Tool completed with ${Log.warningCount} warning(s).\n\nIt is likely that all updates were successful. However, if you notice missing images, try running the tool again.`;
+	}
+	else if( Log.errorCount > 0 && Log.warningCount < 1 ){
+		resultText = `Tool completed with ${Log.errorCount} error(s).\n\nOut of ${count} processsed items, that represents a ${errorPercent}% error rate. ${helpText}`;
+	}
+	else if( Log.errorCount > 0 && Log.warningCount > 0 ){
+		resultText = `Tool completed with ${Log.errorCount} error(s) and ${Log.warningCount} warning(s).\n\nOut of ${iteration} processsed items, that represents a ${errorPercent}% error rate. ${helpText}`;
+	}
+	$info.append(new Paragraph(resultText));
+
+	if( tags || notes ){
+		$info.append(new Paragraph('Changes to tags or notes require a page refresh to display.'));
+	}
+
+	if( css ){
+		let cssRow = new SplitRow();
+		cssRow.$left.append(new Header('CSS Output').$main);
+		cssRow.$right.append(
+			new Button('Copy to Clipboard')
+			.on('click', ()=>{
+				output.$box.trigger('select');
+				navigator.clipboard.writeText(output.$box.val());
+			})
+		);
+		let output = new Textarea(false, '', {'readonly':'readonly'}, 20);
+		output.$box.val(cssComponent.result);
+		$info.append(
+			cssRow.$main,
+			output.$main
+		);
+	}
+
+	popupUI.$window.append($info);
+
+	popupUI.open();
+}

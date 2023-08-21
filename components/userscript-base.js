@@ -31,11 +31,11 @@ var store = new CustomStorage('userscript');
 if( List.isOwner ){
 	let button = $('<a href="javascript:void(0);">Tools</a>')
 	.on('click',()=>{
-		if( UI && UI.dead === false ){
+		if( UI && UI.alive ){
 			UI.open();
 		}
 		else {
-			main();
+			initialise();
 		}
 	});
 
