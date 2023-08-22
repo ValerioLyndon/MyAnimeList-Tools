@@ -1208,10 +1208,8 @@ function initialise() {
 			let doc = createDOM(str);
 		
 			/* get current tags */
-			if( !Settings.get(['update_tags']) || Settings.get(['clear_tags']) ){
-				tags = [];
-			}
-			else if( Settings.get(['update_tags']) ){
+			let tags = [];
+			if( Settings.get(['update_tags']) && !Settings.get(['clear_tags']) ){
 				tags = thisData['tags'].split(',');
 				
 				/* remove extra whitespace */
@@ -2367,7 +2365,7 @@ function buildTagSettings( ){
 		$checkGrid.append(chk.$main);
 	}
 	$options.append(
-		new Check(['clear_tags'], "Overwrite current tags", "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.").$main,
+		new Check(['clear_tags'], "Overwrite Current Tags", "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.").$main,
 		$blurb,
 		$checkGrid
 	);
