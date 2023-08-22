@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre5_a0
+// @version      11.0-pre6_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,7 +24,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre5_a0';
+const ver = '11.0-pre6_a0';
 const verMod = '2023/Aug/22';
 
 class CustomStorage {
@@ -979,6 +979,15 @@ class UserInterface {
 	opacity: 0.5;
 }
 
+.c-option {
+	padding: 5px;
+	background: var(--group-bg);
+	border-radius: 9px;
+}
+.c-option--fit {
+	width: fit-content;
+}
+
 .c-drawer {
 	padding-left: 5px;
 	overflow: hidden;
@@ -987,9 +996,12 @@ class UserInterface {
 
 .c-check-grid {
 	display: grid;
-	width: 100%;
 	grid-template-columns: repeat( auto-fit, minmax(140px, 1fr) );
 	gap: 5px;
+	width: 100%;
+	padding: 10px;
+	background: var(--group-bg);
+	border-radius: 9px;
 }
 
 .c-log {
@@ -1288,12 +1300,12 @@ class OptionalGroupRow extends GroupRow {
 		this.enabled = false;
 
 		this.check = new Check(settingArray, name);
-		this.check.$main.addClass('o-block-gap');
+		this.check.$raw.addClass('o-block-gap');
 		this.check.$box.on('input', ()=>{ this.checkStatus(); });
 		this.checkStatus();
 
 		this.$left.append(
-			this.check.$main
+			this.check.$raw
 		);
 		Worker.disableWhileRunning.push(this.check.$box);
 	}
@@ -1345,14 +1357,24 @@ class Drawer {
 	}
 }
 
+class CheckGrid {
+	constructor( checks ){
+		this.$main = $('<div class="c-check-grid">');
+		for( let chk of checks ){
+			this.$main.append(chk.$raw);
+		}
+	}
+}
+
 class CheckGroup {
 	constructor( settingArray, title, desc = false, checkArray ){
-		this.$main = $(`<div class="c-option c-option--vertical">`);
+		this.$main = $('<div class="c-option c-option--fit">');
+		this.$raw = $(`<div class="l-column o-text-gap">`);
 		
 		let checks = [];
 		for( let check of checkArray ){
-			check.$main.prepend('∟');
-			checks.push(check.$main);
+			check.$raw.prepend('∟');
+			checks.push(check.$raw);
 		}
 
 		let toggle = new Check(settingArray, title, desc);
@@ -1365,16 +1387,19 @@ class CheckGroup {
 			}
 		});
 		let drawer = new Drawer(checks, toggle.$box.is(':checked'));
+		drawer.$main.addClass('o-text-gap');
 		
-		this.$main.append(toggle.$main, drawer.$main);
+		this.$raw.append(toggle.$raw, drawer.$main);
+		this.$main.append(this.$raw);
 	}
 }
 
 class Check {
 	constructor( settingArray, title, desc = false ){
-		this.$main = $(`<label class="c-check">${title}</label>`);
+		this.$main = $('<div class="c-option c-option--fit">');
+		this.$raw = $(`<label class="c-check">${title}</label>`);
 		if( desc ){
-			this.$main.attr('title', desc);
+			this.$raw.attr('title', desc);
 		}
 		this.$box = $('<input class="c-check__box" type="checkbox">')
 			.prop('checked', Settings.get(settingArray))
@@ -1382,15 +1407,17 @@ class Check {
 				Settings.set(settingArray, this.$box.is(':checked'));
 			});
 
-		this.$main.prepend(this.$box);
+		this.$raw.prepend(this.$box);
+		this.$main.append(this.$raw);
 	}
 }
 
 class Field {
 	constructor( settingArray = false, title = '', desc = false, style = 'block' ){
-		this.$main = $(`<label class="c-field">${title}</label>`);
+		this.$main = $('<div class="c-option">');
+		this.$raw = $(`<label class="c-field">${title}</label>`);
 		if( desc ){
-			this.$main.attr('title', desc);
+			this.$raw.attr('title', desc);
 		}
 
 		this.$box = $(`<input class="c-field__box" type="text" spellcheck="no">`);
@@ -1402,9 +1429,10 @@ class Field {
 		}
 		
 		if( style === 'inline' ){
-			this.$main.addClass('c-field--inline');
+			this.$raw.addClass('c-field--inline');
 		}
-		this.$main.append(this.$box);
+		this.$raw.append(this.$box);
+		this.$main.append(this.$raw);
 	}
 }
 
@@ -2580,7 +2608,7 @@ function buildGlobalSettings( ){
 	let $options = $('<div class="l-column o-justify-start">');
 	$options.append(
 		delay.$main,
-		new CheckGroup(['select_categories'], 'Update only specific categories.', 'Want to only update entries in certain categories instead of everything at once?', [
+		new CheckGroup(['select_categories'], 'Update Only Specific Categories', 'Want to only update entries in certain categories instead of everything at once?', [
 			new Check(['checked_categories', '1'], List.type == 'anime' ? "Watching" : "Reading"),
 			new Check(['checked_categories', '2'], "Completed"),
 			new Check(['checked_categories', '3'], "On Hold"),
@@ -2601,7 +2629,6 @@ function buildCssSettings( ){
 	/* Elements */
 
 	let tmpl = new Field(['css_template'], 'Template', 'CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEEN], [TITLEFR], [TITLEES], [TITLEDE], [TITLERAW], [GENRES], [THEMES], [DEMOGRAPHIC], [RANK], [POPULARITY], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]');
-	tmpl.$main.addClass('c-option--max');
 
 	let matchTmpl = new Field(['match_template'], 'Match Template', 'Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.');
 
@@ -2686,7 +2713,7 @@ function buildCssSettings( ){
 		new Paragraph('For premade templates and help creating your own, see the <a href="https://myanimelist.net/forum/?topicid=1905478" target="_blank">forum thread</a>.'),
 		tmpl.$main,
 		matchTmpl.$main,
-		new Check(['live_preview'], 'Live preview', 'Outputs lines to the UI as the tool works. Useful for confirming things are working before you step away, but may cause extra system load.').$main,
+		new Check(['live_preview'], 'Live Preview', 'Outputs lines to the UI as the tool works. Useful for confirming things are working before you step away, but may cause extra system load.').$main,
 		skip.$main,
 		drawer.$main,
 	);
@@ -2803,11 +2830,11 @@ function buildCssExport( ){
 function generateChecks( tagsNotNotes ){
 	let checked = tagsNotNotes ? 'checked_tags' : 'checked_notes';
 	let arr = [
-		new Check([checked, 'english_title'], "English title"),
-		new Check([checked, 'french_title'], "French title"),
-		new Check([checked, 'spanish_title'], "Spanish title"),
-		new Check([checked, 'german_title'], "German title"),
-		new Check([checked, 'native_title'], "Native title"),
+		new Check([checked, 'english_title'], "English Title"),
+		new Check([checked, 'french_title'], "French Title"),
+		new Check([checked, 'spanish_title'], "Spanish Title"),
+		new Check([checked, 'german_title'], "German Title"),
+		new Check([checked, 'native_title'], "Native Title"),
 		new Check([checked, 'season'], "Season"),
 		new Check([checked, 'year'], "Year"),
 		new Check([checked, 'genres'], "Genres"),
@@ -2841,22 +2868,11 @@ function generateChecks( tagsNotNotes ){
 function buildTagSettings( ){
 	let popupUI = new SubsidiaryUI(UI, 'Tag Updater Settings', 'Automatically add info to your tags.');
 
-	/* Elements */
-	
 	let $options = $('<div class="l-column o-justify-start">');
-	let $checkGrid = $('<div class="c-check-grid">');
-	let checks = generateChecks(true);
-	let $blurb = new Paragraph('Enable options here to automatically add them to your tags. Please <a href="https://myanimelist.net/panel.php?go=export" target="_blank">export</a> a copy of your list first if you have any tags you wish to keep as this action can be highly destructive.');
-
-	/* Structure */
-	
-	for( let chk of checks ){
-		$checkGrid.append(chk.$main);
-	}
 	$options.append(
-		new Check(['clear_tags'], "Overwrite Current Tags", "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.").$main,
-		$blurb,
-		$checkGrid
+		new Paragraph('Enabled options will be added to your tags. Please <a href="https://myanimelist.net/panel.php?go=export" target="_blank">export</a> a copy of your list first if you have any tags you wish to keep as this action can be highly destructive.'),
+		new CheckGrid(generateChecks(true)).$main,
+		new Check(['clear_tags'], "Overwrite Current Tags", "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.").$main
 	);
 	popupUI.$window.append($options);
 
@@ -2866,22 +2882,13 @@ function buildTagSettings( ){
 function buildNoteSettings( ){
 	let popupUI = new SubsidiaryUI(UI, 'Note Updater Settings', 'Automatically add info to your notes.');
 
-	/* Elements */
-
-	let $options = $('<div class="l-column o-justify-start">');
-	let $checkGrid = $('<div class="c-check-grid">');
 	let checks = generateChecks(false);
 	checks.push(new Check(['checked_notes', 'synopsis'], "Synopsis"));
-	let $blurb = new Paragraph('Enable options here to automatically add them to your notes/comments. THIS ACTION WILL WIPE YOUR NOTES. Please <a href="https://myanimelist.net/panel.php?go=export" target="_blank">export</a> a copy of your list first if you have any notes you wish to keep.');
-
-	/* Structure */
 	
-	for( let chk of checks ){
-		$checkGrid.append(chk.$main);
-	}
+	let $options = $('<div class="l-column o-justify-start">');
 	$options.append(
-		$blurb,
-		$checkGrid
+		new Paragraph('Enabled options will be added to your notes/comments. THIS ACTION WILL WIPE YOUR NOTES. Please <a href="https://myanimelist.net/panel.php?go=export" target="_blank">export</a> a copy of your list first if you have any notes you wish to keep.'),
+		new CheckGrid(checks).$main
 	);
 	popupUI.$window.append($options);
 
