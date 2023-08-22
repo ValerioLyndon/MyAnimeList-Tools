@@ -11,7 +11,7 @@ function isDict( unknown ){
 
 /* Gets height of element whether it is inserted in the DOM yet or not. */
 class NodeDimensions {
-	static $dummy = $('<div style="position: fixed; left: -9999px; display: none;">');
+	static $dummy = $('<div style="position: fixed; left: -9999px; display: none; width: 480px;">');
 	static height( node ){
 		node = node instanceof $ ? node[0] : node;
 		if( node.parentElement ){
