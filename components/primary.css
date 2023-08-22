@@ -299,6 +299,14 @@
 	);
 	white-space: nowrap;
 }
+.c-status.is-unsure {
+	background-image: linear-gradient(
+		to right,
+		var(--colour) 40%,
+		transparent 40%
+	);
+	animation: unsure-bar 999s linear infinite;
+}
 .c-status.is-fixed {
 	position: fixed;
 	left: 20px;
@@ -382,31 +390,10 @@
 	}
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#hideBtn {
-	display: none;
-}
-.is-closed .main:not(.is-hidden) #hideBtn {
-	visibility: visible;
-	position: fixed;
-	bottom: -35px;
-	left: 205px;
-	display: block;
-	padding-left: 10px;
-	border-top-left-radius: 0;
-	border-bottom-left-radius: 0;
-	pointer-events: auto;
+@keyframes unsure-bar {
+	from {
+		background-position: 20px;
+	} to {
+		background-position: 99999px;
+	}
 }

@@ -1011,6 +1011,14 @@ class UserInterface {
 	);
 	white-space: nowrap;
 }
+.c-status.is-unsure {
+	background-image: linear-gradient(
+		to right,
+		var(--colour) 40%,
+		transparent 40%
+	);
+	animation: unsure-bar 999s linear infinite;
+}
 .c-status.is-fixed {
 	position: fixed;
 	left: 20px;
@@ -1094,33 +1102,12 @@ class UserInterface {
 	}
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#hideBtn {
-	display: none;
-}
-.is-closed .main:not(.is-hidden) #hideBtn {
-	visibility: visible;
-	position: fixed;
-	bottom: -35px;
-	left: 205px;
-	display: block;
-	padding-left: 10px;
-	border-top-left-radius: 0;
-	border-bottom-left-radius: 0;
-	pointer-events: auto;
+@keyframes unsure-bar {
+	from {
+		background-position: 20px;
+	} to {
+		background-position: 99999px;
+	}
 }
 		`);
 		this.setTheme();
@@ -1503,7 +1490,6 @@ class ListItems {
 	static #offset = 0;
 	static #failures = 0;
 	static #delay = 0;
-	static #percent = 30;
 	static #loaded = false;
 
 	static load( ){
@@ -1514,14 +1500,13 @@ class ListItems {
 
 		let url = this.#url + this.#offset;
 
-		Status.update(`Fetching list data (${this.#offset} of ?)...`, 'working', this.#percent <= 85 ? this.#percent : '85');
+		Status.update(`Fetching list data (${this.#offset} of ?)...`, 'working', -1);
 		$.getJSON(url, (json)=>{
 			this.#failures = 0;
 			this.data = this.data.concat(json);
 
 			if( json.length === 300 ){
 				this.#offset += 300;
-				this.#percent += 10;
 				this.load();
 			}
 			else {
@@ -1594,6 +1579,12 @@ var Status = new class {
 			blurb.text(text);
 		}
 		for( let bar of this.bars ){
+			if( percent === -1 ){
+				bar.addClass('is-unsure');
+			}
+			if( percent > 0 ){
+				bar.removeClass('is-unsure');
+			}
 			bar.css({
 				'--percent': `${percent}%`,
 				'--colour': `var(--stat-${type})`

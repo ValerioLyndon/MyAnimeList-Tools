@@ -1011,7 +1011,6 @@ class ListItems {
 	static #offset = 0;
 	static #failures = 0;
 	static #delay = 0;
-	static #percent = 30;
 	static #loaded = false;
 
 	static load( ){
@@ -1022,14 +1021,13 @@ class ListItems {
 
 		let url = this.#url + this.#offset;
 
-		Status.update(`Fetching list data (${this.#offset} of ?)...`, 'working', this.#percent <= 85 ? this.#percent : '85');
+		Status.update(`Fetching list data (${this.#offset} of ?)...`, 'working', -1);
 		$.getJSON(url, (json)=>{
 			this.#failures = 0;
 			this.data = this.data.concat(json);
 
 			if( json.length === 300 ){
 				this.#offset += 300;
-				this.#percent += 10;
 				this.load();
 			}
 			else {
@@ -1102,6 +1100,12 @@ var Status = new class {
 			blurb.text(text);
 		}
 		for( let bar of this.bars ){
+			if( percent === -1 ){
+				bar.addClass('is-unsure');
+			}
+			if( percent > 0 ){
+				bar.removeClass('is-unsure');
+			}
 			bar.css({
 				'--percent': `${percent}%`,
 				'--colour': `var(--stat-${type})`
