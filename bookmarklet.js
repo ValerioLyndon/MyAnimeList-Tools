@@ -7,7 +7,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre7_b0';
+const ver = '11.0-pre8_b0';
 const verMod = '2023/Aug/22';
 
 class CustomStorage {
@@ -108,31 +108,27 @@ class NodeDimensions {
 }
 
 class Logger {
-	constructor( ){
-		this.$parent = false;
-		this.errorCount = 0;
-		this.warningCount = 0;
-	}
+	#$parent = false;
 
-	initialise( ){
+	#initialiseUI( ){
 		if( !UI ){
 			return false;
 		}
-		if( this.$parent ){
+		if( this.#$parent ){
 			return true;
 		}
 		
-		this.$parent = $('<div class="l-column o-half-gap l-scrollable">');
+		this.#$parent = $('<div class="l-column o-half-gap l-scrollable">');
 		UI.newWindow(
 			new Header('Process Log', 'Information, warnings, and errors are output here when something of note occurs.').$main,
-			this.$parent
+			this.#$parent
 		);
 		return true;
 	}
 
 	createMsgBox( msg = '', type = 'ERROR' ){
-		if( !this.initialise() ){
-			alert(`A log of type [${type}] occured during loading:\n${msg}`);
+		if( !this.#initialiseUI() ){
+			alert(`A log of type [${type}] occured before UI was ready:\n${msg}`);
 			return;
 		}
 		let errorBox = document.createElement('div');
@@ -144,7 +140,6 @@ class Logger {
 	/* tellUser can be one of: true (show to user), false (only to console), or string (show custom string to user) */
 	
 	error( msg = 'Something happened.', tellUser = true ){
-		this.errorCount++;
 		console.log('[MAL-Tools][ERROR]', msg);
 		if( tellUser ){
 			let userMsg = typeof tellUser == 'string' ? tellUser : msg;
@@ -153,7 +148,6 @@ class Logger {
 	}
 	
 	warn( msg = 'Something happened.', tellUser = true ){
-		this.warningCount++;
 		console.log('[MAL-Tools][warn]', msg);
 		if( tellUser ){
 			let userMsg = typeof tellUser == 'string' ? tellUser : msg;
@@ -207,7 +201,7 @@ class ListInfo {
 			}
 		}
 		if( !css ){
-			Log.error('Failed to determine modern list style: could not find style element.');
+			log.error('Failed to determine modern list style: could not find style element.');
 			return false;
 		}
 
@@ -272,7 +266,7 @@ class ListInfo {
 				return 30;
 			}
 
-			Log.error('Failed to determine modern list style: style is an unrecognised advanced design.');
+			log.error('Failed to determine modern list style: style is an unrecognised advanced design.');
 			return false;
 		}
 
@@ -280,7 +274,7 @@ class ListInfo {
 
 		let search = css.match(/\.list-unit\s+\.list-status-title\s*{[^}]+background-color:\s*([^;]+);/i);
 		if( !search || search.length < 2 ){
-			Log.error('Failed to determine modern list style: could not match regex.');
+			log.error('Failed to determine modern list style: could not match regex.');
 			return false;
 		}
 		let colour = search[1];
@@ -312,7 +306,7 @@ class ListInfo {
 			case '#F9E0DC':
 				return 28;
 			default:
-				Log.error(`Failed to determine modern list style: style is an unrecognised simple design. Code ${colour}.`);
+				log.error(`Failed to determine modern list style: style is an unrecognised simple design. Code ${colour}.`);
 				return false;
 		}
 	}
@@ -324,7 +318,7 @@ class ListInfo {
 	async #determineClassicStyle( ){
 		let userStylesPage = await request('https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv');
 		if( !userStylesPage ){
-			Log.error('Could not access your classic list style page.');
+			log.error('Could not access your classic list style page.');
 			return false;
 		}
 
@@ -338,14 +332,14 @@ class ListInfo {
 		});
 
 		if( styleUrls.length < 1 ){
-			Log.error('Failed to parse your classic list style page.', false);
+			log.error('Failed to parse your classic list style page.', false);
 			return false;
 		}
 
 		for( let url of styleUrls ){
 			let userCSSPage = await request(url);
 			if( !userCSSPage ){
-				Log.error('Could not access your classic CSS.', false);
+				log.error('Could not access your classic CSS.', false);
 				return false;
 			}
 
@@ -356,7 +350,7 @@ class ListInfo {
 			}
 		}
 
-		Log.error('Could not determine classic list style.', false);
+		log.error('Could not determine classic list style.', false);
 		return false;
 	}
 }
@@ -598,7 +592,7 @@ async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 				return true;
 			})
 			.catch(error => {
-				Log.error(error);
+				log.error(error);
 				return false;
 			});
 			if( !post ){
@@ -629,7 +623,7 @@ async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 				return true;
 			})
 			.catch(error => {
-				Log.error(error);
+				log.error(error);
 				return false;
 			});
 			if( !post ){
@@ -1470,7 +1464,7 @@ class Button {
 
 /* Global Vars */
 
-var Log = new Logger();
+var log = new Logger();
 var List = new ListInfo();
 var Settings;
 var UI;
@@ -1487,6 +1481,8 @@ class Worker {
 	/* similarly, these buttons are re-enabled after finish */
 	static $actionBtn;
 	static running = false;
+	static errors = 0;
+	static warnings = 0;
 }
 
 class ListItems {
@@ -1555,11 +1551,11 @@ class CSSComponent {
 	}
 }
 
-var Status = new class {
-	percent = 0;
-	type = 'working';
+class Status {
+	static percent = 0;
+	static type = 'working';
 
-	constructor( ){
+	static {
 		this.$bar = $('<div class="c-status">');
 		this.$text = $('<span class="c-status__text">');
 		this.$time = $('<span class="c-status__time">');
@@ -1577,7 +1573,7 @@ var Status = new class {
 		this.times = [this.$bar, this.$fixedBar];
 	}
 
-	update( text, type = this.type, percent = this.percent ){
+	static update( text, type = this.type, percent = this.percent ){
 		this.type = type;
 		this.percent = percent;
 		for( let blurb of this.texts ){
@@ -1597,7 +1593,7 @@ var Status = new class {
 		}
 	}
 
-	estimate( remaining = 0, msSinceLast = 0 ){
+	static estimate( remaining = 0, msSinceLast = 0 ){
 		if( remaining === 0 && msSinceLast === 0 ){
 			this.$time.text('');
 			return;
@@ -1619,11 +1615,11 @@ var Status = new class {
 		}
 	}
 
-	showFixed( ){
+	static showFixed( ){
 		this.$fixedBar.removeClass('is-aside');
 	}
 
-	hideFixed( ){
+	static hideFixed( ){
 		this.$fixedBar.addClass('is-aside');
 	}
 }
@@ -1713,7 +1709,8 @@ function initialise() {
 		try {
 			let str = await request(`https://myanimelist.net/${List.type}/${id}`, 'string');
 			if( !str ){
-				Log.error(`${List.type} #${id}: Failed to get entry information.`);
+				Worker.errors++;
+				log.error(`${List.type} #${id}: Failed to get entry information.`);
 				continueProcessing();
 				return;
 			}
@@ -2266,7 +2263,8 @@ function initialise() {
 					return true;
 				})
 				.catch(error => {
-					Log.error(error);
+					Worker.errors++;
+					log.error(error);
 					return false;
 				});
 			}
@@ -2333,7 +2331,8 @@ function initialise() {
 					return true;
 				})
 				.catch(error => {
-					Log.error(error);
+					Worker.errors++;
+					log.error(error);
 					return false;
 				});
 			}
@@ -2351,7 +2350,8 @@ function initialise() {
 			catch(e)
 			{
 				imgUrl = imgUrlt = imgUrlv = imgUrll = 'none';
-				Log.warn(`${List.type} #${id}: no image found`);
+				Worker.warnings++;
+				log.warn(`${List.type} #${id}: no image found`);
 			}
 			
 			/* Generate CSS */
@@ -2393,7 +2393,8 @@ function initialise() {
 		}
 		catch(e)
 		{
-			Log.error(`${List.type} #${id}: ${e}`);
+			Worker.errors++;
+			log.error(`${List.type} #${id}: ${e}`);
 		}
 		
 		continueProcessing();
@@ -2440,7 +2441,7 @@ function initialise() {
 		Worker.$actionBtn.on('click',()=>{
 			buildResults( true, true, true, newData.length );
 		});
-		Status.update(`Completed with ${Log.errorCount} errors`, 'good', 100);
+		Status.update(`Completed with ${Worker.errors} errors`, 'good', 100);
 		Status.estimate();
 		for( let $btn of Worker.reenableAfterDone ){
 			$btn.removeAttr('disabled');
@@ -2460,6 +2461,8 @@ function initialise() {
 	}
 
 	async function beginProcessing( ){
+		Worker.errors = 0;
+		Worker.warnings = 0;
 		Worker.running = true;
 		cssComponent.write(`\/*\nGenerated by MyAnimeList-Tools v${ver}\nhttps://github.com/ValerioLyndon/MyAnimeList-Tools\n\nTemplate=${Settings.get(['css_template']).replace(/\*\//g, "*[DEL]/")}\nMatchTemplate=${Settings.get(['match_template'])}\n*\/\n`);
 		Settings.save();
@@ -2468,7 +2471,7 @@ function initialise() {
 		if( Settings.get(['live_preview']) ){
 			let previewText = new Textarea(false, 'CSS Output', {'readonly':'readonly'}, 12);
 			cssComponent.$preview = previewText.$box;
-			UI.newWindow(previewText.$main);
+			UI.newWindow(previewText.$raw);
 		}
 
 		for( let $btn of Worker.disableWhileRunning ){
@@ -2902,15 +2905,15 @@ function buildResults( css, tags, notes, count ){
 
 	let helpText = `Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors.`;
 	let resultText = 'Tool completed with no issues.';
-	let errorPercent = Log.errorCount / count * 100;
-	if( Log.errorCount < 1 && Log.warningCount > 0 ){
-		resultText = `Tool completed with ${Log.warningCount} warning(s).\n\nIt is likely that all updates were successful. However, if you notice missing images, try running the tool again.`;
+	let errorPercent = Worker.errors / count * 100;
+	if( Worker.errors < 1 && Worker.warnings > 0 ){
+		resultText = `Tool completed with ${Worker.warnings} warning(s).\n\nIt is likely that all updates were successful. However, if you notice missing images, try running the tool again.`;
 	}
-	else if( Log.errorCount > 0 && Log.warningCount < 1 ){
-		resultText = `Tool completed with ${Log.errorCount} error(s).\n\nOut of ${count} processsed items, that represents a ${errorPercent}% error rate. ${helpText}`;
+	else if( Worker.errors > 0 && Worker.warnings < 1 ){
+		resultText = `Tool completed with ${Worker.errors} error(s).\n\nOut of ${count} processsed items, that represents a ${errorPercent}% error rate. ${helpText}`;
 	}
-	else if( Log.errorCount > 0 && Log.warningCount > 0 ){
-		resultText = `Tool completed with ${Log.errorCount} error(s) and ${Log.warningCount} warning(s).\n\nOut of ${iteration} processsed items, that represents a ${errorPercent}% error rate. ${helpText}`;
+	else if( Worker.errors > 0 && Worker.warnings > 0 ){
+		resultText = `Tool completed with ${Worker.errors} error(s) and ${Worker.warnings} warning(s).\n\nOut of ${iteration} processsed items, that represents a ${errorPercent}% error rate. ${helpText}`;
 	}
 	$info.append(new Paragraph(resultText));
 
