@@ -7,8 +7,8 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre3_b0';
-const verMod = '2023/Aug/21';
+const ver = '11.0-pre4_b0';
+const verMod = '2023/Aug/22';
 
 class CustomStorage {
 	constructor( type = 'localStorage' ){
@@ -382,7 +382,7 @@ class UserSettings {
 		"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
 		"match_template": "/[TYPE]/[ID]/",
 		"check_existing": false,
-		"use_last_run": "yes",
+		"use_last_run": true,
 
 		/* tags */
 		"update_tags": false,
@@ -1309,7 +1309,7 @@ class Paragraph {
 
 class Drawer {
 	constructor( children = [], open = false ){
-		this.$main = $('<div class="c-drawer">');
+		this.$main = $('<div class="c-drawer l-column">');
 		this.$main.append(...children);
 		if( open ){
 			this.open();
@@ -1391,34 +1391,6 @@ class Field {
 			this.$main.addClass('c-field--inline');
 		}
 		this.$main.append(this.$box);
-	}
-}
-
-class Radio {
-	constructor( settingArray, title = '', options = {} ){
-		this.$main = $(`<div class="c-radio">${title}</div>`);
-		let $options = $('<div class="c-radio__row">');
-		let value = Settings.get(settingArray);
-		let htmlId = settingArray.join('');
-
-		for( let [newValue, meta] of Object.entries(options) ){
-			let $input = $(`<input type="radio" name="${htmlId}" id="${htmlId+newValue}" />`);
-			$input.on('input', ()=>{ Settings.set(settingArray, newValue); });
-			let $station = $(`<label class="c-radio__station" for="${htmlId+newValue}">${meta['name']}</label>`);
-
-			if( value === newValue ){
-				$input.prop('checked', true);
-			}
-			if( 'desc' in meta ){
-				$station.attr('title', meta['desc']);
-			}
-			if( 'func' in meta ){
-				$input.on('click', ()=>{ meta['func'](); });
-			}
-
-			$options.append($input, $station);
-		}
-		this.$main.append($options);
 	}
 }
 
@@ -2543,7 +2515,7 @@ function initialise() {
 			/* Add to processing list or skip any existing lines.
 			If validating old images, that step will also occur here. */
 			if( lineExists ){
-				if( Settings.get(['check_existing']) ){
+				if( Settings.get(['use_last_run']) && Settings.get(['check_existing']) ){
 					let imgUrl = lineText.match(/http.*?\.(?:jpe?g|webp)/);
 					if( imgUrl.length === 0 ){
 						newData.push(item);
@@ -2616,83 +2588,28 @@ function buildGlobalSettings( ){
 function buildCssSettings( ){
 	let popupUI = new SubsidiaryUI(UI, 'CSS Generation Settings', 'Automatically generate CSS for use on your list.');
 
-	let $options = $('<div class="l-row o-wrap">');
+	let $options = $('<div class="l-column">');
 
 	/* Elements */
 
 	let tmpl = new Field(['css_template'], 'Template', 'CSS template.  Replacements are:\n[TYPE], [ID], [IMGURL], [IMGURLT], [IMGURLV], [IMGURLL], [TITLE], [TITLEEN], [TITLEFR], [TITLEES], [TITLEDE], [TITLERAW], [GENRES], [THEMES], [DEMOGRAPHIC], [RANK], [POPULARITY], [SCORE], [SEASON], [YEAR], [STARTDATE], [ENDDATE], and [DESC].\n\nAnime only:\n[STUDIOS], [PRODUCERS], [LICENSORS], [RATING], [DURATIONEP], [DURATIONTOTAL]\n\nManga only:\n[AUTHORS], [SERIALIZATION]');
 	tmpl.$main.addClass('c-option--max');
 
-	let useLastRun = Settings.get(['use_last_run']);
-	let btnAttrs = useLastRun !== 'custom' ? {'disabled':'disabled'} : {};
-	let runSettingsBtn = new Button('Manual input.', btnAttrs).on('click', ()=>{
-		buildCssRun(popupUI);
-	});
-	let validate = new Check(['check_existing'], 'Validate existing images', 'Attempt to load all images, updating the url if it fails. There is a 5 second delay to allow images to load. Not recommended while adding new anime or updating tags!');
-	let $col = $('<div class="l-column">');
-	$col.append(
-		validate.$main,
-		runSettingsBtn
-	);
-	let drawer = new Drawer(
-		[$col],
-		useLastRun !== 'no'
-	);
-	let radio = new Radio(['use_last_run'], 'Skip previously generated items?', {
-		'yes': {
-			'name': 'Automatic',
-			'desc': 'Automatically remembers your last run and skips entries you generated before.',
-			'func': ()=>{
-				drawer.open();
-				runSettingsBtn.attr('disabled', 'disabled');
-			}
-		},
-		'custom': {
-			'name': 'Manual',
-			'desc': 'Manually input your previous CSS to have full control.',
-			'func': ()=>{
-				drawer.open();
-				runSettingsBtn.removeAttr('disabled');
-			}
-		},
-		'no': {
-			'name': 'Never',
-			'desc': 'Generate items from scratch every single time.',
-			'func': ()=>{
-				drawer.close();
-				runSettingsBtn.attr('disabled', 'disabled');
-			}
+	let matchTmpl = new Field(['match_template'], 'Match Template', 'Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.');
+
+	let validate = new Check(['check_existing'], 'Validate Existing Images', 'Attempt to load all images from previous runs, updating the url if it fails.');
+
+	let skip = new Check(['use_last_run'], 'Skip Previously Generated Items', 'Use the saved information from previous runs, as seen in the field below, to speed up future runs.');
+	skip.$box.on('click',()=>{
+		if( skip.$box.is(':checked') ){
+			drawer.open();
+		}
+		else {
+			drawer.close();
 		}
 	});
 
-	/* Structure */
-
-	$options.append(
-		new Paragraph('For premade templates and help creating your own, see the <a href="https://myanimelist.net/forum/?topicid=1905478" target="_blank">forum thread</a>.'),
-		tmpl.$main,
-		new Field(['match_template'], 'Match Template', 'Line matching template for reading previously generated code. Should match the ID format of your template. Only matching on [ID] is not enough, include previous/next characters to ensure the match is unique.').$main,
-		new Check(['live_preview'], 'Live preview', 'Outputs lines to the UI as the tool works. Useful for confirming things are working before you step away, but may cause extra system load.').$main,
-		radio.$main,
-		drawer.$main
-	);
-
-	popupUI.$window.append($options);
-	popupUI.open();
-}
-
-function buildCssRun( parentUI ){
-	let popupUI = new SubsidiaryUI(parentUI, 'Manage last run.');
-
-	/* vars */
-
-	let key = `manual_${List.type}_run`;
-	let previous = store.get(key);
-
-	/* elements */
-
-	let $form = $('<div class="l-column">');
-
-	$autofillBtn = new Button('Parse Template', {'title':'Parse the template information found in the generated code you\'ve inserted.'})
+	$parseBtn = new Button('Parse Template', {'title':'Parse the template information found in the generated code you\'ve inserted.'})
 	.on('click',()=>{
 		let code = text.$box.val();
 
@@ -2726,10 +2643,18 @@ function buildCssRun( parentUI ){
 			alert('Code is missing template information. It is either incorrectly formatted or not generated by this tool.');
 			return false;
 		}
-		setTemplate(newTemplate, newMatchTemplate);
+		setTemplate(newTemplate, newMatchTemplate)
+		.then((success)=>{
+			if( success ){
+				tmpl.$box.val(newTemplate);
+				matchTmpl.$box.val(newMatchTemplate);
+			}
+		});
 	});
 
-	let text = new Textarea(false, 'Existing lines.', {}, 20);
+	let key = `last_${List.type}_run`;
+	let previous = store.get(key);
+	let text = new Textarea(false, 'Manage Last Run', {}, 20);
 	if( previous ){
 		text.$box.text(previous);
 	}
@@ -2737,16 +2662,28 @@ function buildCssRun( parentUI ){
 		store.set(key, text.$box.val());
 	});
 
-	/* structure */
-
-	$form.append(
-		new Paragraph('Copy and paste previously generated CSS here. The program will use the Match Template to find and skip any duplicate entries which will speed up process times. If you want this to be done automatically, select "Automatic" in the previous menu.'),
-		text.$main,
-		new Paragraph('If your generated code has different templates, you can easily parse and apply them with this button.'),
-		$autofillBtn
+	let drawer = new Drawer(
+		[
+			text.$main,
+			$parseBtn,
+			new Paragraph('The program will use the Match Template to find and skip any duplicate entries from this text area, which will speed up process times. This text area will be automatically updated with the last run every time you use the tool. If want to wipe this data or you have a different run output you want to use, you can freely override or make edits to this text.'),
+			validate.$main
+		],
+		Settings.get(['use_last_run']) === true
 	);
-	
-	popupUI.$window.append($form);
+
+	/* Structure */
+
+	$options.append(
+		new Paragraph('For premade templates and help creating your own, see the <a href="https://myanimelist.net/forum/?topicid=1905478" target="_blank">forum thread</a>.'),
+		tmpl.$main,
+		matchTmpl.$main,
+		new Check(['live_preview'], 'Live preview', 'Outputs lines to the UI as the tool works. Useful for confirming things are working before you step away, but may cause extra system load.').$main,
+		skip.$main,
+		drawer.$main,
+	);
+
+	popupUI.$window.append($options);
 	popupUI.open();
 }
 
