@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre6_a0
+// @version      11.0-pre7_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,7 +24,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre6_a0';
+const ver = '11.0-pre7_a0';
 const verMod = '2023/Aug/22';
 
 class CustomStorage {
@@ -742,7 +742,7 @@ class UserInterface {
 	--outline: #578dad;
 	--bg: #090909f7;
 	--bg2: #292929;
-	--group-bg: #32323244;
+	--group-bg: #88888832;
 	--txt: #eee;
 	--btn-bg: #222222f0;
 	--btn-brdr: #4e4e4e;
@@ -1056,6 +1056,12 @@ class UserInterface {
 	transform: translateX(0px);
 }
 
+/* States */
+
+.is-interactable {
+	cursor: pointer;
+}
+
 /* Overrides */
 
 .o-block-gap {
@@ -1076,8 +1082,8 @@ class UserInterface {
 	justify-items: start;
 }
 
-.o-interactable {
-	cursor: pointer;
+.o-no-resize {
+	resize: none;
 }
 
 .o-wrap {
@@ -1438,7 +1444,8 @@ class Field {
 
 class Textarea {
 	constructor( settingArray = false, title = '', attributes = {}, lines = 3 ){
-		this.$main = $(`<label class="c-field">${title}</label>`);
+		this.$main = $('<div class="c-option">');
+		this.$raw = $(`<label class="c-field">${title}</label>`);
 
 		this.$box = $(`<textarea class="c-field__box c-field__box--multiline" spellcheck="no" style="--lines: ${lines}">`);
 		if( settingArray ){
@@ -1451,7 +1458,8 @@ class Textarea {
 			this.$box.attr(name,value);
 		}
 		
-		this.$main.append(this.$box);
+		this.$raw.append(this.$box);
+		this.$main.append(this.$raw);
 	}
 }
 
@@ -1575,7 +1583,7 @@ var Status = new class {
 		this.$bar.append(this.$text, this.$time);
 
 		this.$fixedBar = this.$bar.clone();
-		this.$fixedBar.addClass('is-fixed o-interactable');
+		this.$fixedBar.addClass('is-fixed is-interactable');
 		this.$fixedBar.on('click', ()=>{
 			UI.open();
 			this.hideFixed();
@@ -2689,17 +2697,19 @@ function buildCssSettings( ){
 
 	let key = `last_${List.type}_run`;
 	let previous = store.get(key);
-	let text = new Textarea(false, 'Manage Last Run', {}, 20);
+	let text = new Textarea(false, '', {}, 20);
 	if( previous ){
 		text.$box.text(previous);
 	}
 	text.$box.on('input', ()=>{
 		store.set(key, text.$box.val());
 	});
+	text.$box.addClass('o-no-resize');
 
 	let drawer = new Drawer(
 		[
-			text.$main,
+			new Header('Manage Last Run').$main,
+			text.$raw,
 			$parseBtn,
 			new Paragraph('The program will use the Match Template to find and skip any duplicate entries from this text area, which will speed up process times. This text area will be automatically updated with the last run every time you use the tool. If want to wipe this data or you have a different run output you want to use, you can freely override or make edits to this text.'),
 			validate.$main
@@ -2765,7 +2775,7 @@ function buildCssImport( ){
 
 	$form.append(
 		$blurb,
-		field.$main,
+		field.$raw,
 		$button
 	);
 	popupUI.$window.append($form);
@@ -2813,13 +2823,13 @@ function buildCssExport( ){
 
 	$row.append(
 		$button,
-		outputField.$main
+		outputField.$raw
 	);
 	$form.append(
 		new Paragraph('CSS designers can use this to create a template for others to quickly import. The template and match template are required, but you may leave the CSS Styling field blank if desired.'),
-		tmplField.$main,
-		matchField.$main,
-		cssField.$main,
+		tmplField.$raw,
+		matchField.$raw,
+		cssField.$raw,
 		$row
 	);
 	popupUI.$window.append($form);

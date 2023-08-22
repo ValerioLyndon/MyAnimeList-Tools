@@ -14,7 +14,7 @@
 	--outline: #578dad;
 	--bg: #090909f7;
 	--bg2: #292929;
-	--group-bg: #32323244;
+	--group-bg: #88888832;
 	--txt: #eee;
 	--btn-bg: #222222f0;
 	--btn-brdr: #4e4e4e;
@@ -328,6 +328,12 @@
 	transform: translateX(0px);
 }
 
+/* States */
+
+.is-interactable {
+	cursor: pointer;
+}
+
 /* Overrides */
 
 .o-block-gap {
@@ -348,8 +354,8 @@
 	justify-items: start;
 }
 
-.o-interactable {
-	cursor: pointer;
+.o-no-resize {
+	resize: none;
 }
 
 .o-wrap {
