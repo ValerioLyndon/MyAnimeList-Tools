@@ -21,7 +21,7 @@
 	--fld-bg: #18181888;
 	--fld-brdr: #424242;
 	--stat-working: #3166e0;
-	--stat-loading: #1b833a;
+	--stat-good: #1b833a;
 	--stat-bad: #f24242;
 	--scroll-thumb: #555;
 }
@@ -37,7 +37,7 @@
 	--fld-bg: #f6f6f688;
 	--fld-brdr: #999;
 	--stat-working: #4277f2;
-	--stat-loading: #60ce81;
+	--stat-good: #60ce81;
 	--stat-bad: #f24242;
 	--scroll-thumb: #555;
 }

@@ -7,7 +7,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre2_b0';
+const ver = '11.0-pre3_b0';
 const verMod = '2023/Aug/21';
 
 class CustomStorage {
@@ -733,7 +733,7 @@ class UserInterface {
 	--fld-bg: #18181888;
 	--fld-brdr: #424242;
 	--stat-working: #3166e0;
-	--stat-loading: #1b833a;
+	--stat-good: #1b833a;
 	--stat-bad: #f24242;
 	--scroll-thumb: #555;
 }
@@ -749,7 +749,7 @@ class UserInterface {
 	--fld-bg: #f6f6f688;
 	--fld-brdr: #999;
 	--stat-working: #4277f2;
-	--stat-loading: #60ce81;
+	--stat-good: #60ce81;
 	--stat-bad: #f24242;
 	--scroll-thumb: #555;
 }
@@ -1497,6 +1497,59 @@ class Worker {
 	static running = false;
 }
 
+class ListItems {
+	static data = [];
+	static #url = window.location.href.split('?')[0] + '/load.json?status=7&offset=';
+	static #offset = 0;
+	static #failures = 0;
+	static #delay = 0;
+	static #percent = 30;
+	static #loaded = false;
+
+	static load( ){
+		if( this.#loaded ){
+			this.#done();
+			return true;
+		}
+
+		let url = this.#url + this.#offset;
+
+		Status.update(`Fetching list data (${this.#offset} of ?)...`, 'working', this.#percent <= 85 ? this.#percent : '85');
+		$.getJSON(url, (json)=>{
+			this.#failures = 0;
+			this.data = this.data.concat(json);
+
+			if( json.length === 300 ){
+				this.#offset += 300;
+				this.#percent += 10;
+				this.load();
+			}
+			else {
+				this.#done();
+				this.#loaded = true;
+			}
+		}).fail(()=>{
+			this.#failures++;
+			this.#delay += 3000;
+
+			if( this.#failures > 3 ){
+				Worker.$actionBtn.val('Failed');
+				Status.update(`Failed to fetch list info.`, 'bad', 100);
+				return;
+			}
+
+			Status.update(`Data fetch failed, retrying in ${this.#delay}ms...`);
+			setTimeout(this.load, this.#delay);
+		});
+	}
+
+	static #done( ){
+		Status.update(`Successfully loaded ${this.data.length} items.`, 'good', 100);
+		Worker.$actionBtn.val('Start');
+		Worker.$actionBtn.removeAttr('disabled');
+	}
+}
+
 class CSSComponent {
 	constructor( ){
 		this.$preview = false;
@@ -1514,7 +1567,7 @@ class CSSComponent {
 
 var Status = new class {
 	percent = 0;
-	type = 'loading';
+	type = 'working';
 
 	constructor( ){
 		this.$bar = $('<div class="c-status">');
@@ -1648,63 +1701,9 @@ function initialise() {
 
 
 
-
-	/* Get list info and enable buttons once done */
-
-	var data = [];
-	var baseUrl = window.location.href.split('?')[0];
-	var offset = 0;
-	var failures = 0;
-	var faildelay = 0;
-	var statusPercent = 30;
-	function getListItems()
-	{
-		/* will take a list URL:
-		https://myanimelist.net/animelist/Valerio_Lyndon?status=2
-		and return:
-		https://myanimelist.net/animelist/Valerio_Lyndon/load.json?status=7 */
-		dataUrl = `${baseUrl}/load.json?status=7&offset=${offset}`;
-
-		$.getJSON(dataUrl, function(json)
-		{
-			failures = 0;
-			data = data.concat(json);
-
-			if(json.length === 300)
-			{
-				offset += 300;
-				statusPercent += 10;
-				Status.update(`Fetching list data (${offset} of ?)...`, 'loading', statusPercent <= 85 ? statusPercent : '85');
-				getListItems();
-			}
-			else
-			{
-				Status.update(`Successfully loaded ${data.length} items.`, 'loading', 100);
-				Worker.$actionBtn.val('Start');
-				Worker.$actionBtn.removeAttr('disabled');
-			}
-		}).fail(()=>
-		{
-			failures++;
-			faildelay += 3000;
-
-			Status.update(`Data fetch failed, retrying in ${faildelay}ms...`);
-
-			if(failures > 3)
-			{
-				Worker.$actionBtn.val('Failed');
-				Status.update(`Failed to fetch list info.`, 'bad', 100);
-				return;
-			}
-
-			setTimeout(getListItems, faildelay);
-		});
-	};
-	getListItems();
-
-
-
 	/* Primary Functions */
+
+	ListItems.load();
 
 	var iteration = -1;
 	var newData = [];
@@ -1715,8 +1714,7 @@ function initialise() {
 		let thisData = newData[iteration];
 		id = thisData[`${List.type}_id`];
 		
-		try
-		{
+		try {
 			let str = await request(`https://myanimelist.net/${List.type}/${id}`, 'string');
 			if( !str ){
 				Log.error(`${List.type} #${id}: Failed to get entry information.`);
@@ -2438,7 +2436,7 @@ function initialise() {
 		window.removeEventListener('beforeunload', warnUserBeforeLeaving);
 
 		/* temporary true values until modules are implemented into runtime */
-		buildResults( true, true, true, data.length );
+		buildResults( true, true, true, newData.length );
 
 		if( cssComponent.result.length > 0 ){
 			store.set(`last_${List.type}_run`, cssComponent.result);
@@ -2446,9 +2444,9 @@ function initialise() {
 		Worker.$actionBtn.val('Open Results');
 		Worker.$actionBtn.off();
 		Worker.$actionBtn.on('click',()=>{
-			buildResults( true, true, true, data.length );
+			buildResults( true, true, true, newData.length );
 		});
-		Status.update(`Completed with ${Log.errorCount} errors`, 'working', 100);
+		Status.update(`Completed with ${Log.errorCount} errors`, 'good', 100);
 		Status.estimate();
 		for( let $btn of Worker.reenableAfterDone ){
 			$btn.removeAttr('disabled');
@@ -2463,7 +2461,7 @@ function initialise() {
 		imagesDone++;
 		let imagesRemaining = imagesTotal - imagesDone;
 		let percent = imagesDone / imagesTotal * 100 || 0;
-		Status.update(`Validating images (${imagesDone} of ~${imagesTotal})...`, 'loading', percent);
+		Status.update(`Validating images (${imagesDone} of ~${imagesTotal})...`, 'working', percent);
 		Status.estimate(imagesRemaining, imageDelay);
 	}
 
@@ -2513,10 +2511,10 @@ function initialise() {
 
 		let oldLines = chosenRun.replace(/\/\*[\s\S]*?Generated by MyAnimeList-Tools[\s\S]*?\*\/\s+/,', ').split("\n");
 		imagesTotal = oldLines.length;
-		Status.update(`Checking your input for matches...`, 'loading', 0);
+		Status.update(`Checking your input for matches...`, 'working', 0);
 
-		for( let i = 0; i < data.length; i++ ){
-			let item = data[i];
+		for( let i = 0; i < ListItems.data.length; i++ ){
+			let item = ListItems.data[i];
 			let id = item[`${List.type}_id`];
 			
 			/* Skip item if category does not match selected user options */
