@@ -54,11 +54,6 @@
 
 /* Layout */
 
-.l-center {
-	display: grid;
-	place-items: center;
-}
-
 .l-column {
 	display: grid;
 	grid-auto-flow: row;
@@ -122,9 +117,11 @@
 	position: fixed;
 	inset: 0;
 	z-index: 99999;
+	display: grid;
+	place-items: start center;
+	overflow: auto;
 	text-align: left;
 	opacity: 1;
-	overflow: auto;
 	transition: opacity .16s ease;
 }
 .c-container--blurred {
@@ -142,12 +139,13 @@
 .c-window-list {
 	display: flex;
 	flex-direction: column;
-	place-items: center;
-	place-content: center;
+	align-items: center;
+	justify-content: start;
 	gap: 15px;
-	padding: 30px 10px;
+	padding: min(15vh, 200px) 10px 30px;
 }
 .is-subsidiary .c-window-list {
+	padding-top: min(20vh, 230px);
 	margin-left: min(75px, calc(100vw - 527px));
 }
 
