@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre10_a0
+// @version      11.0-pre11_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,7 +24,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre10_a0';
+const ver = '11.0-pre11_a0';
 const verMod = '2023/Aug/22';
 
 class CustomStorage {
@@ -124,63 +124,74 @@ class NodeDimensions {
 	}
 }
 
-class Logger {
-	#$parent = false;
+/* Handles logging to console and UI to inform users of errors.
+Requires use of the prepare() function to enable UI logging. */
+class Log {
+	static #userInterface = false; /* must be an instace of UserInterface */
+	static #$parent = false;
+	static #unsentLogs = [];
 
-	#initialiseUI( ){
-		if( !UI ){
+	/* argument must be an instance of UserInterface
+	only builds UI if there are messages to be sent, otherwise waits for future sendToUI() call */
+	static prepare( userInterface ){
+		this.#userInterface = userInterface;
+		if( this.#unsentLogs.length === 0 ){
+			return;
+		}
+		this.#ready();
+		for( let [msg, type] of this.#unsentLogs ){
+			this.sendToUI(msg, type);
+		}
+		this.#unsentLogs = [];
+	}
+
+	static #ready( ){
+		if( !this.#userInterface || !this.#userInterface.alive ){
 			return false;
 		}
 		if( this.#$parent ){
 			return true;
 		}
-		
 		this.#$parent = $('<div class="l-column o-half-gap l-scrollable">');
-		UI.newWindow(
+		this.#userInterface.newWindow(
 			new Header('Process Log', 'Information, warnings, and errors are output here when something of note occurs.').$main,
 			this.#$parent
 		);
 		return true;
 	}
 
-	createMsgBox( msg = '', type = 'ERROR' ){
-		if( !this.#initialiseUI() ){
-			alert(`A log of type [${type}] occured before UI was ready:\n${msg}`);
+	static sendToUI( msg = '', type = 'ERROR' ){
+		if( this.#ready() ){
+			this.#$parent.prepend($(`<div class="c-log"><b>[${type}]</b> ${msg}</div>`));
 			return;
 		}
-		let errorBox = document.createElement('div');
-		errorBox.className = 'c-log';
-		errorBox.insertAdjacentHTML('afterbegin', `<b>[${type}]</b> ${msg}`);
-		this.#$parent.prepend(errorBox);
+		this.#unsentLogs.push([msg, type]);
 	}
-	
-	/* tellUser can be one of: true (show to user), false (only to console), or string (show custom string to user) */
-	
-	error( msg = 'Something happened.', tellUser = true ){
+
+	static error( msg = 'Something happened.', tellUser = true ){
 		console.log('[MAL-Tools][ERROR]', msg);
 		if( tellUser ){
-			let userMsg = typeof tellUser == 'string' ? tellUser : msg;
-			this.createMsgBox(userMsg, 'Error');
+			this.sendToUI(msg, 'Error');
 		}
 	}
 	
-	warn( msg = 'Something happened.', tellUser = true ){
+	static warn( msg = 'Something happened.', tellUser = true ){
 		console.log('[MAL-Tools][warn]', msg);
 		if( tellUser ){
-			let userMsg = typeof tellUser == 'string' ? tellUser : msg;
-			this.createMsgBox(userMsg, 'Warning');
+			this.sendToUI(msg, 'Warning');
 		}
 	}
 
-	generic( msg = 'Something happened.', tellUser = false ){
+	static generic( msg = 'Something happened.', tellUser = true ){
 		console.log('[MAL-Tools][info]', msg);
 		if( tellUser ){
-			let userMsg = typeof tellUser == 'string' ? tellUser : msg;
-			this.createMsgBox(userMsg, 'Info');
+			this.sendToUI(msg, 'Info');
 		}
 	}
 }
 
+/* List class handles all information relating to the list page.
+Must have Logger class available first */
 class List {
 	static type = window.location.pathname.split('/')[1].substring(0,5);
 	static isAnime = (this.type === 'anime');
@@ -220,7 +231,7 @@ class List {
 			}
 		}
 		if( !css ){
-			log.error('Failed to determine modern list style: could not find style element.');
+			Log.error('Failed to determine modern list style: could not find style element.');
 			return false;
 		}
 
@@ -285,7 +296,7 @@ class List {
 				return 30;
 			}
 
-			log.error('Failed to determine modern list style: style is an unrecognised advanced design.');
+			Log.error('Failed to determine modern list style: style is an unrecognised advanced design.');
 			return false;
 		}
 
@@ -293,7 +304,7 @@ class List {
 
 		let search = css.match(/\.list-unit\s+\.list-status-title\s*{[^}]+background-color:\s*([^;]+);/i);
 		if( !search || search.length < 2 ){
-			log.error('Failed to determine modern list style: could not match regex.');
+			Log.error('Failed to determine modern list style: could not match regex.');
 			return false;
 		}
 		let colour = search[1];
@@ -325,7 +336,7 @@ class List {
 			case '#F9E0DC':
 				return 28;
 			default:
-				log.error(`Failed to determine modern list style: style is an unrecognised simple design. Code ${colour}.`);
+				Log.error(`Failed to determine modern list style: style is an unrecognised simple design. Code ${colour}.`);
 				return false;
 		}
 	}
@@ -337,7 +348,7 @@ class List {
 	static async #determineClassicStyle( ){
 		let userStylesPage = await request('https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv');
 		if( !userStylesPage ){
-			log.error('Could not access your classic list style page.');
+			Log.error('Could not access your classic list style page.');
 			return false;
 		}
 
@@ -351,14 +362,14 @@ class List {
 		});
 
 		if( styleUrls.length < 1 ){
-			log.error('Failed to parse your classic list style page.', false);
+			Log.error('Failed to parse your classic list style page.', false);
 			return false;
 		}
 
 		for( let url of styleUrls ){
 			let userCSSPage = await request(url);
 			if( !userCSSPage ){
-				log.error('Could not access your classic CSS.', false);
+				Log.error('Could not access your classic CSS.', false);
 				return false;
 			}
 
@@ -369,11 +380,13 @@ class List {
 			}
 		}
 
-		log.error('Could not determine classic list style.', false);
+		Log.error('Could not determine classic list style.', false);
 		return false;
 	}
 }
 
+/* handles the "settings" storage key where user settings are kept.
+requires the CustomStorage class */
 class UserSettings {
 	settings = {
 		/* application */
@@ -560,8 +573,8 @@ class UserSettings {
 
 /* Updates settings and sends new CSS to MAL */
 async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
-	Settings.set(['css_template'], newTemplate);
-	Settings.set(['match_template'], newMatchTemplate);
+	settings.set(['css_template'], newTemplate);
+	settings.set(['match_template'], newMatchTemplate);
 	
 	if( newCss !== false ){
 		if( !List.style ){
@@ -611,7 +624,7 @@ async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 				return true;
 			})
 			.catch(error => {
-				log.error(error);
+				Log.error(error);
 				return false;
 			});
 			if( !post ){
@@ -642,7 +655,7 @@ async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 				return true;
 			})
 			.catch(error => {
-				log.error(error);
+				Log.error(error);
 				return false;
 			});
 			if( !post ){
@@ -705,6 +718,8 @@ function sleep( ms ){
 
 /* Main Program */
 
+/* Core class for handling popup windows and overlays, extended by Primary and Subsidiary variants
+no requirements */
 class UserInterface {
 	alive = true;
 	#attachmentPoint = document.createElement('div');
@@ -809,7 +824,7 @@ class UserInterface {
 
 .l-scrollable {
 	max-height: 50vh;
-	overflow-y: scroll;
+	overflow-y: auto;
 }
 
 
@@ -1404,9 +1419,9 @@ class Check {
 			this.$raw.attr('title', desc);
 		}
 		this.$box = $('<input class="c-check__box" type="checkbox">')
-			.prop('checked', Settings.get(settingArray))
+			.prop('checked', settings.get(settingArray))
 			.on('change', ()=>{
-				Settings.set(settingArray, this.$box.is(':checked'));
+				settings.set(settingArray, this.$box.is(':checked'));
 			});
 
 		this.$raw.prepend(this.$box);
@@ -1425,9 +1440,9 @@ class Field {
 		this.$box = $(`<input class="c-field__box" type="text" spellcheck="no">`);
 		if( settingArray ){
 			this.$box.on('input', ()=>{
-				Settings.set(settingArray, this.$box.val());
+				settings.set(settingArray, this.$box.val());
 			});
-			this.$box.val(Settings.get(settingArray));
+			this.$box.val(settings.get(settingArray));
 		}
 		
 		if( style === 'inline' ){
@@ -1446,9 +1461,9 @@ class Textarea {
 		this.$box = $(`<textarea class="c-field__box c-field__box--multiline" spellcheck="no" style="--lines: ${lines}">`);
 		if( settingArray ){
 			this.$box.on('input', ()=>{
-				Settings.set(settingArray, this.$box.val());
+				settings.set(settingArray, this.$box.val());
 			});
-			this.$box.val(Settings.get(settingArray));
+			this.$box.val(settings.get(settingArray));
 		}
 		for( let [name,value] of Object.entries(attributes) ){
 			this.$box.attr(name,value);
@@ -1483,8 +1498,7 @@ class Button {
 
 /* Global Vars */
 
-var log = new Logger();
-var Settings;
+var settings;
 var UI;
 var cssComponent;
 var worker;
@@ -1494,9 +1508,10 @@ var worker;
 /* Runtime */
 
 function initialise() {
-	List.determineStyle();
-	Settings = new UserSettings();
 	UI = new PrimaryUI();
+	Log.prepare(UI);
+	List.determineStyle();
+	settings = new UserSettings();
 	cssComponent = new CSSComponent();
 
 	buildMainUI();
@@ -1673,7 +1688,7 @@ class Worker {
 			let str = await request(`https://myanimelist.net/${List.type}/${id}`, 'string');
 			if( !str ){
 				this.errors++;
-				log.error(`${List.type} #${id}: Failed to get entry information.`);
+				Log.error(`${List.type} #${id}: Failed to get entry information.`);
 				this.continue();
 				return;
 			}
@@ -1681,7 +1696,7 @@ class Worker {
 		
 			/* get current tags */
 			let tags = [];
-			if( Settings.get(['update_tags']) && !Settings.get(['clear_tags']) ){
+			if( settings.get(['update_tags']) && !settings.get(['clear_tags']) ){
 				tags = itemData['tags'].split(',');
 				
 				/* remove extra whitespace */
@@ -2171,30 +2186,30 @@ class Worker {
 			
 			/* Update Notes & Tags */
 
-			if( Settings.get(['update_tags']) ){
-				if(titleEn && Settings.get(['checked_tags','english_title'])) { notes.push(titleEn); }
-				if(titleFr && Settings.get(['checked_tags','french_title'])) { notes.push(titleFr); }
-				if(titleEs && Settings.get(['checked_tags','spanish_title'])) { notes.push(titleEs); }
-				if(titleDe && Settings.get(['checked_tags','german_title'])) { notes.push(titleDe); }
-				if(titleNative && Settings.get(['checked_tags','native_title'])) { notes.push(titleNative); }
-				if(season && Settings.get(['checked_tags','season'])) { notes.push(season); }
-				if(year && Settings.get(['checked_tags','year'])) { notes.push(year); }
-				if(studios && Settings.get(['checked_tags','studio'])) { notes.push(studios); }
-				if(producers && Settings.get(['checked_tags','producers'])) { notes.push(producers); }
-				if(licensors && Settings.get(['checked_tags','licensors'])) { notes.push(licensors); }
-				if(serializations && Settings.get(['checked_tags','serialization'])) { notes.push(serializations); }
-				if(genres && Settings.get(['checked_tags','genres'])) { notes.push(genres); }
-				if(themes && Settings.get(['checked_tags','themes'])) { notes.push(themes); }
-				if(demographic && Settings.get(['checked_tags','demographic'])) { notes.push(demographic); }
-				if(authors && Settings.get(['checked_tags','authbors'])) { notes.push(authors); }
-				if(Settings.get(['checked_tags','aired'])) { notes.push(airedTag); }
-				if(Settings.get(['checked_tags','published'])) { notes.push(publishedTag); }
-				if(Settings.get(['checked_tags','score'])) { notes.push(scoreTag); }
-				if(Settings.get(['checked_tags','rank'])) { notes.push(rankTag); }
-				if(Settings.get(['checked_tags','popularity'])) { notes.push(popularityTag); }
-				if(Settings.get(['checked_tags','rating'])) { notes.push(ratingTag); }
-				if(Settings.get(['checked_tags','duration'])) { notes.push(durationTag); }
-				if(Settings.get(['checked_tags','total_duration'])) { notes.push(totalDurationTag); }
+			if( settings.get(['update_tags']) ){
+				if(titleEn && settings.get(['checked_tags','english_title'])) { notes.push(titleEn); }
+				if(titleFr && settings.get(['checked_tags','french_title'])) { notes.push(titleFr); }
+				if(titleEs && settings.get(['checked_tags','spanish_title'])) { notes.push(titleEs); }
+				if(titleDe && settings.get(['checked_tags','german_title'])) { notes.push(titleDe); }
+				if(titleNative && settings.get(['checked_tags','native_title'])) { notes.push(titleNative); }
+				if(season && settings.get(['checked_tags','season'])) { notes.push(season); }
+				if(year && settings.get(['checked_tags','year'])) { notes.push(year); }
+				if(studios && settings.get(['checked_tags','studio'])) { notes.push(studios); }
+				if(producers && settings.get(['checked_tags','producers'])) { notes.push(producers); }
+				if(licensors && settings.get(['checked_tags','licensors'])) { notes.push(licensors); }
+				if(serializations && settings.get(['checked_tags','serialization'])) { notes.push(serializations); }
+				if(genres && settings.get(['checked_tags','genres'])) { notes.push(genres); }
+				if(themes && settings.get(['checked_tags','themes'])) { notes.push(themes); }
+				if(demographic && settings.get(['checked_tags','demographic'])) { notes.push(demographic); }
+				if(authors && settings.get(['checked_tags','authbors'])) { notes.push(authors); }
+				if(settings.get(['checked_tags','aired'])) { notes.push(airedTag); }
+				if(settings.get(['checked_tags','published'])) { notes.push(publishedTag); }
+				if(settings.get(['checked_tags','score'])) { notes.push(scoreTag); }
+				if(settings.get(['checked_tags','rank'])) { notes.push(rankTag); }
+				if(settings.get(['checked_tags','popularity'])) { notes.push(popularityTag); }
+				if(settings.get(['checked_tags','rating'])) { notes.push(ratingTag); }
+				if(settings.get(['checked_tags','duration'])) { notes.push(durationTag); }
+				if(settings.get(['checked_tags','total_duration'])) { notes.push(totalDurationTag); }
 				
 				let tagsRequestUrl;
 				let animeOrMangaId;
@@ -2228,38 +2243,38 @@ class Worker {
 				})
 				.catch(error => {
 					this.errors++;
-					log.error(error);
+					Log.error(error);
 					return false;
 				});
 			}
 
-			if( Settings.get(['update_notes']) ){
+			if( settings.get(['update_notes']) ){
 				let notes = [];
 
-				if(titleEn && Settings.get(['checked_notes','english_title'])) { notes.push(titleEn); }
-				if(titleFr && Settings.get(['checked_notes','french_title'])) { notes.push(titleFr); }
-				if(titleEs && Settings.get(['checked_notes','spanish_title'])) { notes.push(titleEs); }
-				if(titleDe && Settings.get(['checked_notes','german_title'])) { notes.push(titleDe); }
-				if(titleNative && Settings.get(['checked_notes','native_title'])) { notes.push(titleNative); }
-				if(season && Settings.get(['checked_notes','season'])) { notes.push(season); }
-				if(year && Settings.get(['checked_notes','year'])) { notes.push(year); }
-				if(studios && Settings.get(['checked_notes','studio'])) { notes.push(studios); }
-				if(producers && Settings.get(['checked_notes','producers'])) { notes.push(producers); }
-				if(licensors && Settings.get(['checked_notes','licensors'])) { notes.push(licensors); }
-				if(serializations && Settings.get(['checked_notes','serialization'])) { notes.push(serializations); }
-				if(genres && Settings.get(['checked_notes','genres'])) { notes.push(genres); }
-				if(themes && Settings.get(['checked_notes','themes'])) { notes.push(themes); }
-				if(demographic && Settings.get(['checked_notes','demographic'])) { notes.push(demographic); }
-				if(authors && Settings.get(['checked_notes','authbors'])) { notes.push(authors); }
-				if(Settings.get(['checked_notes','aired'])) { notes.push(airedTag); }
-				if(Settings.get(['checked_notes','published'])) { notes.push(publishedTag); }
-				if(Settings.get(['checked_notes','score'])) { notes.push(scoreTag); }
-				if(Settings.get(['checked_notes','rank'])) { notes.push(rankTag); }
-				if(Settings.get(['checked_notes','popularity'])) { notes.push(popularityTag); }
-				if(Settings.get(['checked_notes','rating'])) { notes.push(ratingTag); }
-				if(Settings.get(['checked_notes','duration'])) { notes.push(durationTag); }
-				if(Settings.get(['checked_notes','total_duration'])) { notes.push(totalDurationTag); }
-				if(Settings.get(['checked_notes','synopsis'])) { notes.push(synopsis); }
+				if(titleEn && settings.get(['checked_notes','english_title'])) { notes.push(titleEn); }
+				if(titleFr && settings.get(['checked_notes','french_title'])) { notes.push(titleFr); }
+				if(titleEs && settings.get(['checked_notes','spanish_title'])) { notes.push(titleEs); }
+				if(titleDe && settings.get(['checked_notes','german_title'])) { notes.push(titleDe); }
+				if(titleNative && settings.get(['checked_notes','native_title'])) { notes.push(titleNative); }
+				if(season && settings.get(['checked_notes','season'])) { notes.push(season); }
+				if(year && settings.get(['checked_notes','year'])) { notes.push(year); }
+				if(studios && settings.get(['checked_notes','studio'])) { notes.push(studios); }
+				if(producers && settings.get(['checked_notes','producers'])) { notes.push(producers); }
+				if(licensors && settings.get(['checked_notes','licensors'])) { notes.push(licensors); }
+				if(serializations && settings.get(['checked_notes','serialization'])) { notes.push(serializations); }
+				if(genres && settings.get(['checked_notes','genres'])) { notes.push(genres); }
+				if(themes && settings.get(['checked_notes','themes'])) { notes.push(themes); }
+				if(demographic && settings.get(['checked_notes','demographic'])) { notes.push(demographic); }
+				if(authors && settings.get(['checked_notes','authbors'])) { notes.push(authors); }
+				if(settings.get(['checked_notes','aired'])) { notes.push(airedTag); }
+				if(settings.get(['checked_notes','published'])) { notes.push(publishedTag); }
+				if(settings.get(['checked_notes','score'])) { notes.push(scoreTag); }
+				if(settings.get(['checked_notes','rank'])) { notes.push(rankTag); }
+				if(settings.get(['checked_notes','popularity'])) { notes.push(popularityTag); }
+				if(settings.get(['checked_notes','rating'])) { notes.push(ratingTag); }
+				if(settings.get(['checked_notes','duration'])) { notes.push(durationTag); }
+				if(settings.get(['checked_notes','total_duration'])) { notes.push(totalDurationTag); }
+				if(settings.get(['checked_notes','synopsis'])) { notes.push(synopsis); }
 
 				let notesStr = notes.join("\n\n");
 				let notesRequestUrl = '';
@@ -2296,7 +2311,7 @@ class Worker {
 				})
 				.catch(error => {
 					this.errors++;
-					log.error(error);
+					Log.error(error);
 					return false;
 				});
 			}
@@ -2320,11 +2335,11 @@ class Worker {
 			{
 				imgUrl = imgUrlt = imgUrlv = imgUrll = 'none';
 				this.warnings++;
-				log.warn(`${List.type} #${id}: no image found`);
+				Log.warn(`${List.type} #${id}: no image found`);
 			}
 			
 			/* Generate CSS */
-			let cssLine = Settings.get(['css_template'])
+			let cssLine = settings.get(['css_template'])
 				.replaceAll('[DEL]', '')
 				.replaceAll('[ID]', id)
 				.replaceAll('[TYPE]', List.type)
@@ -2363,7 +2378,7 @@ class Worker {
 		catch(e)
 		{
 			this.errors++;
-			log.error(`${List.type} #${id}: ${e}`);
+			Log.error(`${List.type} #${id}: ${e}`);
 		}
 		
 		this.continue();
@@ -2377,7 +2392,7 @@ class Worker {
 		this.percent = this.iteration / this.data.length * 100 || 0;
 
 		if( this.iteration === 0 ){
-			this.timeThen = performance.now() - Settings.get(['delay']);
+			this.timeThen = performance.now() - settings.get(['delay']);
 		}
 		let timeSince = performance.now() - this.timeThen;
 		this.timeThen = performance.now();
@@ -2392,7 +2407,7 @@ class Worker {
 			this.finish();
 			return;
 		}
-		this.timeout = setTimeout(()=>{this.scrape()}, Settings.get(['delay']));
+		this.timeout = setTimeout(()=>{this.scrape()}, settings.get(['delay']));
 	}
 
 	finish( ){
@@ -2430,11 +2445,11 @@ class Worker {
 	async start( ){
 		this.errors = 0;
 		this.warnings = 0;
-		cssComponent.write(`\/*\nGenerated by MyAnimeList-Tools v${ver}\nhttps://github.com/ValerioLyndon/MyAnimeList-Tools\n\nTemplate=${Settings.get(['css_template']).replace(/\*\//g, "*[DEL]/")}\nMatchTemplate=${Settings.get(['match_template'])}\n*\/\n`);
-		Settings.save();
+		cssComponent.write(`\/*\nGenerated by MyAnimeList-Tools v${ver}\nhttps://github.com/ValerioLyndon/MyAnimeList-Tools\n\nTemplate=${settings.get(['css_template']).replace(/\*\//g, "*[DEL]/")}\nMatchTemplate=${settings.get(['match_template'])}\n*\/\n`);
+		settings.save();
 		window.addEventListener('beforeunload', warnUserBeforeLeaving);
 
-		if( Settings.get(['live_preview']) ){
+		if( settings.get(['live_preview']) ){
 			let previewText = new Textarea(false, 'CSS Output', {'readonly':'readonly'}, 12);
 			cssComponent.$preview = previewText.$box;
 			UI.newWindow(previewText.$raw);
@@ -2452,7 +2467,7 @@ class Worker {
 			this.finish();
 		});
 		let categories = [];
-		for( let [categoryId, check] of Object.entries(Settings.get(['checked_categories'])) )
+		for( let [categoryId, check] of Object.entries(settings.get(['checked_categories'])) )
 		{
 			if(check)
 			{
@@ -2464,7 +2479,7 @@ class Worker {
 
 		/* Skip old lines */
 
-		let lastRun = Settings.get(['use_last_run']) === true ?
+		let lastRun = settings.get(['use_last_run']) === true ?
 			store.get([`last_${List.type}_run`]) ?
 				store.get([`last_${List.type}_run`]) : '' : '';
 
@@ -2477,7 +2492,7 @@ class Worker {
 			let id = item[`${List.type}_id`];
 			
 			/* Skip item if category does not match selected user options */
-			if( Settings.get(['select_categories']) ){
+			if( settings.get(['select_categories']) ){
 				let skip = true;
 				let rewatchKey = List.isAnime ? 'is_rewatching' : 'is_rereading';
 				for( let categoryId of categories ){
@@ -2501,7 +2516,7 @@ class Worker {
 			let lineText;
 			for( let j = 0; j < oldLines.length; j++ ){
 				lineText = oldLines[j];
-				let match = Settings.get(['match_template']).replaceAll(/\[ID\]/g, id).replaceAll(/\[TYPE\]/g, List.type);
+				let match = settings.get(['match_template']).replaceAll(/\[ID\]/g, id).replaceAll(/\[TYPE\]/g, List.type);
 				lineExists = lineText.indexOf(match) > 0;
 				if( lineExists ){
 					break;
@@ -2511,7 +2526,7 @@ class Worker {
 			/* Add to processing list or skip any existing lines.
 			If validating old images, that step will also occur here. */
 			if( lineExists ){
-				if( Settings.get(['use_last_run']) && Settings.get(['check_existing']) ){
+				if( settings.get(['use_last_run']) && settings.get(['check_existing']) ){
 					let imgUrl = lineText.match(/http.*?\.(?:jpe?g|webp)/);
 					if( imgUrl.length === 0 ){
 						this.data.push(item);
@@ -2597,7 +2612,7 @@ function buildMainUI( ){
 	let $clearBtn = new Button('Clear Settings', {title:'Clears any stored settings from previous runs.'});
 	if( store.has(`${List.type}_settings`) || store.has(`last_${List.type}_run`) ){
 		$clearBtn.on('click', ()=> {
-			Settings.clear();
+			settings.clear();
 		});
 	}
 	else {
@@ -2726,7 +2741,7 @@ function buildCssSettings( ){
 			new Paragraph('The program will use the Match Template to find and skip any duplicate entries from this text area, which will speed up process times. This text area will be automatically updated with the last run every time you use the tool. If want to wipe this data or you have a different run output you want to use, you can freely override or make edits to this text.'),
 			validate.$main
 		],
-		Settings.get(['use_last_run']) === true
+		settings.get(['use_last_run']) === true
 	);
 
 	/* Structure */
@@ -2803,9 +2818,9 @@ function buildCssExport( ){
 	let $row = $('<div class="l-row">');
 	let $form = $('<div class="l-column">');
 	let tmplField = new Field(false, 'Template');
-	tmplField.$box.val(Settings.get(['css_template']));
+	tmplField.$box.val(settings.get(['css_template']));
 	let matchField = new Field(false, 'Match Template');
-	matchField.$box.val(Settings.get(['match_template']));
+	matchField.$box.val(settings.get(['match_template']));
 	let cssField = new Textarea(false, 'CSS Styling');
 	let outputField = new Field();
 	outputField.$box.attr('readonly','readonly');
@@ -2973,7 +2988,7 @@ function buildResults( css, tags, notes, items, errors, warnings ){
 /* Add "Tools" button to list */
 
 if( List.isOwner ){
-	let button = $('<a href="javascript:void(0);">Tools</a>')
+	let $button = $('<a href="javascript:void(0);">Tools</a>')
 	.on('click',()=>{
 		if( UI && UI.alive ){
 			UI.open();
@@ -2984,15 +2999,15 @@ if( List.isOwner ){
 	});
 
 	if( List.isModern ){
-		button.addClass('icon-menu');
-		button.html(`
+		$button.addClass('icon-menu');
+		$button.html(`
 			<svg class="icon burnt-trigger-icon" xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 512 512"><!--! Font Awesome Free 6.4.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2023 Fonticons, Inc. --><path d="M78.6 5C69.1-2.4 55.6-1.5 47 7L7 47c-8.5 8.5-9.4 22-2.1 31.6l80 104c4.5 5.9 11.6 9.4 19 9.4h54.1l109 109c-14.7 29-10 65.4 14.3 89.6l112 112c12.5 12.5 32.8 12.5 45.3 0l64-64c12.5-12.5 12.5-32.8 0-45.3l-112-112c-24.2-24.2-60.6-29-89.6-14.3l-109-109V104c0-7.5-3.5-14.5-9.4-19L78.6 5zM19.9 396.1C7.2 408.8 0 426.1 0 444.1C0 481.6 30.4 512 67.9 512c18 0 35.3-7.2 48-19.9L233.7 374.3c-7.8-20.9-9-43.6-3.6-65.1l-61.7-61.7L19.9 396.1zM512 144c0-10.5-1.1-20.7-3.2-30.5c-2.4-11.2-16.1-14.1-24.2-6l-63.9 63.9c-3 3-7.1 4.7-11.3 4.7H352c-8.8 0-16-7.2-16-16V102.6c0-4.2 1.7-8.3 4.7-11.3l63.9-63.9c8.1-8.1 5.2-21.8-6-24.2C388.7 1.1 378.5 0 368 0C288.5 0 224 64.5 224 144l0 .8 85.3 85.3c36-9.1 75.8 .5 104 28.7L429 274.5c49-23 83-72.8 83-130.5zM56 432a24 24 0 1 1 48 0 24 24 0 1 1 -48 0z"/></svg>
 			<span class="text">Tools</span>
 		`);
-		$('.list-menu-float').append(button);
+		$('.list-menu-float').append($button);
 	}
 	else {
-		$('#mal_cs_otherlinks div:last-of-type').append(button);
+		$('#mal_cs_otherlinks div:last-of-type').append($button);
 	}
 
 	$('head').append($('<style>').text(`
