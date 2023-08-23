@@ -716,785 +716,6 @@ function sleep( ms ){
 	return new Promise(resolve => { setTimeout(resolve, ms); });
 }
 
-/* Main Program */
-
-/* Core class for handling popup windows and overlays, extended by Primary and Subsidiary variants
-no requirements */
-class UserInterface {
-	alive = true;
-	#attachmentPoint = document.createElement('div');
-	#shadowRoot = this.#attachmentPoint.attachShadow({mode: 'open'});
-	root = document.createElement('div');
-	$container = $('<div class="c-container">');
-	$windowList = $('<div class="c-window-list js-focus">');
-	$window = $('<main class="l-column c-window">');
-
-	constructor( ){
-		this.#shadowRoot.append(this.root);
-		this.root.className = 'root is-closed';
-		$(this.root).append(this.$container);
-		this.$container.append(this.$windowList);
-		this.$windowList.append(this.$window);
-
-		this.style(`
-/* Absolute Basics */
-
-*, *::before, *::after {
-	scrollbar-color: var(--scroll-thumb) var(--bg2);
-	box-sizing: inherit;
-}
-.root {
-	box-sizing: border-box;
-	display: contents;
-}
-
-.dark {
-	color-scheme: dark;
-	--outline: #578dad;
-	--bg: #090909f7;
-	--bg2: #292929;
-	--group-bg: #88888832;
-	--txt: #eee;
-	--btn-bg: #222222f0;
-	--btn-brdr: #4e4e4e;
-	--fld-bg: #18181888;
-	--fld-brdr: #424242;
-	--stat-working: #3166e0;
-	--stat-good: #1b833a;
-	--stat-bad: #f24242;
-	--scroll-thumb: #555;
-}
-.light {
-	color-scheme: light;
-	--outline: #78BBE2;
-	--bg: #ffffffc8;
-	--bg2: #c0c0c0;
-	--group-bg: #88888832;
-	--txt: #111;
-	--btn-bg: #d9d9d9f0;
-	--btn-brdr: #767676;
-	--fld-bg: #f6f6f688;
-	--fld-brdr: #999;
-	--stat-working: #4277f2;
-	--stat-good: #60ce81;
-	--stat-bad: #f24242;
-	--scroll-thumb: #555;
-}
-
-*:not([type="checkbox"]):focus {
-	outline: 2px solid var(--outline);
-	outline-offset: -2px;
-}
-[type="checkbox"]:focus-visible {
-	outline: 2px solid var(--outline);
-}
-
-
-
-/* Layout */
-
-.l-column {
-	display: grid;
-	grid-auto-flow: row;
-	gap: 10px;
-	place-items: start stretch;
-}
-
-.l-row {
-	display: flex;
-	gap: 10px;
-	place-items: start left;
-}
-
-.l-split {
-	display: flex;
-	width: 100%;
-	gap: 10px;
-	align-items: stretch;
-	justify-content: space-between;
-}
-
-.l-expand {
-	flex-grow: 1;
-}
-.l-fit {
-	width: fit-content;
-	flex: 0 0 auto;
-}
-
-.l-scrollable {
-	max-height: 50vh;
-	overflow-y: auto;
-}
-
-
-
-/* Components */
-
-.c-hr {
-	height: 4px;
-	background: var(--bg2);
-	border: 0;
-	border-radius: 2px;
-	margin: 5px 0;
-}
-
-.c-title {
-	font-size: 14px;
-	margin: 0;
-}
-.c-subtitle {
-	margin: 0;
-}
-
-.c-paragraph {
-	line-height: 1.3;
-	margin: 0;
-}
-
-.c-container {
-	position: fixed;
-	inset: 0;
-	z-index: 99999;
-	display: grid;
-	place-items: start center;
-	overflow: auto;
-	text-align: left;
-	opacity: 1;
-	transition: opacity .16s ease;
-}
-.c-container--blurred {
-	background-color: rgba(0,0,0,0.5);
-	backdrop-filter: blur(1.5px);
-}
-.root:not(.is-closed) .c-container {
-	animation: fade .2s ease;
-}
-.root.is-closed .c-container {
-	opacity: 0;
-	pointer-events: none;
-}
-
-.c-window-list {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: start;
-	gap: 15px;
-	padding: min(15vh, 200px) 10px 30px;
-}
-.is-subsidiary .c-window-list {
-	padding-top: min(20vh, 230px);
-	margin-left: min(75px, calc(100vw - 527px));
-}
-
-.c-window {
-	width: 500px;
-	height: fit-content;
-	padding: 10px;
-	background-color: var(--bg);
-	border-radius: 12px;
-	box-shadow: 0 3px 12px rgba(0,0,0,0.7);
-	color: var(--txt);
-	font: 13px/1.3 Roboto, Arial, Helvetica, "Segoe UI", sans-serif;
-	backdrop-filter: blur(5px);
-}
-
-.c-button {
-	padding: 2px 4px;
-	background: var(--btn-bg);
-	border: 1px solid var(--btn-brdr);
-	border-radius: 6px;
-	color: var(--txt);
-	cursor: pointer;
-	justify-self: start;
-}
-.c-button:disabled {
-	opacity: 0.7;
-	cursor: not-allowed;
-}
-
-.c-check {
-	display: flex;
-	align-items: center;
-	gap: 5px;
-	cursor: pointer;
-}
-.c-check__box {
-	margin: 0;
-}
-
-.c-radio,
-.c-field {
-	display: flex;
-	gap: 5px;
-	flex-direction: column;
-	place-items: start;
-	width: 100%;
-	white-space: nowrap;
-	font-weight: bold;
-}
-.c-field--inline {
-	width: fit-content;
-	flex-direction: row;
-	place-items: center;
-	font-weight: normal;
-}
-.c-field__box {
-	width: 100%;
-	padding: 3px;
-	background: var(--fld-bg);
-	border: 1px solid var(--fld-brdr);
-	border-radius: 6px;
-	color: var(--txt);
-	font: 400 12px/1 monospace;
-}
-.c-field__box--multiline {
-	--lines: 3;
-	min-height: 20px;
-	height: calc(8px + var(--lines) * 12px);
-	max-height: 80vh;
-	padding: 6px;
-	resize: vertical;
-	word-break: break-all;
-}
-
-.c-radio input {
-	display: none;
-}
-.c-radio__row {
-	display: flex;
-	border-radius: 6px;
-	overflow: hidden;
-}
-.c-radio__station {
-	padding: 3px 6px;
-	background: var(--group-bg);
-	cursor: pointer;
-	font-weight: normal;
-}
-.c-radio__station ~ .c-radio__station {
-	margin-left: 2px;
-}
-:checked + .c-radio__station {
-	background: var(--btn-bg);
-	filter: invert(1);
-}
-
-.c-component {
-	padding: 10px;
-	background: var(--group-bg);
-	border-radius: 9px;
-}
-.c-component.is-disabled {
-	opacity: 0.5;
-}
-
-.c-option {
-	padding: 5px;
-	background: var(--group-bg);
-	border-radius: 9px;
-}
-.c-option--fit {
-	width: fit-content;
-}
-
-.c-drawer {
-	padding-left: 5px;
-	overflow: hidden;
-	transition: height 0.16s ease;
-}
-
-.c-check-grid {
-	display: grid;
-	grid-template-columns: repeat( auto-fit, minmax(140px, 1fr) );
-	gap: 5px;
-	width: 100%;
-	padding: 10px;
-	background: var(--group-bg);
-	border-radius: 9px;
-}
-
-.c-log {
-	padding: 5px;
-	background: var(--group-bg);
-	border-radius: 9px;
-	font: 11px/1.5em monospace;
-}
-
-
-
-/* One-off Components */
-
-.c-footer {
-	font-size: 10px;
-}
-
-.c-status {
-	--percent: 0%;
-	--colour: var(--stat-working);
-	align-self: stretch;
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	width: 100%;
-	padding: 2px 6px;
-	background: var(--bg2);
-	border-radius: 6px;
-	background-image: linear-gradient(
-		to right,
-		var(--colour) var(--percent),
-		transparent var(--percent)
-	);
-	white-space: nowrap;
-}
-.c-status.is-unsure {
-	background-image: linear-gradient(
-		to right,
-		var(--colour) 40%,
-		transparent 40%
-	);
-	animation: unsure-bar 999s linear infinite;
-}
-.c-status.is-fixed {
-	position: fixed;
-	left: 20px;
-	top: 20px;
-	width: 240px;
-	transform: translateX(-280px);
-}
-.is-closed .c-status.is-fixed {
-	transform: translateX(0px);
-}
-
-/* States */
-
-.is-interactable {
-	cursor: pointer;
-}
-
-/* Overrides */
-
-.o-block-gap {
-	gap: 10px;
-}
-.o-half-gap {
-	gap: 5px;
-}
-.o-text-gap {
-	gap: 3px;
-}
-
-.o-align-center {
-	align-items: center;
-}
-
-.o-justify-start {
-	justify-items: start;
-}
-
-.o-no-resize {
-	resize: none;
-}
-
-.o-wrap {
-	flex-wrap: wrap;
-}
-
-.o-bold {
-	font-weight: 700;
-}
-
-
-
-/* JS Functions */
-
-.js-focus {
-	transition:
-		transform .22s ease,
-		opacity .16s ease;
-}
-.js-focus.is-unfocused {
-	transform: translateX(-75px);
-	opacity: 0.7;
-}
-.root:not(.is-closed) .js-focus {
-	animation: slide .22s ease;
-}
-.root.is-closed .js-focus {
-	transform: translateX(75px);
-}
-
-
-
-/* Animations */
-
-@keyframes fade {
-	from {
-		opacity: 0;
-	} to {
-		opacity: 1;
-	}
-}
-
-@keyframes slide {
-	from {
-		transform: translateX(75px);
-	} to {
-		transform: translateX(0);
-	}
-}
-
-@keyframes unsure-bar {
-	from {
-		background-position: 20px;
-	} to {
-		background-position: 99999px;
-	}
-}
-		`);
-		this.setTheme();
-
-		document.body.append(this.#attachmentPoint);
-	}
-
-	open( ){
-		if( this.alive ){
-			this.root.classList.remove('is-closed');
-		}
-	}
-
-	close( ){
-		this.root.classList.add('is-closed');
-	}
-
-	destruct( ){
-		if( this.alive ){
-			this.alive = false;
-			this.close();
-			setTimeout(()=>{
-				this.#attachmentPoint.remove();
-			}, 200);
-		}
-	}
-
-	style( css ){
-		let html = document.createElement('style');
-		html.className = 'css';
-		html.textContent = css;
-		this.#shadowRoot.append(html);
-		return html;
-	}
-
-	getThemePreference( ){
-		let preference = store.get('theme');
-		return preference !== undefined ?
-			preference :
-			window.matchMedia('(prefers-color-scheme: light)').matches ?
-				'light' :
-				'dark';
-	}
-
-	setTheme( theme ){
-		if( !['light', 'dark'].includes(theme) ){
-			theme = this.getThemePreference();
-		}
-		this.root.classList.remove('light', 'dark');
-		this.root.classList.add(theme);
-		store.set('theme', theme);
-	}
-
-	swapTheme( ){
-		let theme = this.getThemePreference() === 'light' ? 'dark' : 'light';
-		this.setTheme(theme);
-	}
-
-	unfocus( ){
-		this.$windowList.addClass('is-unfocused');
-	}
-
-	refocus( ){
-		this.$windowList.removeClass('is-unfocused');
-	}
-
-	newWindow( ...children ){
-		let $window = $(`<aside class="l-column c-window">`);
-		$window.append(...children);
-		this.$windowList.append($window);
-		return $window;
-	}
-}
-
-class PrimaryUI extends UserInterface {
-	constructor( ){
-		super();
-		this.$container.addClass('c-container--blurred');
-	}
-
-	open( ){
-		super.open();
-		document.body.style.overflow = 'hidden';
-	}
-
-	close( ){
-		super.close();
-		document.body.style.overflow = '';
-	}
-}
-
-class SubsidiaryUI extends UserInterface {
-	constructor( parentUI, title, subtitle = false ){
-		super();
-		this.parentUI = parentUI;
-
-		this.nav = new SplitRow();
-		this.nav.$left.append(
-			new Header(title, subtitle).$main
-		);
-		this.nav.$right.append(
-			$(`<input class="c-button" type="button" value="Back">`).on('click', ()=>{
-				this.destruct();
-			})
-		);
-		this.$window.append(this.nav.$main, new Hr());
-		this.$container.addClass('is-subsidiary');
-	}
-
-	open( ){
-		super.open();
-		this.parentUI.open();
-		this.parentUI.unfocus();
-	}
-
-	close( ){
-		super.close();
-		this.parentUI.refocus();
-	}
-
-	destruct( ){
-		super.destruct();
-		this.parentUI.refocus();
-	}
-}
-
-
-
-/* Common user interface constructors */
-
-class SplitRow {
-	constructor( leftCls = 'l-expand l-row', rightCls = 'l-fit l-row' ){
-		this.$main = $('<div class="l-split">');
-		this.$left = $(`<div class="${leftCls}">`);
-		this.$right = $(`<div class="${rightCls}">`);
-		this.$main.append(this.$left,this.$right);
-	}
-}
-
-class GroupRow extends SplitRow {
-	constructor( name, settingsFunc, additionalActions = [] ){
-		super();
-
-		this.$left.addClass('o-align-center');
-		this.$left.append(
-			name
-		);
-		let $button = new Button('Settings')
-		.on('click', ()=>{
-			settingsFunc();
-		});
-		this.$right.append(
-			...additionalActions,
-			$button
-		);
-		this.$main.addClass('c-component');
-		Worker.disableWhileRunning.push(...additionalActions, $button);
-	}
-}
-
-class OptionalGroupRow extends GroupRow {
-	constructor( name, settingArray, settingsFunc, additionalActions = [] ){
-		super('', settingsFunc, additionalActions);
-		this.enabled = false;
-
-		this.check = new Check(settingArray, name);
-		this.check.$raw.addClass('o-block-gap');
-		this.check.$box.on('input', ()=>{ this.checkStatus(); });
-		this.checkStatus();
-
-		this.$left.append(
-			this.check.$raw
-		);
-		Worker.disableWhileRunning.push(this.check.$box);
-	}
-
-	checkStatus( ){
-		if( this.check.$box.is(':checked') ){
-			this.$main.removeClass('is-disabled');
-		}
-		else {
-			this.$main.addClass('is-disabled');
-		}
-	}
-}
-
-class Hr {
-	static $node = $('<hr class="c-hr">');
-	constructor( ){
-		return Hr.$node.clone();
-	}
-}
-
-class Paragraph {
-	constructor( text ){
-		return $('<p class="c-paragraph">'+text.split('\n\n').join('</p><p class="c-paragraph">')+'</p>');
-	}
-}
-
-class Drawer {
-	constructor( children = [], open = false ){
-		this.$main = $('<div class="c-drawer l-column">');
-		this.$main.append(...children);
-		if( open ){
-			this.open();
-		}
-		else {
-			this.close();
-		}
-	}
-
-	open( ){
-		let height = NodeDimensions.height(this.$main);
-		this.$main.css('height', height+'px');
-		this.$main.removeClass('is-hidden');
-	}
-
-	close( ){
-		this.$main.addClass('is-hidden');
-		this.$main.css('height', '0px');
-	}
-}
-
-class CheckGrid {
-	constructor( checks ){
-		this.$main = $('<div class="c-check-grid">');
-		for( let chk of checks ){
-			this.$main.append(chk.$raw);
-		}
-	}
-}
-
-class CheckGroup {
-	constructor( settingArray, title, desc = false, checkArray ){
-		this.$main = $('<div class="c-option c-option--fit">');
-		this.$raw = $(`<div class="l-column o-text-gap">`);
-		
-		let checks = [];
-		for( let check of checkArray ){
-			check.$raw.prepend('∟');
-			checks.push(check.$raw);
-		}
-
-		let toggle = new Check(settingArray, title, desc);
-		toggle.$box.on('click', ()=>{
-			if( toggle.$box.is(':checked') ){
-				drawer.open();
-			}
-			else {
-				drawer.close();
-			}
-		});
-		let drawer = new Drawer(checks, toggle.$box.is(':checked'));
-		drawer.$main.addClass('o-text-gap');
-		
-		this.$raw.append(toggle.$raw, drawer.$main);
-		this.$main.append(this.$raw);
-	}
-}
-
-class Check {
-	constructor( settingArray, title, desc = false ){
-		this.$main = $('<div class="c-option c-option--fit">');
-		this.$raw = $(`<label class="c-check">${title}</label>`);
-		if( desc ){
-			this.$raw.attr('title', desc);
-		}
-		this.$box = $('<input class="c-check__box" type="checkbox">')
-			.prop('checked', settings.get(settingArray))
-			.on('change', ()=>{
-				settings.set(settingArray, this.$box.is(':checked'));
-			});
-
-		this.$raw.prepend(this.$box);
-		this.$main.append(this.$raw);
-	}
-}
-
-class Field {
-	constructor( settingArray = false, title = '', desc = false, style = 'block' ){
-		this.$main = $('<div class="c-option">');
-		this.$raw = $(`<label class="c-field">${title}</label>`);
-		if( desc ){
-			this.$raw.attr('title', desc);
-		}
-
-		this.$box = $(`<input class="c-field__box" type="text" spellcheck="no">`);
-		if( settingArray ){
-			this.$box.on('input', ()=>{
-				settings.set(settingArray, this.$box.val());
-			});
-			this.$box.val(settings.get(settingArray));
-		}
-		
-		if( style === 'inline' ){
-			this.$raw.addClass('c-field--inline');
-		}
-		this.$raw.append(this.$box);
-		this.$main.append(this.$raw);
-	}
-}
-
-class Textarea {
-	constructor( settingArray = false, title = '', attributes = {}, lines = 3 ){
-		this.$main = $('<div class="c-option">');
-		this.$raw = $(`<label class="c-field">${title}</label>`);
-
-		this.$box = $(`<textarea class="c-field__box c-field__box--multiline" spellcheck="no" style="--lines: ${lines}">`);
-		if( settingArray ){
-			this.$box.on('input', ()=>{
-				settings.set(settingArray, this.$box.val());
-			});
-			this.$box.val(settings.get(settingArray));
-		}
-		for( let [name,value] of Object.entries(attributes) ){
-			this.$box.attr(name,value);
-		}
-		
-		this.$raw.append(this.$box);
-		this.$main.append(this.$raw);
-	}
-}
-
-class Header {
-	constructor( title, subtitle = false ){
-		subtitle = subtitle ? `<p class="c-subtitle">${subtitle}</p>` : '';
-		this.$main = $(`<hgroup class="l-column o-text-gap">
-			<h2 class="c-title">${title}</h2>
-			${subtitle}
-		</hgroup>`);
-	}
-}
-
-class Button {
-	constructor( value, attributes = {} ){
-		let button = $(`<input class="c-button" type="button" value="${value}">`);
-		for( let [name,value] of Object.entries(attributes) ){
-			button.attr(name,value);
-		}
-		return button;
-	}
-}
-
-
 
 /* Global Vars */
 
@@ -2983,6 +2204,780 @@ function buildResults( css, tags, notes, items, errors, warnings ){
 	popupUI.$window.append($info);
 
 	popupUI.open();
+}
+
+/* Core class for handling popup windows and overlays, extended by Primary and Subsidiary variants
+no requirements */
+class UserInterface {
+	alive = true;
+	#attachmentPoint = document.createElement('div');
+	#shadowRoot = this.#attachmentPoint.attachShadow({mode: 'open'});
+	root = document.createElement('div');
+	$container = $('<div class="c-container">');
+	$windowList = $('<div class="c-window-list js-focus">');
+	$window = $('<main class="l-column c-window">');
+
+	constructor( ){
+		this.#shadowRoot.append(this.root);
+		this.root.className = 'root is-closed';
+		$(this.root).append(this.$container);
+		this.$container.append(this.$windowList);
+		this.$windowList.append(this.$window);
+
+		this.style(`
+/* Absolute Basics */
+
+*, *::before, *::after {
+	scrollbar-color: var(--scroll-thumb) var(--bg2);
+	box-sizing: inherit;
+}
+.root {
+	box-sizing: border-box;
+	display: contents;
+}
+
+.dark {
+	color-scheme: dark;
+	--outline: #578dad;
+	--bg: #090909f7;
+	--bg2: #292929;
+	--group-bg: #88888832;
+	--txt: #eee;
+	--btn-bg: #222222f0;
+	--btn-brdr: #4e4e4e;
+	--fld-bg: #18181888;
+	--fld-brdr: #424242;
+	--stat-working: #3166e0;
+	--stat-good: #1b833a;
+	--stat-bad: #f24242;
+	--scroll-thumb: #555;
+}
+.light {
+	color-scheme: light;
+	--outline: #78BBE2;
+	--bg: #ffffffc8;
+	--bg2: #c0c0c0;
+	--group-bg: #88888832;
+	--txt: #111;
+	--btn-bg: #d9d9d9f0;
+	--btn-brdr: #767676;
+	--fld-bg: #f6f6f688;
+	--fld-brdr: #999;
+	--stat-working: #4277f2;
+	--stat-good: #60ce81;
+	--stat-bad: #f24242;
+	--scroll-thumb: #555;
+}
+
+*:not([type="checkbox"]):focus {
+	outline: 2px solid var(--outline);
+	outline-offset: -2px;
+}
+[type="checkbox"]:focus-visible {
+	outline: 2px solid var(--outline);
+}
+
+
+
+/* Layout */
+
+.l-column {
+	display: grid;
+	grid-auto-flow: row;
+	gap: 10px;
+	place-items: start stretch;
+}
+
+.l-row {
+	display: flex;
+	gap: 10px;
+	place-items: start left;
+}
+
+.l-split {
+	display: flex;
+	width: 100%;
+	gap: 10px;
+	align-items: stretch;
+	justify-content: space-between;
+}
+
+.l-expand {
+	flex-grow: 1;
+}
+.l-fit {
+	width: fit-content;
+	flex: 0 0 auto;
+}
+
+.l-scrollable {
+	max-height: 50vh;
+	overflow-y: auto;
+}
+
+
+
+/* Components */
+
+.c-hr {
+	height: 4px;
+	background: var(--bg2);
+	border: 0;
+	border-radius: 2px;
+	margin: 5px 0;
+}
+
+.c-title {
+	font-size: 14px;
+	margin: 0;
+}
+.c-subtitle {
+	margin: 0;
+}
+
+.c-paragraph {
+	line-height: 1.3;
+	margin: 0;
+}
+
+.c-container {
+	position: fixed;
+	inset: 0;
+	z-index: 99999;
+	display: grid;
+	place-items: start center;
+	overflow: auto;
+	text-align: left;
+	opacity: 1;
+	transition: opacity .16s ease;
+}
+.c-container--blurred {
+	background-color: rgba(0,0,0,0.5);
+	backdrop-filter: blur(1.5px);
+}
+.root:not(.is-closed) .c-container {
+	animation: fade .2s ease;
+}
+.root.is-closed .c-container {
+	opacity: 0;
+	pointer-events: none;
+}
+
+.c-window-list {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: start;
+	gap: 15px;
+	padding: min(15vh, 200px) 10px 30px;
+}
+.is-subsidiary .c-window-list {
+	padding-top: min(20vh, 230px);
+	margin-left: min(75px, calc(100vw - 527px));
+}
+
+.c-window {
+	width: 500px;
+	height: fit-content;
+	padding: 10px;
+	background-color: var(--bg);
+	border-radius: 12px;
+	box-shadow: 0 3px 12px rgba(0,0,0,0.7);
+	color: var(--txt);
+	font: 13px/1.3 Roboto, Arial, Helvetica, "Segoe UI", sans-serif;
+	backdrop-filter: blur(5px);
+}
+
+.c-button {
+	padding: 2px 4px;
+	background: var(--btn-bg);
+	border: 1px solid var(--btn-brdr);
+	border-radius: 6px;
+	color: var(--txt);
+	cursor: pointer;
+	justify-self: start;
+}
+.c-button:disabled {
+	opacity: 0.7;
+	cursor: not-allowed;
+}
+
+.c-check {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	cursor: pointer;
+}
+.c-check__box {
+	margin: 0;
+}
+
+.c-radio,
+.c-field {
+	display: flex;
+	gap: 5px;
+	flex-direction: column;
+	place-items: start;
+	width: 100%;
+	white-space: nowrap;
+	font-weight: bold;
+}
+.c-field--inline {
+	width: fit-content;
+	flex-direction: row;
+	place-items: center;
+	font-weight: normal;
+}
+.c-field__box {
+	width: 100%;
+	padding: 3px;
+	background: var(--fld-bg);
+	border: 1px solid var(--fld-brdr);
+	border-radius: 6px;
+	color: var(--txt);
+	font: 400 12px/1 monospace;
+}
+.c-field__box--multiline {
+	--lines: 3;
+	min-height: 20px;
+	height: calc(8px + var(--lines) * 12px);
+	max-height: 80vh;
+	padding: 6px;
+	resize: vertical;
+	word-break: break-all;
+}
+
+.c-radio input {
+	display: none;
+}
+.c-radio__row {
+	display: flex;
+	border-radius: 6px;
+	overflow: hidden;
+}
+.c-radio__station {
+	padding: 3px 6px;
+	background: var(--group-bg);
+	cursor: pointer;
+	font-weight: normal;
+}
+.c-radio__station ~ .c-radio__station {
+	margin-left: 2px;
+}
+:checked + .c-radio__station {
+	background: var(--btn-bg);
+	filter: invert(1);
+}
+
+.c-component {
+	padding: 10px;
+	background: var(--group-bg);
+	border-radius: 9px;
+}
+.c-component.is-disabled {
+	opacity: 0.5;
+}
+
+.c-option {
+	padding: 5px;
+	background: var(--group-bg);
+	border-radius: 9px;
+}
+.c-option--fit {
+	width: fit-content;
+}
+
+.c-drawer {
+	padding-left: 5px;
+	overflow: hidden;
+	transition: height 0.16s ease;
+}
+
+.c-check-grid {
+	display: grid;
+	grid-template-columns: repeat( auto-fit, minmax(140px, 1fr) );
+	gap: 5px;
+	width: 100%;
+	padding: 10px;
+	background: var(--group-bg);
+	border-radius: 9px;
+}
+
+.c-log {
+	padding: 5px;
+	background: var(--group-bg);
+	border-radius: 9px;
+	font: 11px/1.5em monospace;
+}
+
+
+
+/* One-off Components */
+
+.c-footer {
+	font-size: 10px;
+}
+
+.c-status {
+	--percent: 0%;
+	--colour: var(--stat-working);
+	align-self: stretch;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	width: 100%;
+	padding: 2px 6px;
+	background: var(--bg2);
+	border-radius: 6px;
+	background-image: linear-gradient(
+		to right,
+		var(--colour) var(--percent),
+		transparent var(--percent)
+	);
+	white-space: nowrap;
+}
+.c-status.is-unsure {
+	background-image: linear-gradient(
+		to right,
+		var(--colour) 40%,
+		transparent 40%
+	);
+	animation: unsure-bar 999s linear infinite;
+}
+.c-status.is-fixed {
+	position: fixed;
+	left: 20px;
+	top: 20px;
+	width: 240px;
+	transform: translateX(-280px);
+}
+.is-closed .c-status.is-fixed {
+	transform: translateX(0px);
+}
+
+/* States */
+
+.is-interactable {
+	cursor: pointer;
+}
+
+/* Overrides */
+
+.o-block-gap {
+	gap: 10px;
+}
+.o-half-gap {
+	gap: 5px;
+}
+.o-text-gap {
+	gap: 3px;
+}
+
+.o-align-center {
+	align-items: center;
+}
+
+.o-justify-start {
+	justify-items: start;
+}
+
+.o-no-resize {
+	resize: none;
+}
+
+.o-wrap {
+	flex-wrap: wrap;
+}
+
+.o-bold {
+	font-weight: 700;
+}
+
+
+
+/* JS Functions */
+
+.js-focus {
+	transition:
+		transform .22s ease,
+		opacity .16s ease;
+}
+.js-focus.is-unfocused {
+	transform: translateX(-75px);
+	opacity: 0.7;
+}
+.root:not(.is-closed) .js-focus {
+	animation: slide .22s ease;
+}
+.root.is-closed .js-focus {
+	transform: translateX(75px);
+}
+
+
+
+/* Animations */
+
+@keyframes fade {
+	from {
+		opacity: 0;
+	} to {
+		opacity: 1;
+	}
+}
+
+@keyframes slide {
+	from {
+		transform: translateX(75px);
+	} to {
+		transform: translateX(0);
+	}
+}
+
+@keyframes unsure-bar {
+	from {
+		background-position: 20px;
+	} to {
+		background-position: 99999px;
+	}
+}
+		`);
+		this.setTheme();
+
+		document.body.append(this.#attachmentPoint);
+	}
+
+	open( ){
+		if( this.alive ){
+			this.root.classList.remove('is-closed');
+		}
+	}
+
+	close( ){
+		this.root.classList.add('is-closed');
+	}
+
+	destruct( ){
+		if( this.alive ){
+			this.alive = false;
+			this.close();
+			setTimeout(()=>{
+				this.#attachmentPoint.remove();
+			}, 200);
+		}
+	}
+
+	style( css ){
+		let html = document.createElement('style');
+		html.className = 'css';
+		html.textContent = css;
+		this.#shadowRoot.append(html);
+		return html;
+	}
+
+	getThemePreference( ){
+		let preference = store.get('theme');
+		return preference !== undefined ?
+			preference :
+			window.matchMedia('(prefers-color-scheme: light)').matches ?
+				'light' :
+				'dark';
+	}
+
+	setTheme( theme ){
+		if( !['light', 'dark'].includes(theme) ){
+			theme = this.getThemePreference();
+		}
+		this.root.classList.remove('light', 'dark');
+		this.root.classList.add(theme);
+		store.set('theme', theme);
+	}
+
+	swapTheme( ){
+		let theme = this.getThemePreference() === 'light' ? 'dark' : 'light';
+		this.setTheme(theme);
+	}
+
+	unfocus( ){
+		this.$windowList.addClass('is-unfocused');
+	}
+
+	refocus( ){
+		this.$windowList.removeClass('is-unfocused');
+	}
+
+	newWindow( ...children ){
+		let $window = $(`<aside class="l-column c-window">`);
+		$window.append(...children);
+		this.$windowList.append($window);
+		return $window;
+	}
+}
+
+class PrimaryUI extends UserInterface {
+	constructor( ){
+		super();
+		this.$container.addClass('c-container--blurred');
+	}
+
+	open( ){
+		super.open();
+		document.body.style.overflow = 'hidden';
+	}
+
+	close( ){
+		super.close();
+		document.body.style.overflow = '';
+	}
+}
+
+class SubsidiaryUI extends UserInterface {
+	constructor( parentUI, title, subtitle = false ){
+		super();
+		this.parentUI = parentUI;
+
+		this.nav = new SplitRow();
+		this.nav.$left.append(
+			new Header(title, subtitle).$main
+		);
+		this.nav.$right.append(
+			$(`<input class="c-button" type="button" value="Back">`).on('click', ()=>{
+				this.destruct();
+			})
+		);
+		this.$window.append(this.nav.$main, new Hr());
+		this.$container.addClass('is-subsidiary');
+	}
+
+	open( ){
+		super.open();
+		this.parentUI.open();
+		this.parentUI.unfocus();
+	}
+
+	close( ){
+		super.close();
+		this.parentUI.refocus();
+	}
+
+	destruct( ){
+		super.destruct();
+		this.parentUI.refocus();
+	}
+}
+
+/* Common user interface constructors */
+
+class SplitRow {
+	constructor( leftCls = 'l-expand l-row', rightCls = 'l-fit l-row' ){
+		this.$main = $('<div class="l-split">');
+		this.$left = $(`<div class="${leftCls}">`);
+		this.$right = $(`<div class="${rightCls}">`);
+		this.$main.append(this.$left,this.$right);
+	}
+}
+
+class GroupRow extends SplitRow {
+	constructor( name, settingsFunc, additionalActions = [] ){
+		super();
+
+		this.$left.addClass('o-align-center');
+		this.$left.append(
+			name
+		);
+		let $button = new Button('Settings')
+		.on('click', ()=>{
+			settingsFunc();
+		});
+		this.$right.append(
+			...additionalActions,
+			$button
+		);
+		this.$main.addClass('c-component');
+		Worker.disableWhileRunning.push(...additionalActions, $button);
+	}
+}
+
+class OptionalGroupRow extends GroupRow {
+	constructor( name, settingArray, settingsFunc, additionalActions = [] ){
+		super('', settingsFunc, additionalActions);
+		this.enabled = false;
+
+		this.check = new Check(settingArray, name);
+		this.check.$raw.addClass('o-block-gap');
+		this.check.$box.on('input', ()=>{ this.checkStatus(); });
+		this.checkStatus();
+
+		this.$left.append(
+			this.check.$raw
+		);
+		Worker.disableWhileRunning.push(this.check.$box);
+	}
+
+	checkStatus( ){
+		if( this.check.$box.is(':checked') ){
+			this.$main.removeClass('is-disabled');
+		}
+		else {
+			this.$main.addClass('is-disabled');
+		}
+	}
+}
+
+class Hr {
+	static $node = $('<hr class="c-hr">');
+	constructor( ){
+		return Hr.$node.clone();
+	}
+}
+
+class Paragraph {
+	constructor( text ){
+		return $('<p class="c-paragraph">'+text.split('\n\n').join('</p><p class="c-paragraph">')+'</p>');
+	}
+}
+
+class Drawer {
+	constructor( children = [], open = false ){
+		this.$main = $('<div class="c-drawer l-column">');
+		this.$main.append(...children);
+		if( open ){
+			this.open();
+		}
+		else {
+			this.close();
+		}
+	}
+
+	open( ){
+		let height = NodeDimensions.height(this.$main);
+		this.$main.css('height', height+'px');
+		this.$main.removeClass('is-hidden');
+	}
+
+	close( ){
+		this.$main.addClass('is-hidden');
+		this.$main.css('height', '0px');
+	}
+}
+
+class CheckGrid {
+	constructor( checks ){
+		this.$main = $('<div class="c-check-grid">');
+		for( let chk of checks ){
+			this.$main.append(chk.$raw);
+		}
+	}
+}
+
+class CheckGroup {
+	constructor( settingArray, title, desc = false, checkArray ){
+		this.$main = $('<div class="c-option c-option--fit">');
+		this.$raw = $(`<div class="l-column o-text-gap">`);
+		
+		let checks = [];
+		for( let check of checkArray ){
+			check.$raw.prepend('∟');
+			checks.push(check.$raw);
+		}
+
+		let toggle = new Check(settingArray, title, desc);
+		toggle.$box.on('click', ()=>{
+			if( toggle.$box.is(':checked') ){
+				drawer.open();
+			}
+			else {
+				drawer.close();
+			}
+		});
+		let drawer = new Drawer(checks, toggle.$box.is(':checked'));
+		drawer.$main.addClass('o-text-gap');
+		
+		this.$raw.append(toggle.$raw, drawer.$main);
+		this.$main.append(this.$raw);
+	}
+}
+
+class Check {
+	constructor( settingArray, title, desc = false ){
+		this.$main = $('<div class="c-option c-option--fit">');
+		this.$raw = $(`<label class="c-check">${title}</label>`);
+		if( desc ){
+			this.$raw.attr('title', desc);
+		}
+		this.$box = $('<input class="c-check__box" type="checkbox">')
+			.prop('checked', settings.get(settingArray))
+			.on('change', ()=>{
+				settings.set(settingArray, this.$box.is(':checked'));
+			});
+
+		this.$raw.prepend(this.$box);
+		this.$main.append(this.$raw);
+	}
+}
+
+class Field {
+	constructor( settingArray = false, title = '', desc = false, style = 'block' ){
+		this.$main = $('<div class="c-option">');
+		this.$raw = $(`<label class="c-field">${title}</label>`);
+		if( desc ){
+			this.$raw.attr('title', desc);
+		}
+
+		this.$box = $(`<input class="c-field__box" type="text" spellcheck="no">`);
+		if( settingArray ){
+			this.$box.on('input', ()=>{
+				settings.set(settingArray, this.$box.val());
+			});
+			this.$box.val(settings.get(settingArray));
+		}
+		
+		if( style === 'inline' ){
+			this.$raw.addClass('c-field--inline');
+		}
+		this.$raw.append(this.$box);
+		this.$main.append(this.$raw);
+	}
+}
+
+class Textarea {
+	constructor( settingArray = false, title = '', attributes = {}, lines = 3 ){
+		this.$main = $('<div class="c-option">');
+		this.$raw = $(`<label class="c-field">${title}</label>`);
+
+		this.$box = $(`<textarea class="c-field__box c-field__box--multiline" spellcheck="no" style="--lines: ${lines}">`);
+		if( settingArray ){
+			this.$box.on('input', ()=>{
+				settings.set(settingArray, this.$box.val());
+			});
+			this.$box.val(settings.get(settingArray));
+		}
+		for( let [name,value] of Object.entries(attributes) ){
+			this.$box.attr(name,value);
+		}
+		
+		this.$raw.append(this.$box);
+		this.$main.append(this.$raw);
+	}
+}
+
+class Header {
+	constructor( title, subtitle = false ){
+		subtitle = subtitle ? `<p class="c-subtitle">${subtitle}</p>` : '';
+		this.$main = $(`<hgroup class="l-column o-text-gap">
+			<h2 class="c-title">${title}</h2>
+			${subtitle}
+		</hgroup>`);
+	}
+}
+
+class Button {
+	constructor( value, attributes = {} ){
+		let button = $(`<input class="c-button" type="button" value="${value}">`);
+		for( let [name,value] of Object.entries(attributes) ){
+			button.attr(name,value);
+		}
+		return button;
+	}
 }
 
 /* Add "Tools" button to list */

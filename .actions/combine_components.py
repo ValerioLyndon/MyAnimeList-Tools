@@ -29,6 +29,7 @@ fileReplacements = [
 	['credit', 'components/credit.js'],
 	['store', 'components/store.js'],
 	['main', 'components/main.js'],
+	['interface', 'components/interface.js'],
 	['css', 'components/primary.css']
 ]
 

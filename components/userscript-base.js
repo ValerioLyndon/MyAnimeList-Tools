@@ -26,6 +26,8 @@ var store = new CustomStorage('userscript');
 
 /*<<<main>>>*/
 
+/*<<<interface>>>*/
+
 /* Add "Tools" button to list */
 
 if( List.isOwner ){

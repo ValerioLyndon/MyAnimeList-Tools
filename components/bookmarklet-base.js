@@ -9,6 +9,8 @@ var store = new CustomStorage('localStorage');
 
 /*<<<main>>>*/
 
+/*<<<interface>>>*/
+
 if( List.isOwner ){
 	initialise();
 }
