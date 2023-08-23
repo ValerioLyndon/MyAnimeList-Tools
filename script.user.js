@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre9_a0
+// @version      11.0-pre10_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,7 +24,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre9_a0';
+const ver = '11.0-pre10_a0';
 const verMod = '2023/Aug/22';
 
 class CustomStorage {
@@ -181,20 +181,22 @@ class Logger {
 	}
 }
 
-class ListInfo {
-	constructor( ){
-		this.type = window.location.pathname.split('/')[1].substring(0,5);
-		this.isAnime = (this.type === 'anime');
-		this.isOwner = ($('body').attr('data-owner') === "1");
-		this.isModern = ($('#list_surround').length === 0);
-		this.style = undefined;
-		this.customCssEle = this.isModern ? $('#custom-css') : $('head style:first-of-type');
-		this.customCss = this.customCssEle.text().trim();
-		this.customCssModified = this.customCss.replaceAll(/\/\*MYANIMELIST-TOOLS START\*\/(.|\n)*\/\*MYANIMELIST-TOOLS END\*\//g, '').trim();
-		this.csrf = $('meta[name="csrf_token"]').attr('content');
-	}
+class List {
+	static type = window.location.pathname.split('/')[1].substring(0,5);
+	static isAnime = (this.type === 'anime');
+	static isOwner = ($('body').attr('data-owner') === "1");
+	static isModern = ($('#list_surround').length === 0);
+	static style = undefined;
+	static customCssEle = this.isModern ? $('#custom-css') : $('head style:first-of-type');
+	static customCss = this.customCssEle.text().trim();
+	static customCssModified = this.customCss.replaceAll(/\/\*MYANIMELIST-TOOLS START\*\/(.|\n)*\/\*MYANIMELIST-TOOLS END\*\//g, '').trim();
+	static csrf = $('meta[name="csrf_token"]').attr('content');
 
-	async determineStyle( ){
+	static async determineStyle( ){
+		if( this.style ){
+			return true;
+		}
+		
 		if( this.isModern ){
 			this.style = this.#determineModernStyle();
 		}
@@ -203,7 +205,7 @@ class ListInfo {
 		}
 	}
 
-	#determineModernStyle( ){
+	static #determineModernStyle( ){
 		/* function is slightly over-engineered to prevent failure,
 		hence the node loop and thorough error checking. */
 
@@ -332,7 +334,7 @@ class ListInfo {
 	scrape the list of advanced classic styles the user has created and subsequently
 	scrape the CSS from each of those styles until it finds one that matches the
 	currently applied CSS. */
-	async #determineClassicStyle( ){
+	static async #determineClassicStyle( ){
 		let userStylesPage = await request('https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv');
 		if( !userStylesPage ){
 			log.error('Could not access your classic list style page.');
@@ -1482,7 +1484,6 @@ class Button {
 /* Global Vars */
 
 var log = new Logger();
-var List = new ListInfo();
 var Settings;
 var UI;
 var cssComponent;
