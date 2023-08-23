@@ -53,7 +53,7 @@ class Logger {
 		let errorBox = document.createElement('div');
 		errorBox.className = 'c-log';
 		errorBox.insertAdjacentHTML('afterbegin', `<b>[${type}]</b> ${msg}`);
-		this.$parent.prepend(errorBox);
+		this.#$parent.prepend(errorBox);
 	}
 	
 	/* tellUser can be one of: true (show to user), false (only to console), or string (show custom string to user) */
@@ -974,20 +974,21 @@ var List = new ListInfo();
 var Settings;
 var UI;
 var cssComponent;
+var worker;
 
 
 
 /* Runtime */
 
-class Worker {
-	static disableWhileRunning = [];
-	/* buttons are added to this list to be later disabled upon process start */
-	static reenableAfterDone = [];
-	/* similarly, these buttons are re-enabled after finish */
-	static $actionBtn;
-	static running = false;
-	static errors = 0;
-	static warnings = 0;
+function initialise() {
+	List.determineStyle();
+	Settings = new UserSettings();
+	UI = new PrimaryUI();
+	cssComponent = new CSSComponent();
+
+	buildMainUI();
+
+	worker = new Worker();
 }
 
 class ListItems {
@@ -1036,6 +1037,9 @@ class ListItems {
 
 	static #done( ){
 		Status.update(`Successfully loaded ${this.data.length} items.`, 'good', 100);
+		Worker.$actionBtn.one('click', ()=>{
+			worker.start();
+		});
 		Worker.$actionBtn.val('Start');
 		Worker.$actionBtn.removeAttr('disabled');
 	}
@@ -1128,95 +1132,36 @@ class Status {
 		this.$fixedBar.addClass('is-aside');
 	}
 }
-
-
-function initialise() {
-	List.determineStyle();
-	Settings = new UserSettings();
-	UI = new PrimaryUI();
-	cssComponent = new CSSComponent();
-
-	/* Control Row */
-	let $actionBtn = new Button('Loading...', {'disabled':'disabled'}).one('click', ()=>{
-		beginProcessing();
-	});
-	let $hideBtn = new Button('Minimise', {title:'Closes the program window while it keeps running in the background.'}).on('click', ()=>{
-		UI.close();
-		$(UI.root).append(Status.$fixedBar);
-	});
-	let $exitBtn = new Button('Exit', {title:'Completely exit the program.'}).on('click', ()=>{
-		UI.destruct();
-	});
-	let controls = new SplitRow();
-	controls.$left.append(Status.$bar);
-	controls.$right.append($actionBtn, $hideBtn, $exitBtn);
-
-	/* Components Row */
-	let $components = $('<div class="l-column">');
-	$components.append(
-		new Header('Components', 'Enable, disable, and configure what tools run on your list.').$main,
-		new GroupRow('Global Defaults', ()=>{ buildGlobalSettings(); }).$main,
-		new OptionalGroupRow('CSS Generator', ['update_css'], ()=>{ buildCssSettings(); }, [
-			new Button('Import').on('click', ()=>{
-				buildCssImport();
-			}),
-			new Button('Export').on('click', ()=>{
-				buildCssExport();
-			})
-		]).$main,
-		new OptionalGroupRow('Tags Updater', ['update_tags'], ()=>{ buildTagSettings(); }).$main,
-		new OptionalGroupRow('Notes Updater', ['update_notes'], ()=>{ buildNoteSettings(); }).$main
-	);
-
-	/* Footer Row */
-	let $switchBtn = new Button('Switch Theme').on('click', ()=>{
-		UI.swapTheme();
-	});
-	let $clearBtn = new Button('Clear Settings', {title:'Clears any stored settings from previous runs.'});
-	if( store.has(`${List.type}_settings`) || store.has(`last_${List.type}_run`) ){
-		$clearBtn.on('click', ()=> {
-			Settings.clear();
-		});
-	}
-	else {
-		$clearBtn.attr('disabled', 'disabled');
-	}
-	let footer = new SplitRow();
-	footer.$left.append($(`<footer class="c-footer">MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</footer>`));
-	footer.$right.append(
-		$switchBtn,
-		$clearBtn
-	);
-
-	/* Add all rows to UI */
-	UI.$window.append(controls.$main, new Hr(), $components, new Hr(), footer.$main);
-	UI.open();
 	
-	Worker.disableWhileRunning.push($clearBtn, $exitBtn);
-	Worker.reenableAfterDone.push($clearBtn, $exitBtn);
-	Worker.$actionBtn = $actionBtn;
+class Worker {
+	static disableWhileRunning = [];
+	/* buttons are added to this list to be later disabled upon process start */
+	static reenableAfterDone = [];
+	/* similarly, these buttons are re-enabled after finish */
+	static $actionBtn;
 
+	errors = 0;
+	warnings = 0;
+	iteration = -1;
+	data = [];
+	percent = 0;
+	timeout;
+	timeThen;
 
+	constructor( ){
+		ListItems.load();
+	}
 
-	/* Primary Functions */
-
-	ListItems.load();
-
-	var iteration = -1;
-	var newData = [];
-	var percent = 0;
-	var timeout;
-	var timeThen;
-	async function processItem( ){
-		let thisData = newData[iteration];
-		id = thisData[`${List.type}_id`];
+	async scrape( ){
+		let itemData = this.data[this.iteration];
+		let id = itemData[`${List.type}_id`];
 		
 		try {
 			let str = await request(`https://myanimelist.net/${List.type}/${id}`, 'string');
 			if( !str ){
-				Worker.errors++;
+				this.errors++;
 				log.error(`${List.type} #${id}: Failed to get entry information.`);
-				continueProcessing();
+				this.continue();
 				return;
 			}
 			let doc = createDOM(str);
@@ -1224,10 +1169,10 @@ function initialise() {
 			/* get current tags */
 			let tags = [];
 			if( Settings.get(['update_tags']) && !Settings.get(['clear_tags']) ){
-				tags = thisData['tags'].split(',');
+				tags = itemData['tags'].split(',');
 				
 				/* remove extra whitespace */
-				for(j = 0; j < tags.length; j++)
+				for(let j = 0; j < tags.length; j++)
 				{
 					tags[j] = tags[j].trim();
 				}
@@ -1252,8 +1197,7 @@ function initialise() {
 				}
 
 				tagsLength = tags.length;
-				for(k = 0; k < tagsLength; k++)
-				{
+				for( let k = 0; k < tagsLength; k++ ){
 					tagNormalized = tags[k].toUpperCase();
 					matchNormalized = match.toUpperCase();
 					if(
@@ -1272,30 +1216,30 @@ function initialise() {
 
 			/* titles */
 
-			title = thisData[`${List.type}_title`];
+			let title = itemData[`${List.type}_title`];
 
 			/* English title */
 			
-			titleEn = null;
-			if('anime_title_eng' in thisData)
+			let titleEn = null;
+			if('anime_title_eng' in itemData)
 			{
-				titleEn = thisData['anime_title_eng'];
+				titleEn = itemData['anime_title_eng'];
 			}
-			else if('manga_english' in thisData)
+			else if('manga_english' in itemData)
 			{
-				titleEn = thisData['manga_english'];
+				titleEn = itemData['manga_english'];
 			}
 			removeTagIfExist(titleEn);
 
 			/* French title */
 
-			titleFr = null;
-			titleFrStartTxt = 'French:</span>';
-			titleFrStartIndex = str.indexOf(titleFrStartTxt);
+			let titleFr = null;
+			let titleFrStartTxt = 'French:</span>';
+			let titleFrStartIndex = str.indexOf(titleFrStartTxt);
 			if(str.indexOf(titleFrStartTxt) != -1)
 			{
 				titleFrStartIndex += titleFrStartTxt.length;
-				titleFrEndIndex = str.indexOf('</div>', titleFrStartIndex);
+				let titleFrEndIndex = str.indexOf('</div>', titleFrStartIndex);
 				titleFr = str.substring(titleFrStartIndex, titleFrEndIndex);
 				titleFr = decodeHtml(titleFr);
 				
@@ -1305,13 +1249,13 @@ function initialise() {
 
 			/* German title */
 
-			titleDe = null;
-			titleDeStartTxt = 'German:</span>';
-			titleDeStartIndex = str.indexOf(titleDeStartTxt);
+			let titleDe = null;
+			let titleDeStartTxt = 'German:</span>';
+			let titleDeStartIndex = str.indexOf(titleDeStartTxt);
 			if(str.indexOf(titleDeStartTxt) != -1)
 			{
 				titleDeStartIndex += titleDeStartTxt.length;
-				titleDeEndIndex = str.indexOf('</div>', titleDeStartIndex);
+				let titleDeEndIndex = str.indexOf('</div>', titleDeStartIndex);
 				titleDe = str.substring(titleDeStartIndex, titleDeEndIndex);
 				titleDe = decodeHtml(titleDe);
 				
@@ -1321,13 +1265,13 @@ function initialise() {
 
 			/* Spanish title */
 
-			titleEs = null;
-			titleEsStartTxt = 'Spanish:</span>';
-			titleEsStartIndex = str.indexOf(titleEsStartTxt);
+			let titleEs = null;
+			let titleEsStartTxt = 'Spanish:</span>';
+			let titleEsStartIndex = str.indexOf(titleEsStartTxt);
 			if(str.indexOf(titleEsStartTxt) != -1)
 			{
 				titleEsStartIndex += titleEsStartTxt.length;
-				titleEsEndIndex = str.indexOf('</div>', titleEsStartIndex);
+				let titleEsEndIndex = str.indexOf('</div>', titleEsStartIndex);
 				titleEs = str.substring(titleEsStartIndex, titleEsEndIndex);
 				titleEs = decodeHtml(titleEs);
 				
@@ -1337,13 +1281,13 @@ function initialise() {
 			
 			/* Native/raw title - may need some correction for titles that aren't originally japanese. */
 
-			titleNative = null;
-			titleNativeStartTxt = "Japanese:</span>";
-			titleNativeStartIndex = str.indexOf(titleNativeStartTxt);
+			let titleNative = null;
+			let titleNativeStartTxt = "Japanese:</span>";
+			let titleNativeStartIndex = str.indexOf(titleNativeStartTxt);
 			if(str.indexOf(titleNativeStartTxt) != -1)
 			{
 				titleNativeStartIndex += titleNativeStartTxt.length;
-				titleNativeEndIndex = str.indexOf("</div>", titleNativeStartIndex);
+				let titleNativeEndIndex = str.indexOf("</div>", titleNativeStartIndex);
 				titleNative = str.substring(titleNativeStartIndex, titleNativeEndIndex);
 				titleNative = decodeHtml(titleNative);
 				
@@ -1353,15 +1297,16 @@ function initialise() {
 			
 			/* Title synonyms */
 			
-			titleSynStartTxt = 'Synonyms:</span>';
-			titleSynStartIndex = str.indexOf(titleSynStartTxt);
+			let titleSynStartTxt = 'Synonyms:</span>';
+			let titleSynStartIndex = str.indexOf(titleSynStartTxt);
+			let titleSyn;
 			if(str.indexOf(titleSynStartTxt) != -1)
 			{
 				titleSynStartIndex += titleSynStartTxt.length;
-				titleSynEndIndex = str.indexOf('</div>', titleSynStartIndex);
+				let titleSynEndIndex = str.indexOf('</div>', titleSynStartIndex);
 				titleSyn = str.substring(titleSynStartIndex, titleSynEndIndex);
 				titleSyn = decodeHtml(titleSyn);
-				titleSynArr = titleSyn.split(',');
+				let titleSynArr = titleSyn.split(',');
 				if(titleSynArr.length > 0)
 				{
 					titleSyn = titleSynArr[0].trim();
@@ -1369,30 +1314,31 @@ function initialise() {
 			}
 			
 			/* Title fallbacks for when no alternatives found */
-			for (t in [titleEn, titleFr, titleEs, titleDe])
-			{
-				if(t == null && titleSyn != null)
-				{
+			for( let t of [titleEn, titleFr, titleEs, titleDe] ){
+				if( t === null && titleSyn !== null ){
 					t = titleSyn;
 				}
-				else
-				{
+				else {
 					t = title;
 				}
 			}
 			
 			/* date */
-			season = null;
-			year = null;
-			dateStartTxt = ( List.type == "anime" ) ? 'Aired:</span>' : 'Published:</span>';
-			dateStartIndex = str.indexOf(dateStartTxt) + dateStartTxt.length;
+			let season = null;
+			let year = null;
+			let airedTag;
+			let publishedTag;
+			let startDate;
+			let endDate;
+			let dateStartTxt = ( List.type == "anime" ) ? 'Aired:</span>' : 'Published:</span>';
+			let dateStartIndex = str.indexOf(dateStartTxt) + dateStartTxt.length;
 			if(str.indexOf(dateStartTxt) != -1)
 			{
-				dateEndIndex = str.indexOf("</div>", dateStartIndex);
-				dateHtml = str.substring(dateStartIndex, dateEndIndex);
+				let dateEndIndex = str.indexOf("</div>", dateStartIndex);
+				let dateHtml = str.substring(dateStartIndex, dateEndIndex);
 				/* dateHtml should output "Oct 4, 2003 to Oct 2, 2004" or similar */
-				dateArr = dateHtml.split(" to ");
-				dateBegunArr = dateArr[0].split(",");
+				let dateArr = dateHtml.split(" to ");
+				let dateBegunArr = dateArr[0].split(",");
 
 				if(dateBegunArr.length == 2)
 				{
@@ -1422,27 +1368,26 @@ function initialise() {
 				endDate = dateArr.length == 2 ? dateArr[1].trim() : "";
 
 				airedTag = "Aired: " + dateArr[0].trim().replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].trim().replace(',', '') : "");
-				removeTagIfExist('Aired: ', mode = 2);
+				removeTagIfExist('Aired: ', 2);
 				publishedTag = "Published: " + dateArr[0].trim().replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].trim().replace(',', '') : "");
-				removeTagIfExist('Published: ', mode = 2);
+				removeTagIfExist('Published: ', 2);
 			}
 			
 			/* studio (anime) */
-			studios = null;
-			studiosStartTxt = "Studios:</span>";
-			studiosStartIndex = str.indexOf(studiosStartTxt);
+			let studios = null;
+			let studiosStartTxt = "Studios:</span>";
+			let studiosStartIndex = str.indexOf(studiosStartTxt);
 			if(str.indexOf(studiosStartTxt) != -1)
 			{
 				studiosStartIndex += studiosStartTxt.length;
-				studiosEndIndex = str.indexOf("</div>", studiosStartIndex);
-				studiosHtml = str.substring(studiosStartIndex, studiosEndIndex);
+				let studiosEndIndex = str.indexOf("</div>", studiosStartIndex);
+				let studiosHtml = str.substring(studiosStartIndex, studiosEndIndex);
 				
 				studios = studiosHtml.split(",");
-				studiosLength = studios.length;
-				for(j = 0; j < studiosLength; j++)
+				for(let j = 0; j < studios.length; j++)
 				{
-					g1 = studios[j].indexOf("\">") + 2;
-					g2 = studios[j].indexOf("</a>");
+					let g1 = studios[j].indexOf("\">") + 2;
+					let g2 = studios[j].indexOf("</a>");
 					if(g2 == -1) { studios = null; break; }
 					studios[j] = studios[j].substring(g1, g2).trim();
 					studios[j] = decodeHtml(studios[j]);
@@ -1451,21 +1396,21 @@ function initialise() {
 			}
 			
 			/* authors (manga) */
-			authors = null;
-			authorsStartTxt = "Authors:</span>";
-			authorsStartIndex = str.indexOf(authorsStartTxt);
+			let authors = null;
+			let authorsStartTxt = "Authors:</span>";
+			let authorsStartIndex = str.indexOf(authorsStartTxt);
 			if(str.indexOf(authorsStartTxt) != -1)
 			{
 				authorsStartIndex += authorsStartTxt.length;
-				authorsEndIndex = str.indexOf("</div>", authorsStartIndex);
-				authorsHtml = str.substring(authorsStartIndex, authorsEndIndex);
+				let authorsEndIndex = str.indexOf("</div>", authorsStartIndex);
+				let authorsHtml = str.substring(authorsStartIndex, authorsEndIndex);
 
 				authors = authorsHtml.split(", <a");
-				authorsLength = authors.length;
-				for(j = 0; j < authorsLength; j++)
+				let authorsLength = authors.length;
+				for(let j = 0; j < authorsLength; j++)
 				{
-					startAt = authors[j].indexOf("\">") + 2;
-					endAt = authors[j].indexOf("</a>");
+					let startAt = authors[j].indexOf("\">") + 2;
+					let endAt = authors[j].indexOf("</a>");
 					if(endAt == -1) { authors = null; break; }
 					authors[j] = authors[j].substring(startAt, endAt).trim().replaceAll(',',', ');
 					authors[j] = decodeHtml(authors[j]);
@@ -1474,23 +1419,23 @@ function initialise() {
 			}
 
 			/* producers (anime) */
-			producers = null;
-			producersStartTxt = "Producers:</span>";
-			producersStartIndex = str.indexOf(producersStartTxt);
+			let producers = null;
+			let producersStartTxt = "Producers:</span>";
+			let producersStartIndex = str.indexOf(producersStartTxt);
 			if(str.indexOf(producersStartTxt) != -1)
 			{
 				producersStartIndex += producersStartTxt.length;
-				producersEndIndex = str.indexOf("</div>", producersStartIndex);
-				producersHtml = str.substring(producersStartIndex, producersEndIndex);
+				let producersEndIndex = str.indexOf("</div>", producersStartIndex);
+				let producersHtml = str.substring(producersStartIndex, producersEndIndex);
 
 				producers = producersHtml.split(",");
-				producersLength = producers.length;
-				for(j = 0; j < producersLength; j++)
+				let producersLength = producers.length;
+				for(let j = 0; j < producersLength; j++)
 				{
 					if(producers[j].indexOf("<sup>") == -1)
 					{
-						startAt = producers[j].indexOf("\">") + 2;
-						endAt = producers[j].indexOf("</a>");
+						let startAt = producers[j].indexOf("\">") + 2;
+						let endAt = producers[j].indexOf("</a>");
 						if(endAt == -1) { producers = null; break; }
 						producers[j] = producers[j].substring(startAt, endAt).trim();
 						producers[j] = decodeHtml(producers[j]);
@@ -1506,23 +1451,23 @@ function initialise() {
 			}
 
 			/* licensors (anime) */
-			licensors = null;
-			licensorsStartTxt = "Licensors:</span>";
-			licensorsStartIndex = str.indexOf(licensorsStartTxt);
+			let licensors = null;
+			let licensorsStartTxt = "Licensors:</span>";
+			let licensorsStartIndex = str.indexOf(licensorsStartTxt);
 			if(str.indexOf(licensorsStartTxt) != -1)
 			{
 				licensorsStartIndex += licensorsStartTxt.length;
-				licensorsEndIndex = str.indexOf("</div>", licensorsStartIndex);
-				licensorsHtml = str.substring(licensorsStartIndex, licensorsEndIndex);
+				let licensorsEndIndex = str.indexOf("</div>", licensorsStartIndex);
+				let licensorsHtml = str.substring(licensorsStartIndex, licensorsEndIndex);
 
 				licensors = licensorsHtml.split(",");
-				licensorsLength = licensors.length;
-				for(j = 0; j < licensorsLength; j++)
+				let licensorsLength = licensors.length;
+				for(let j = 0; j < licensorsLength; j++)
 				{
 					if(licensors[j].indexOf("<sup>") == -1)
 					{
-						startAt = licensors[j].indexOf("\">") + 2;
-						endAt = licensors[j].indexOf("</a>");
+						let startAt = licensors[j].indexOf("\">") + 2;
+						let endAt = licensors[j].indexOf("</a>");
 						if(endAt == -1) { licensors = null; break; }
 						licensors[j] = licensors[j].substring(startAt, endAt).trim();
 						licensors[j] = decodeHtml(licensors[j]);
@@ -1538,23 +1483,23 @@ function initialise() {
 			}
 
 			/* serialization (manga) */
-			serializations = null;
-			serializationStartTxt = "Serialization:</span>";
-			serializationStartIndex = str.indexOf(serializationStartTxt);
+			let serializations = null;
+			let serializationStartTxt = "Serialization:</span>";
+			let serializationStartIndex = str.indexOf(serializationStartTxt);
 			if(str.indexOf(serializationStartTxt) != -1)
 			{
 				serializationStartIndex += serializationStartTxt.length;
-				serializationEndIndex = str.indexOf("</div>", serializationStartIndex);
-				serializationHtml = str.substring(serializationStartIndex, serializationEndIndex);
+				let serializationEndIndex = str.indexOf("</div>", serializationStartIndex);
+				let serializationHtml = str.substring(serializationStartIndex, serializationEndIndex);
 
 				serializations = serializationHtml.split(",");
-				serializationLength = serializations.length;
-				for(j = 0; j < serializationLength; j++)
+				let serializationLength = serializations.length;
+				for(let j = 0; j < serializationLength; j++)
 				{
 					if(serializations[j].indexOf("<sup>") == -1)
 					{
-						startAt = serializations[j].indexOf("\">") + 2;
-						endAt = serializations[j].indexOf("</a>");
+						let startAt = serializations[j].indexOf("\">") + 2;
+						let endAt = serializations[j].indexOf("</a>");
 						if(endAt == -1) { serializations = null; break; }
 						serializations[j] = serializations[j].substring(startAt, endAt).trim();
 						serializations[j] = decodeHtml(serializations[j]);
@@ -1570,26 +1515,26 @@ function initialise() {
 			}
 
 			/* rating (anime) */
-			rating = "?";
-			if('anime_mpaa_rating_string' in thisData)
+			let rating = "?";
+			if('anime_mpaa_rating_string' in itemData)
 			{
-				rating = thisData['anime_mpaa_rating_string'];
+				rating = itemData['anime_mpaa_rating_string'];
 			}
-			ratingTag = `Rating: ${rating}`;
-			removeTagIfExist('Rating: ', mode = 2);
+			let ratingTag = `Rating: ${rating}`;
+			removeTagIfExist('Rating: ', 2);
 
 			/* duration (anime) */
-			duration = '?';
-			totalDuration = '?';
-			durationStartTxt = "Duration:</span>";
-			durationStartIndex = str.indexOf(durationStartTxt);
+			let duration = '?';
+			let totalDuration = '?';
+			let durationStartTxt = "Duration:</span>";
+			let durationStartIndex = str.indexOf(durationStartTxt);
 			if(durationStartIndex !== -1)
 			{
 				function splitMinute(minutes)
 				{
-					final = [];
-					leftover = minutes % 60;
-					hours = (minutes - leftover) / 60;
+					let final = [];
+					let leftover = minutes % 60;
+					let hours = (minutes - leftover) / 60;
 					if(hours > 0)
 					{
 						final.push(hours + 'h');
@@ -1599,13 +1544,14 @@ function initialise() {
 				}
 
 				durationStartIndex += durationStartTxt.length;
-				durationEndIndex = str.indexOf("</div>", durationStartIndex);
+				let durationEndIndex = str.indexOf("</div>", durationStartIndex);
 
-				durationSubStr = str.substring(durationStartIndex, durationEndIndex);
+				let durationSubStr = str.substring(durationStartIndex, durationEndIndex);
+				let minutes;
 				if(durationSubStr.indexOf('hr') !== -1)
 				{
-					splitHr = durationSubStr.split('hr');
-					hours = parseInt(splitHr[0].trim());
+					let splitHr = durationSubStr.split('hr');
+					let hours = parseInt(splitHr[0].trim());
 					minutes = parseInt(splitHr[1].replace(/[^0-9]*/g, ''));
 					minutes += hours * 60;
 				}
@@ -1618,13 +1564,13 @@ function initialise() {
 				{
 					duration = splitMinute(minutes);
 
-					episodesStartTxt = 'Episodes:</span>';
-					episodesStartIndex = str.indexOf(episodesStartTxt);
+					let episodesStartTxt = 'Episodes:</span>';
+					let episodesStartIndex = str.indexOf(episodesStartTxt);
 					if(episodesStartIndex !== -1)
 					{
 						episodesStartIndex += episodesStartTxt.length;
-						episodesEndIndex = str.indexOf("</div>", episodesStartIndex);
-						episodes = parseInt(str.substring(episodesStartIndex, episodesEndIndex).trim());
+						let episodesEndIndex = str.indexOf("</div>", episodesStartIndex);
+						let episodes = parseInt(str.substring(episodesStartIndex, episodesEndIndex).trim());
 
 						if(!isNaN(episodes))
 						{
@@ -1633,26 +1579,26 @@ function initialise() {
 					}
 				}
 			}
-			durationTag = `Duration/Ep: ${duration}`;
-			totalDurationTag = `Duration: ${totalDuration}`;
-			removeTagIfExist('Duration/Ep: ', mode = 2);
-			removeTagIfExist('Duration: ', mode = 2);
+			let durationTag = `Duration/Ep: ${duration}`;
+			let totalDurationTag = `Duration: ${totalDuration}`;
+			removeTagIfExist('Duration/Ep: ', 2);
+			removeTagIfExist('Duration: ', 2);
 
 			/* genres */
-			genres = [];
-			for(each of thisData['genres'])
+			let genres = [];
+			for(let each of itemData['genres'])
 			{
-				genre = each['name'];
+				let genre = each['name'];
 				genres.push(genre);
 				removeTagIfExist(genre);
 			}
 
 			/* themes */
-			themes = [];
-			themesRaw = $(doc).find('span.dark_text:contains("Theme") ~ [itemprop="genre"]');
+			let themes = [];
+			let themesRaw = $(doc).find('span.dark_text:contains("Theme") ~ [itemprop="genre"]');
 			if(themesRaw.length > 0)
 			{
-				for(j = 0; j < themesRaw.length; j++)
+				for(let j = 0; j < themesRaw.length; j++)
 				{
 					themes[j] = themesRaw.eq(j).text().trim();
 					removeTagIfExist(themes[j]);
@@ -1660,55 +1606,55 @@ function initialise() {
 			}
 
 			/* demographic */
-			demographics = [];
-			for(each of thisData['demographics'])
+			let demographics = [];
+			for(let each of itemData['demographics'])
 			{
-				demographic = each['name'];
+				let demographic = each['name'];
 				demographics.push(demographic);
 				removeTagIfExist(demographic);
 			}
 
 			/* rank */
-			rank = "?";
-			rankStartTxt = "Ranked:</span>";
-			rankStartIndex = str.indexOf(rankStartTxt);
+			let rank = "?";
+			let rankStartTxt = "Ranked:</span>";
+			let rankStartIndex = str.indexOf(rankStartTxt);
 			if(rankStartIndex != -1)
 			{
 				rankStartIndex += rankStartTxt.length;
-				rankEndIndex = str.indexOf("<sup>", rankStartIndex);
+				let rankEndIndex = str.indexOf("<sup>", rankStartIndex);
 				rank = str.substring(rankStartIndex, rankEndIndex);
 				rank = rank.trim().replace("#", "");
 			}
-			rankTag = `Ranked: ${rank}`;
-			removeTagIfExist('Ranked: ', mode = 2);
+			let rankTag = `Ranked: ${rank}`;
+			removeTagIfExist('Ranked: ', 2);
 			
 			/* popularity */
-			popularity = "?";
-			popularityStartTxt = "Popularity:</span>";
-			popularityStartIndex = str.indexOf(popularityStartTxt);
+			let popularity = "?";
+			let popularityStartTxt = "Popularity:</span>";
+			let popularityStartIndex = str.indexOf(popularityStartTxt);
 			if(popularityStartIndex != -1)
 			{
 				popularityStartIndex += popularityStartTxt.length;
-				popularityEndIndex = str.indexOf("</div>", popularityStartIndex);
+				let popularityEndIndex = str.indexOf("</div>", popularityStartIndex);
 				popularity = str.substring(popularityStartIndex, popularityEndIndex);
 				popularity = popularity.trim().replace("#", "");
 			}
-			popularityTag = `Popularity: ${popularity}`;
-			removeTagIfExist('Popularity: ', mode = 2);
+			let popularityTag = `Popularity: ${popularity}`;
+			removeTagIfExist('Popularity: ', 2);
 			
 			/* score */
-			score = "?";
-			scoreEle = $(doc).find("[itemprop=\"ratingValue\"]");
+			let score = "?";
+			let scoreEle = $(doc).find("[itemprop=\"ratingValue\"]");
 			if(scoreEle.length > 0)
 			{
 				score = scoreEle.text().trim();
 			}
-			scoreTag = `Score: ${score}`;
-			removeTagIfExist('Score: ', mode = 2);
+			let scoreTag = `Score: ${score}`;
+			removeTagIfExist('Score: ', 2);
 
 			/* Synopsis (description) */
-			synopsis = $(doc).find("[itemprop=\"description\"]").text().trim();
-			synopsisCss = synopsis.replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").trim();
+			let synopsis = $(doc).find("[itemprop=\"description\"]").text().trim();
+			let synopsisCss = synopsis.replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").trim();
 			
 			/* Update Notes & Tags */
 
@@ -1768,7 +1714,7 @@ function initialise() {
 					return true;
 				})
 				.catch(error => {
-					Worker.errors++;
+					this.errors++;
 					log.error(error);
 					return false;
 				});
@@ -1806,7 +1752,7 @@ function initialise() {
 				let notesRequestUrl = '';
 				let notesRequestDict = {
 					"comments": notesStr,
-					"status": thisData['status'],
+					"status": itemData['status'],
 					"csrf_token": List.csrf
 				};
 
@@ -1836,18 +1782,23 @@ function initialise() {
 					return true;
 				})
 				.catch(error => {
-					Worker.errors++;
+					this.errors++;
 					log.error(error);
 					return false;
 				});
 			}
 			
 			/* thumbs */
+			let img;
+			let imgUrl;
+			let imgUrlt;
+			let imgUrlv;
+			let imgUrll;
 			try
 			{
 				img = $(doc).find('img[itemprop="image"]')[0];
 				imgUrl = img.getAttribute("data-src") || img.src;
-				
+			
 				imgUrlt = imgUrl.replace(".jpg", "t.jpg");
 				imgUrlv = imgUrl.replace(".jpg", "v.jpg");
 				imgUrll = imgUrl.replace(".jpg", "l.jpg");
@@ -1855,12 +1806,12 @@ function initialise() {
 			catch(e)
 			{
 				imgUrl = imgUrlt = imgUrlv = imgUrll = 'none';
-				Worker.warnings++;
+				this.warnings++;
 				log.warn(`${List.type} #${id}: no image found`);
 			}
 			
 			/* Generate CSS */
-			cssLine = Settings.get(['css_template'])
+			let cssLine = Settings.get(['css_template'])
 				.replaceAll('[DEL]', '')
 				.replaceAll('[ID]', id)
 				.replaceAll('[TYPE]', List.type)
@@ -1898,45 +1849,44 @@ function initialise() {
 		}
 		catch(e)
 		{
-			Worker.errors++;
+			this.errors++;
 			log.error(`${List.type} #${id}: ${e}`);
 		}
 		
-		continueProcessing();
+		this.continue();
 	}
 
-	function continueProcessing( ){
-		iteration++;
+	continue( ){
+		this.iteration++;
 		
 		/* update variables */
 
-		percent = iteration / newData.length * 100 || 0;
+		this.percent = this.iteration / this.data.length * 100 || 0;
 
-		if( iteration === 0 ){
-			timeThen = performance.now() - Settings.get(['delay']);
+		if( this.iteration === 0 ){
+			this.timeThen = performance.now() - Settings.get(['delay']);
 		}
-		timeSince = performance.now() - timeThen;
-		timeThen = performance.now();
-		idsRemaining = newData.length - iteration;
+		let timeSince = performance.now() - this.timeThen;
+		this.timeThen = performance.now();
+		let idsRemaining = this.data.length - this.iteration;
 
 		/* update UI */
 
 		Status.estimate(idsRemaining, timeSince);
-		Status.update(`Processed ${iteration} of ${newData.length}`, 'working', percent);
+		Status.update(`Processed ${this.iteration} of ${this.data.length}`, 'working', this.percent);
 		
-		if( iteration >= newData.length ){
-			finishProcessing();
+		if( this.iteration >= this.data.length ){
+			this.finish();
 			return;
 		}
-		timeout = setTimeout(processItem, Settings.get(['delay']));
+		this.timeout = setTimeout(()=>{this.scrape()}, Settings.get(['delay']));
 	}
 
-	function finishProcessing( ){
-		Worker.running = false;
+	finish( ){
 		window.removeEventListener('beforeunload', warnUserBeforeLeaving);
 
 		/* temporary true values until modules are implemented into runtime */
-		buildResults( true, true, true, newData.length );
+		buildResults( true, true, true, this.data.length, this.errors, this.warnings );
 
 		if( cssComponent.result.length > 0 ){
 			store.set(`last_${List.type}_run`, cssComponent.result);
@@ -1944,31 +1894,29 @@ function initialise() {
 		Worker.$actionBtn.val('Open Results');
 		Worker.$actionBtn.off();
 		Worker.$actionBtn.on('click',()=>{
-			buildResults( true, true, true, newData.length );
+			buildResults( true, true, true, this.data.length, this.errors, this.warnings );
 		});
-		Status.update(`Completed with ${Worker.errors} errors`, 'good', 100);
+		Status.update(`Completed with ${this.errors} errors`, 'good', 100);
 		Status.estimate();
 		for( let $btn of Worker.reenableAfterDone ){
 			$btn.removeAttr('disabled');
 		}
 	}
 
-	var imagesTotal = 0;
-	var imagesDone = 0;
-	var imageDelay = 50;
-
-	function updateImageStatus( ){
-		imagesDone++;
-		let imagesRemaining = imagesTotal - imagesDone;
-		let percent = imagesDone / imagesTotal * 100 || 0;
-		Status.update(`Validating images (${imagesDone} of ~${imagesTotal})...`, 'working', percent);
-		Status.estimate(imagesRemaining, imageDelay);
+	imagesTotal = 0;
+	imagesDone = 0;
+	imageDelay = 50;
+	updateImageStatus( ){
+		this.imagesDone++;
+		let imagesRemaining = this.imagesTotal - this.imagesDone;
+		let percent = this.imagesDone / this.imagesTotal * 100 || 0;
+		Status.update(`Validating images (${this.imagesDone} of ~${this.imagesTotal})...`, 'working', percent);
+		Status.estimate(imagesRemaining, this.imageDelay);
 	}
 
-	async function beginProcessing( ){
-		Worker.errors = 0;
-		Worker.warnings = 0;
-		Worker.running = true;
+	async start( ){
+		this.errors = 0;
+		this.warnings = 0;
 		cssComponent.write(`\/*\nGenerated by MyAnimeList-Tools v${ver}\nhttps://github.com/ValerioLyndon/MyAnimeList-Tools\n\nTemplate=${Settings.get(['css_template']).replace(/\*\//g, "*[DEL]/")}\nMatchTemplate=${Settings.get(['match_template'])}\n*\/\n`);
 		Settings.save();
 		window.addEventListener('beforeunload', warnUserBeforeLeaving);
@@ -1985,10 +1933,10 @@ function initialise() {
 
 		Worker.$actionBtn.val('Stop');
 		Worker.$actionBtn.one('click', ()=>{
-			$actionBtn.val('Stopping...');
-			newData = [];
-			clearTimeout(timeout);
-			finishProcessing();
+			Worker.$actionBtn.val('Stopping...');
+			this.data = [];
+			clearTimeout(this.timeout);
+			this.finish();
 		});
 		let categories = [];
 		for( let [categoryId, check] of Object.entries(Settings.get(['checked_categories'])) )
@@ -2008,7 +1956,7 @@ function initialise() {
 				store.get([`last_${List.type}_run`]) : '' : '';
 
 		let oldLines = lastRun.replace(/\/\*[\s\S]*?Generated by MyAnimeList-Tools[\s\S]*?\*\/\s+/,'').split("\n");
-		imagesTotal = oldLines.length;
+		this.imagesTotal = oldLines.length;
 		Status.update(`Checking your input for matches...`, 'working', 0);
 
 		for( let i = 0; i < ListItems.data.length; i++ ){
@@ -2053,8 +2001,8 @@ function initialise() {
 				if( Settings.get(['use_last_run']) && Settings.get(['check_existing']) ){
 					let imgUrl = lineText.match(/http.*?\.(?:jpe?g|webp)/);
 					if( imgUrl.length === 0 ){
-						newData.push(item);
-						imagesTotal--;
+						this.data.push(item);
+						this.imagesTotal--;
 						continue;
 					}
 
@@ -2063,12 +2011,12 @@ function initialise() {
 						let tempImg = document.createElement('img');
 						tempImg.addEventListener('load', ()=>{
 							cssComponent.write(lineText);
-							updateImageStatus();
+							this.updateImageStatus();
 							resolve(true);
 						});
 						tempImg.addEventListener('error', ()=>{
-							newData.push(item);
-							updateImageStatus();
+							this.data.push(item);
+							this.updateImageStatus();
 							resolve(false);
 						});
 						tempImg.src = imgUrl;
@@ -2077,7 +2025,7 @@ function initialise() {
 					/* Add to Promise stack to await resolution */
 					beforeProcessing.push(imageLoad);
 					/* Add delay to prevent image loading spam */
-					await sleep(imageDelay);
+					await sleep(this.imageDelay);
 				}
 				else {
 					cssComponent.write(lineText);
@@ -2085,18 +2033,78 @@ function initialise() {
 			}
 			/* If not in existing, add to list for processing */
 			else {
-				imagesTotal--;
-				newData.push(item);
+				this.imagesTotal--;
+				this.data.push(item);
 			}
 		}
 
 		/* Start processing items */
 		Promise.allSettled(beforeProcessing)
 		.then(()=>{
-			continueProcessing();
+			this.continue();
 		})
 	}
 };
+
+function buildMainUI( ){
+	/* Control Row */
+	let $actionBtn = new Button('Loading...', {'disabled':'disabled'});
+	let $hideBtn = new Button('Minimise', {title:'Closes the program window while it keeps running in the background.'}).on('click', ()=>{
+		UI.close();
+		$(UI.root).append(Status.$fixedBar);
+	});
+	let $exitBtn = new Button('Exit', {title:'Completely exit the program.'}).on('click', ()=>{
+		UI.destruct();
+	});
+	let controls = new SplitRow();
+	controls.$left.append(Status.$bar);
+	controls.$right.append($actionBtn, $hideBtn, $exitBtn);
+
+	/* Components Row */
+	let $components = $('<div class="l-column">');
+	$components.append(
+		new Header('Components', 'Enable, disable, and configure what tools run on your list.').$main,
+		new GroupRow('Global Defaults', ()=>{ buildGlobalSettings(); }).$main,
+		new OptionalGroupRow('CSS Generator', ['update_css'], ()=>{ buildCssSettings(); }, [
+			new Button('Import').on('click', ()=>{
+				buildCssImport();
+			}),
+			new Button('Export').on('click', ()=>{
+				buildCssExport();
+			})
+		]).$main,
+		new OptionalGroupRow('Tags Updater', ['update_tags'], ()=>{ buildTagSettings(); }).$main,
+		new OptionalGroupRow('Notes Updater', ['update_notes'], ()=>{ buildNoteSettings(); }).$main
+	);
+
+	/* Footer Row */
+	let $switchBtn = new Button('Switch Theme').on('click', ()=>{
+		UI.swapTheme();
+	});
+	let $clearBtn = new Button('Clear Settings', {title:'Clears any stored settings from previous runs.'});
+	if( store.has(`${List.type}_settings`) || store.has(`last_${List.type}_run`) ){
+		$clearBtn.on('click', ()=> {
+			Settings.clear();
+		});
+	}
+	else {
+		$clearBtn.attr('disabled', 'disabled');
+	}
+	let footer = new SplitRow();
+	footer.$left.append($(`<footer class="c-footer">MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</footer>`));
+	footer.$right.append(
+		$switchBtn,
+		$clearBtn
+	);
+
+	/* Add all rows to UI */
+	UI.$window.append(controls.$main, new Hr(), $components, new Hr(), footer.$main);
+	UI.open();
+	
+	Worker.disableWhileRunning.push($clearBtn, $exitBtn);
+	Worker.reenableAfterDone.push($clearBtn, $exitBtn);
+	Worker.$actionBtn = $actionBtn;
+}
 
 function buildGlobalSettings( ){
 	let popupUI = new SubsidiaryUI(UI, 'Global Settings', 'These settings apply to all components, where applicable.');
@@ -2396,7 +2404,7 @@ function buildNoteSettings( ){
 	popupUI.open();
 }
 
-function buildResults( css, tags, notes, count ){
+function buildResults( css, tags, notes, items, errors, warnings ){
 	let popupUI = new SubsidiaryUI(UI, 'Job\'s Done!');
 	popupUI.nav.$right.append(
 		new Button('Exit')
@@ -2410,15 +2418,15 @@ function buildResults( css, tags, notes, count ){
 
 	let helpText = `Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors.`;
 	let resultText = 'Tool completed with no issues.';
-	let errorPercent = Worker.errors / count * 100;
-	if( Worker.errors < 1 && Worker.warnings > 0 ){
-		resultText = `Tool completed with ${Worker.warnings} warning(s).\n\nIt is likely that all updates were successful. However, if you notice missing images, try running the tool again.`;
+	let errorPercent = errors / items * 100;
+	if( errors < 1 && warnings > 0 ){
+		resultText = `Tool completed with ${warnings} warning(s).\n\nIt is likely that all updates were successful. However, if you notice missing images, try running the tool again.`;
 	}
-	else if( Worker.errors > 0 && Worker.warnings < 1 ){
-		resultText = `Tool completed with ${Worker.errors} error(s).\n\nOut of ${count} processsed items, that represents a ${errorPercent}% error rate. ${helpText}`;
+	else if( errors > 0 && warnings < 1 ){
+		resultText = `Tool completed with ${errors} error(s).\n\nOut of ${items} processsed items, that represents a ${errorPercent}% error rate. ${helpText}`;
 	}
-	else if( Worker.errors > 0 && Worker.warnings > 0 ){
-		resultText = `Tool completed with ${Worker.errors} error(s) and ${Worker.warnings} warning(s).\n\nOut of ${iteration} processsed items, that represents a ${errorPercent}% error rate. ${helpText}`;
+	else if( errors > 0 && warnings > 0 ){
+		resultText = `Tool completed with ${errors} error(s) and ${warnings} warning(s).\n\nOut of ${this.iteration} processsed items, that represents a ${errorPercent}% error rate. ${helpText}`;
 	}
 	$info.append(new Paragraph(resultText));
 
@@ -2440,7 +2448,7 @@ function buildResults( css, tags, notes, count ){
 		output.$box.val(cssComponent.result);
 		$info.append(
 			cssRow.$main,
-			output.$main
+			output.$raw
 		);
 	}
 
