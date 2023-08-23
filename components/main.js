@@ -714,39 +714,40 @@ class CSSComponent {
 class Status {
 	static percent = 0;
 	static type = 'working';
+	static bars = [];
 
 	static {
-		this.$bar = $('<div class="c-status">');
-		this.$text = $('<span class="c-status__text">');
-		this.$time = $('<span class="c-status__time">');
-		this.$bar.append(this.$text, this.$time);
-
-		this.$fixedBar = this.$bar.clone();
-		this.$fixedBar.addClass('is-fixed is-interactable');
-		this.$fixedBar.on('click', ()=>{
+		this.$main = this.#new();
+		this.$fixed = this.#new();
+		this.$fixed.addClass('is-fixed is-interactable');
+		this.$fixed.on('click', ()=>{
 			UI.open();
 			this.hideFixed();
 		});
+	}
 
-		this.bars = [this.$bar, this.$fixedBar];
-		this.texts = [this.$bar, this.$fixedBar];
-		this.times = [this.$bar, this.$fixedBar];
+	static #new( ){
+		let $bar = $('<div class="c-status">');
+		let $text = $('<span class="c-status__text">');
+		let $time = $('<span class="c-status__time">');
+		$bar.append($text, $time);
+
+		this.bars.push({'$main': $bar, '$text': $text, '$time': $time});
+		return $bar;
 	}
 
 	static update( text, type = this.type, percent = this.percent ){
 		this.type = type;
 		this.percent = percent;
-		for( let blurb of this.texts ){
-			blurb.text(text);
-		}
 		for( let bar of this.bars ){
+			bar.$text.text(text);
 			if( percent === -1 ){
-				bar.addClass('is-unsure');
+				bar.$main.addClass('is-unsure');
 			}
 			if( percent > 0 ){
-				bar.removeClass('is-unsure');
+				bar.$main.removeClass('is-unsure');
 			}
-			bar.css({
+			bar.$main.css({
 				'--percent': `${percent}%`,
 				'--colour': `var(--stat-${type})`
 			});
@@ -755,7 +756,9 @@ class Status {
 
 	static estimate( remaining = 0, msSinceLast = 0 ){
 		if( remaining === 0 && msSinceLast === 0 ){
-			this.$time.text('');
+			for( let bar of this.bars ){
+				bar.$time.text('');
+			}
 			return;
 		}
 
@@ -770,17 +773,17 @@ class Status {
 		else if( seconds > 3600 ){
 			formatted = `${round(seconds / 60 / 60, 1)}h`;
 		}
-		for( let time of this.times ){
-			time.text(`~ ${formatted} left`);
+		for( let bar of this.bars ){
+			bar.$time.text(`~ ${formatted} left`);
 		}
 	}
 
 	static showFixed( ){
-		this.$fixedBar.removeClass('is-aside');
+		this.$fixed.removeClass('is-aside');
 	}
 
 	static hideFixed( ){
-		this.$fixedBar.addClass('is-aside');
+		this.$fixed.addClass('is-aside');
 	}
 }
 	
@@ -1702,13 +1705,13 @@ function buildMainUI( ){
 	let $actionBtn = new Button('Loading...', {'disabled':'disabled'});
 	let $hideBtn = new Button('Minimise', {title:'Closes the program window while it keeps running in the background.'}).on('click', ()=>{
 		UI.close();
-		$(UI.root).append(Status.$fixedBar);
+		$(UI.root).append(Status.$fixed);
 	});
 	let $exitBtn = new Button('Exit', {title:'Completely exit the program.'}).on('click', ()=>{
 		UI.destruct();
 	});
 	let controls = new SplitRow();
-	controls.$left.append(Status.$bar);
+	controls.$left.append(Status.$main);
 	controls.$right.append($actionBtn, $hideBtn, $exitBtn);
 
 	/* Components Row */
