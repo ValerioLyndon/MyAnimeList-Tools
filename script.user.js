@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre12_a0
+// @version      11.0-pre13_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,8 +24,8 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre12_a0';
-const verMod = '2023/Aug/22';
+const ver = '11.0-pre13_a0';
+const verMod = '2023/Aug/25';
 
 class CustomStorage {
 	constructor( type = 'localStorage' ){
@@ -716,6 +716,28 @@ function sleep( ms ){
 	return new Promise(resolve => { setTimeout(resolve, ms); });
 }
 
+function find( str, startTxt, endTxt ){
+	let startIndex = str.indexOf(startTxt);
+	if( startIndex < 0 ){
+		return '';
+	}
+	startIndex += startTxt.length;
+	const endIndex = str.indexOf(endTxt, startIndex);
+	if( endIndex < 0 ){
+		return '';
+	}
+	return decodeHtml(str.substring(startIndex, endIndex));
+}
+
+function encodeForCss( str ){
+	return str.replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").trim()
+}
+
+/* Parse any and all numbers from a string into an int */
+function getInt( str ){
+	return parseInt(str.replaceAll(/\D*/g, '')) || 0;
+}
+
 
 /* Global Vars */
 
@@ -740,6 +762,8 @@ function initialise() {
 	worker = new Worker();
 }
 
+/* fetches list item data from the load.json endpoint.
+requires Status and Worker classes */
 class ListItems {
 	static data = [];
 	static #url = window.location.href.split('?')[0] + '/load.json?status=7&offset=';
@@ -904,35 +928,30 @@ class Worker {
 		ListItems.load();
 	}
 
-	async scrape( ){
-		let itemData = this.data[this.iteration];
-		let id = itemData[`${List.type}_id`];
+	async process( ){
+		const meta = this.data[this.iteration];
+		const id = meta[`${List.type}_id`];
+		let strings = {};
+		let verbose = {};
 		
 		try {
-			let str = await request(`https://myanimelist.net/${List.type}/${id}`, 'string');
+			const str = await request(`https://myanimelist.net/${List.type}/${id}`, 'string');
 			if( !str ){
 				this.errors++;
 				Log.error(`${List.type} #${id}: Failed to get entry information.`);
 				this.continue();
 				return;
 			}
-			let doc = createDOM(str);
+			const $doc = $(createDOM(str));
 		
 			/* get current tags */
 			let tags = [];
 			if( settings.get(['update_tags']) && !settings.get(['clear_tags']) ){
-				tags = itemData['tags'].split(',');
-				
-				/* remove extra whitespace */
-				for(let j = 0; j < tags.length; j++)
-				{
-					tags[j] = tags[j].trim();
-				}
+				tags = meta['tags'].split(',');
+				tags.map(tag=>tag.trim());
 			}
 
-			/* common functions */
-			
-			function removeTagIfExist(match, mode = 0)
+			function removeTagIfExist( match, mode = 0 )
 			/* takes input tag and checks if it is already in the tag list.
 			If it is, it removes it. This is so that the new tags added later are not duplicates.
 			It is done this way instead of simply removing the new tag so that the new tags can
@@ -944,503 +963,310 @@ class Worker {
 			2 = old tag begins with match
 			3 = old tag ends with match */
 			{
-				if(tags.length == 0) {
+				let tagsLength = tags.length;
+				if( tagsLength === 0 ) {
 					return;
 				}
 
-				tagsLength = tags.length;
-				for( let k = 0; k < tagsLength; k++ ){
-					tagNormalized = tags[k].toUpperCase();
-					matchNormalized = match.toUpperCase();
+				for( let i = 0; i < tagsLength; i++ ){
+					const tag = tags[i].toUpperCase();
+					match = match.toUpperCase();
 					if(
-						tags[k].length == 0 ||
-						mode == 0 && tagNormalized == matchNormalized ||
-						mode == 1 && tagNormalized.indexOf(matchNormalized) != -1 ||
-						mode == 2 && tagNormalized.startsWith(matchNormalized) ||
-						mode == 3 && tagNormalized.endsWith(matchNormalized)
+						tags[i].length == 0 ||
+						mode == 0 && tag == match ||
+						mode == 1 && tag.indexOf(match) != -1 ||
+						mode == 2 && tag.startsWith(match) ||
+						mode == 3 && tag.endsWith(match)
 					) {
-						tags.splice(k, 1);
+						tags.splice(i, 1);
 						tagsLength--;
-						k--;
+						i--;
 					}
 				}
 			}
 
-			/* titles */
 
-			let title = itemData[`${List.type}_title`];
+			/* Titles */
 
-			/* English title */
+			let fallbackTitle = find(str, 'Synonyms:</span>', '</div>').split(',')[0].trim() || meta[`${List.type}_title`];
 			
-			let titleEn = null;
-			if('anime_title_eng' in itemData)
-			{
-				titleEn = itemData['anime_title_eng'];
-			}
-			else if('manga_english' in itemData)
-			{
-				titleEn = itemData['manga_english'];
-			}
-			removeTagIfExist(titleEn);
+			strings['title_en'] = meta[`anime_title_eng`] || meta['manga_english'] || fallbackTitle;
+			removeTagIfExist(strings['title_en']);
 
-			/* French title */
+			strings['title_fr'] = find(str, 'French:</span>', '</div>').trim() || fallbackTitle;
+			removeTagIfExist(strings['title_fr']);
 
-			let titleFr = null;
-			let titleFrStartTxt = 'French:</span>';
-			let titleFrStartIndex = str.indexOf(titleFrStartTxt);
-			if(str.indexOf(titleFrStartTxt) != -1)
-			{
-				titleFrStartIndex += titleFrStartTxt.length;
-				let titleFrEndIndex = str.indexOf('</div>', titleFrStartIndex);
-				titleFr = str.substring(titleFrStartIndex, titleFrEndIndex);
-				titleFr = decodeHtml(titleFr);
-				
-				titleFr = titleFr.trim().replace(',', '');
-				removeTagIfExist(titleFr);
-			}
+			strings['title_de'] = find(str, 'German:</span>', '</div>').trim() || fallbackTitle;
+			removeTagIfExist(strings['title_de']);
 
-			/* German title */
+			strings['title_es'] = find(str, 'Spanish:</span>', '</div>').trim() || fallbackTitle;
+			removeTagIfExist(strings['title_es']);
 
-			let titleDe = null;
-			let titleDeStartTxt = 'German:</span>';
-			let titleDeStartIndex = str.indexOf(titleDeStartTxt);
-			if(str.indexOf(titleDeStartTxt) != -1)
-			{
-				titleDeStartIndex += titleDeStartTxt.length;
-				let titleDeEndIndex = str.indexOf('</div>', titleDeStartIndex);
-				titleDe = str.substring(titleDeStartIndex, titleDeEndIndex);
-				titleDe = decodeHtml(titleDe);
-				
-				titleDe = titleDe.trim().replace(',', '');
-				removeTagIfExist(titleDe);
-			}
-
-			/* Spanish title */
-
-			let titleEs = null;
-			let titleEsStartTxt = 'Spanish:</span>';
-			let titleEsStartIndex = str.indexOf(titleEsStartTxt);
-			if(str.indexOf(titleEsStartTxt) != -1)
-			{
-				titleEsStartIndex += titleEsStartTxt.length;
-				let titleEsEndIndex = str.indexOf('</div>', titleEsStartIndex);
-				titleEs = str.substring(titleEsStartIndex, titleEsEndIndex);
-				titleEs = decodeHtml(titleEs);
-				
-				titleEs = titleEs.trim().replace(',', '');
-				removeTagIfExist(titleEs);
-			}
+			/* despite MAL calling all native titles "Japanese", they can be any language including Korean and more */
+			strings['title_raw'] = find(str, 'Japanese:</span>', '</div>').trim() || fallbackTitle;
+			removeTagIfExist(strings['title_raw']);
 			
-			/* Native/raw title - may need some correction for titles that aren't originally japanese. */
+			/* Score */
 
-			let titleNative = null;
-			let titleNativeStartTxt = "Japanese:</span>";
-			let titleNativeStartIndex = str.indexOf(titleNativeStartTxt);
-			if(str.indexOf(titleNativeStartTxt) != -1)
-			{
-				titleNativeStartIndex += titleNativeStartTxt.length;
-				let titleNativeEndIndex = str.indexOf("</div>", titleNativeStartIndex);
-				titleNative = str.substring(titleNativeStartIndex, titleNativeEndIndex);
-				titleNative = decodeHtml(titleNative);
-				
-				titleNative = titleNative.trim().replace(',', '');
-				removeTagIfExist(titleNative);
-			}
-			
-			/* Title synonyms */
-			
-			let titleSynStartTxt = 'Synonyms:</span>';
-			let titleSynStartIndex = str.indexOf(titleSynStartTxt);
-			let titleSyn;
-			if(str.indexOf(titleSynStartTxt) != -1)
-			{
-				titleSynStartIndex += titleSynStartTxt.length;
-				let titleSynEndIndex = str.indexOf('</div>', titleSynStartIndex);
-				titleSyn = str.substring(titleSynStartIndex, titleSynEndIndex);
-				titleSyn = decodeHtml(titleSyn);
-				let titleSynArr = titleSyn.split(',');
-				if(titleSynArr.length > 0)
-				{
-					titleSyn = titleSynArr[0].trim();
-				}
-			}
-			
-			/* Title fallbacks for when no alternatives found */
-			for( let t of [titleEn, titleFr, titleEs, titleDe] ){
-				if( t === null && titleSyn !== null ){
-					t = titleSyn;
-				}
-				else {
-					t = title;
-				}
-			}
-			
-			/* date */
-			let season = null;
-			let year = null;
-			let airedTag;
-			let publishedTag;
-			let startDate;
-			let endDate;
-			let dateStartTxt = ( List.type == "anime" ) ? 'Aired:</span>' : 'Published:</span>';
-			let dateStartIndex = str.indexOf(dateStartTxt) + dateStartTxt.length;
-			if(str.indexOf(dateStartTxt) != -1)
-			{
-				let dateEndIndex = str.indexOf("</div>", dateStartIndex);
-				let dateHtml = str.substring(dateStartIndex, dateEndIndex);
-				/* dateHtml should output "Oct 4, 2003 to Oct 2, 2004" or similar */
-				let dateArr = dateHtml.split(" to ");
-				let dateBegunArr = dateArr[0].split(",");
+			strings['score'] = meta[`${List.type}_score_val`] || '';
+			verbose['score'] = 'Score: '+strings['score'];
+			removeTagIfExist('Score: ', 2);
 
-				if(dateBegunArr.length == 2)
-				{
-					season = null;
-					if(dateBegunArr[0].indexOf("Jan") != -1 || dateBegunArr[0].indexOf("Feb") != -1 || dateBegunArr[0].indexOf("Mar") != -1)
-					{
-						season = "Winter";
+			/* Rating (anime) */
+			
+			strings['rating'] = meta['anime_mpaa_rating_string'] || '?';
+			verbose['rating'] = 'Rating: ' + strings['rating'];
+			removeTagIfExist('Rating: ', 2);
+			
+			/* Dates */
+			/* can't use meta[] array as formatting is unclear and it requires list column enabled in settings */
+
+			/* find() should output "Oct 4, 2003 to Oct 2, 2004" or similar, which then gets split into an array */
+			strings['season'] = '';
+			verbose['season'] = 'Season: '+strings['season'];
+			strings['year'] = '';
+			strings['start'] = '';
+			strings['end'] = '';
+			let dates = find(List.type === 'anime' ? 'Aired:</span>' : 'Published:</span>', '</div>').split(" to ");
+			if( dates.length > 0 ){
+				const begun = dates[0].trim().split(',');
+				if( begun.length === 2 ){
+					const month = begun.substring(0, 3).toLowerCase();
+					switch( month ){
+						case 'jan':
+						case 'feb':
+						case 'mar':
+							strings['season'] = 'Winter';
+							break;
+						case 'apr':
+						case 'may':
+						case 'jun':
+							strings['season'] = 'Spring';
+							break;
+						case 'jul':
+						case 'aug':
+						case 'sep':
+							strings['season'] = 'Summer';
+							break;
+						case 'oct':
+						case 'nov':
+						case 'dec':
+							strings['season'] = 'Fall';
+							break;
 					}
-					else if(dateBegunArr[0].indexOf("Apr") != -1 || dateBegunArr[0].indexOf("May") != -1 || dateBegunArr[0].indexOf("Jun") != -1)
-					{
-						season = "Spring";
-					}
-					else if(dateBegunArr[0].indexOf("Jul") != -1 || dateBegunArr[0].indexOf("Aug") != -1 || dateBegunArr[0].indexOf("Sep") != -1)
-					{
-						season = "Summer";
-					}
-					else if(dateBegunArr[0].indexOf("Oct") != -1 || dateBegunArr[0].indexOf("Nov") != -1 || dateBegunArr[0].indexOf("Dec") != -1)
-					{
-						season = "Fall";
-					}
-					year = dateBegunArr[1].trim();
-					removeTagIfExist(season);
-					removeTagIfExist(year);
+					removeTagIfExist(strings['season']);
+					strings['year'] = begun[1]?.trim();
+					removeTagIfExist(strings['year']);
 				}
 
-				startDate = dateArr[0].trim();
-				endDate = dateArr.length == 2 ? dateArr[1].trim() : "";
+				strings['start'] = dates[0].trim();
+				strings['end'] = dates.length === 2 ? dates[1].trim() : '';
 
-				airedTag = "Aired: " + dateArr[0].trim().replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].trim().replace(',', '') : "");
+				const dateStr = dates[0].trim().replace(',', '') + dates.length === 2 ? ' to ' + dates[1].trim().replace(',', '') : ''
+				verbose['aired'] = 'Aired: '+dateStr;
 				removeTagIfExist('Aired: ', 2);
-				publishedTag = "Published: " + dateArr[0].trim().replace(',', '') + (dateArr.length == 2 ? " to " + dateArr[1].trim().replace(',', '') : "");
+				verbose['published'] = 'Published: '+dateStr;
 				removeTagIfExist('Published: ', 2);
 			}
+		
+			/* Studios (anime) */
+			/* can't use meta[] array as it requires list column enabled in settings */
+
+			let studios = [];
+			const studiosHtml = find(str, 'Studios:</span>', '</div>').split(',');
+			for( const html of studiosHtml ){
+				const stud = find(html, '">', '</a>').trim();
+				studios.push(stud);
+				removeTagIfExist(stud);
+			}
+			strings['studios'] = studios.join(', ');
 			
-			/* studio (anime) */
-			let studios = null;
-			let studiosStartTxt = "Studios:</span>";
-			let studiosStartIndex = str.indexOf(studiosStartTxt);
-			if(str.indexOf(studiosStartTxt) != -1)
-			{
-				studiosStartIndex += studiosStartTxt.length;
-				let studiosEndIndex = str.indexOf("</div>", studiosStartIndex);
-				let studiosHtml = str.substring(studiosStartIndex, studiosEndIndex);
-				
-				studios = studiosHtml.split(",");
-				for(let j = 0; j < studios.length; j++)
-				{
-					let g1 = studios[j].indexOf("\">") + 2;
-					let g2 = studios[j].indexOf("</a>");
-					if(g2 == -1) { studios = null; break; }
-					studios[j] = studios[j].substring(g1, g2).trim();
-					studios[j] = decodeHtml(studios[j]);
-					removeTagIfExist(studios[j]);
-				}
+			/* Authors (manga) */
+
+			let authors = [];
+			const authorsHtml = find(str, 'Authors:</span>', '</div>').split(', <a');
+			for( const html of authorsHtml ){
+				const author = find(html, '">', '</a>').trim();
+				authors.push(author);
+				removeTagIfExist(author);
 			}
+			strings['authors'] = studios.join(' & ');
+
+			/* Licensors (anime) */
+			/* can't use meta[] array as it requires list column enabled in settings */
 			
-			/* authors (manga) */
-			let authors = null;
-			let authorsStartTxt = "Authors:</span>";
-			let authorsStartIndex = str.indexOf(authorsStartTxt);
-			if(str.indexOf(authorsStartTxt) != -1)
-			{
-				authorsStartIndex += authorsStartTxt.length;
-				let authorsEndIndex = str.indexOf("</div>", authorsStartIndex);
-				let authorsHtml = str.substring(authorsStartIndex, authorsEndIndex);
-
-				authors = authorsHtml.split(", <a");
-				let authorsLength = authors.length;
-				for(let j = 0; j < authorsLength; j++)
-				{
-					let startAt = authors[j].indexOf("\">") + 2;
-					let endAt = authors[j].indexOf("</a>");
-					if(endAt == -1) { authors = null; break; }
-					authors[j] = authors[j].substring(startAt, endAt).trim().replaceAll(',',', ');
-					authors[j] = decodeHtml(authors[j]);
-					removeTagIfExist(authors[j]);
-				}
+			let licensors = [];
+			const licensorHtml = find(str, 'Licensors:</span>', '</div>').split(', <a');
+			for( const html of licensorHtml ){
+				const licensor = find(html, '">', '</a>').trim();
+				licensors.push(licensor);
+				removeTagIfExist(licensor);
 			}
+			strings['licensors'] = licensors.join(', ');
 
-			/* producers (anime) */
-			let producers = null;
-			let producersStartTxt = "Producers:</span>";
-			let producersStartIndex = str.indexOf(producersStartTxt);
-			if(str.indexOf(producersStartTxt) != -1)
-			{
-				producersStartIndex += producersStartTxt.length;
-				let producersEndIndex = str.indexOf("</div>", producersStartIndex);
-				let producersHtml = str.substring(producersStartIndex, producersEndIndex);
+			/* Producers (anime) */
 
-				producers = producersHtml.split(",");
-				let producersLength = producers.length;
-				for(let j = 0; j < producersLength; j++)
-				{
-					if(producers[j].indexOf("<sup>") == -1)
-					{
-						let startAt = producers[j].indexOf("\">") + 2;
-						let endAt = producers[j].indexOf("</a>");
-						if(endAt == -1) { producers = null; break; }
-						producers[j] = producers[j].substring(startAt, endAt).trim();
-						producers[j] = decodeHtml(producers[j]);
-						removeTagIfExist(producers[j]);
-					}
-					else
-					{
-						producers.splice(j, 1);
-						producersLength--;
-						j--;
-					}
-				}
+			let producers = [];
+			const prodHtml = find(str, 'Producers:</span>', '</div>').split(',');
+			for( const html of prodHtml ){
+				const producer = find(html, '">', '</a>').trim();
+				producers.push(producer);
+				removeTagIfExist(producer);
 			}
+			strings['producers'] = producers.join(', ');
 
-			/* licensors (anime) */
-			let licensors = null;
-			let licensorsStartTxt = "Licensors:</span>";
-			let licensorsStartIndex = str.indexOf(licensorsStartTxt);
-			if(str.indexOf(licensorsStartTxt) != -1)
-			{
-				licensorsStartIndex += licensorsStartTxt.length;
-				let licensorsEndIndex = str.indexOf("</div>", licensorsStartIndex);
-				let licensorsHtml = str.substring(licensorsStartIndex, licensorsEndIndex);
-
-				licensors = licensorsHtml.split(",");
-				let licensorsLength = licensors.length;
-				for(let j = 0; j < licensorsLength; j++)
-				{
-					if(licensors[j].indexOf("<sup>") == -1)
-					{
-						let startAt = licensors[j].indexOf("\">") + 2;
-						let endAt = licensors[j].indexOf("</a>");
-						if(endAt == -1) { licensors = null; break; }
-						licensors[j] = licensors[j].substring(startAt, endAt).trim();
-						licensors[j] = decodeHtml(licensors[j]);
-						removeTagIfExist(licensors[j]);
-					}
-					else
-					{
-						licensors.splice(j, 1);
-						licensorsLength--;
-						j--;
-					}
-				}
+			/* Serialization (manga) */
+			
+			let serializations = [];
+			const serialHtml = find(str, 'Serialization:</span>', '</div>').split(',');
+			for( const html of serialHtml ){
+				const serial = find(html, '">', '</a>').trim();
+				serializations.push(serial);
+				removeTagIfExist(serial);
 			}
+			strings['serializations'] = serializations.join(', ');
 
-			/* serialization (manga) */
-			let serializations = null;
-			let serializationStartTxt = "Serialization:</span>";
-			let serializationStartIndex = str.indexOf(serializationStartTxt);
-			if(str.indexOf(serializationStartTxt) != -1)
-			{
-				serializationStartIndex += serializationStartTxt.length;
-				let serializationEndIndex = str.indexOf("</div>", serializationStartIndex);
-				let serializationHtml = str.substring(serializationStartIndex, serializationEndIndex);
+			/* Duration (anime) */
 
-				serializations = serializationHtml.split(",");
-				let serializationLength = serializations.length;
-				for(let j = 0; j < serializationLength; j++)
-				{
-					if(serializations[j].indexOf("<sup>") == -1)
-					{
-						let startAt = serializations[j].indexOf("\">") + 2;
-						let endAt = serializations[j].indexOf("</a>");
-						if(endAt == -1) { serializations = null; break; }
-						serializations[j] = serializations[j].substring(startAt, endAt).trim();
-						serializations[j] = decodeHtml(serializations[j]);
-						removeTagIfExist(serializations[j]);
-					}
-					else
-					{
-						serializations.splice(j, 1);
-						serializationLength--;
-						j--;
-					}
-				}
-			}
-
-			/* rating (anime) */
-			let rating = "?";
-			if('anime_mpaa_rating_string' in itemData)
-			{
-				rating = itemData['anime_mpaa_rating_string'];
-			}
-			let ratingTag = `Rating: ${rating}`;
-			removeTagIfExist('Rating: ', 2);
-
-			/* duration (anime) */
-			let duration = '?';
-			let totalDuration = '?';
-			let durationStartTxt = "Duration:</span>";
-			let durationStartIndex = str.indexOf(durationStartTxt);
-			if(durationStartIndex !== -1)
-			{
-				function splitMinute(minutes)
-				{
+			const durationHtml = find(str, 'Duration:</span>', '</div>');
+			verbose['duration'] = strings['duration'] = '?';
+			verbose['duration_total'] = strings['duration_total'] = '?';
+			if( durationHtml ){
+				function minutesToStr( minutes ){
 					let final = [];
-					let leftover = minutes % 60;
-					let hours = (minutes - leftover) / 60;
-					if(hours > 0)
-					{
+					const leftover = minutes % 60;
+					const hours = (minutes - leftover) / 60;
+					if( hours > 0 ){
 						final.push(hours + 'h');
 					}
 					final.push(leftover + 'm');
 					return final.join(' ');
 				}
 
-				durationStartIndex += durationStartTxt.length;
-				let durationEndIndex = str.indexOf("</div>", durationStartIndex);
+				/* string should be either "24 min. per ep." or "1 hr. 46 min." */
+				/* thus we split by "hr" text, getting hours if possible */
+				const split = durationHtml.split('hr');
+				let minutes = getInt(split.pop());
+				const hours = getInt(split.pop());
 
-				let durationSubStr = str.substring(durationStartIndex, durationEndIndex);
-				let minutes;
-				if(durationSubStr.indexOf('hr') !== -1)
-				{
-					let splitHr = durationSubStr.split('hr');
-					let hours = parseInt(splitHr[0].trim());
-					minutes = parseInt(splitHr[1].replace(/[^0-9]*/g, ''));
+				if( hours > 0 ){
 					minutes += hours * 60;
 				}
-				else
-				{
-					minutes = parseInt(durationSubStr.split('min')[0].trim());
-				}
 
-				if(!isNaN(minutes))
-				{
-					duration = splitMinute(minutes);
+				if( !isNaN(minutes) ){
+					let duration = minutesToStr(minutes);
+					strings['duration'] = totalDuration;
+					verbose['duration'] = 'Duration/Ep: '+duration;
 
-					let episodesStartTxt = 'Episodes:</span>';
-					let episodesStartIndex = str.indexOf(episodesStartTxt);
-					if(episodesStartIndex !== -1)
-					{
-						episodesStartIndex += episodesStartTxt.length;
-						let episodesEndIndex = str.indexOf("</div>", episodesStartIndex);
-						let episodes = parseInt(str.substring(episodesStartIndex, episodesEndIndex).trim());
-
-						if(!isNaN(episodes))
-						{
-							totalDuration = splitMinute(minutes * episodes);
-						}
+					let episodes = meta['anime_num_episodes'];
+					if( episodes ){
+						let totalDuration = minutesToStr(minutes * episodes);
+						strings['duration_total'] = totalDuration;
+						verbose['duration_total'] = 'Duration: '+totalDuration;
 					}
 				}
 			}
-			let durationTag = `Duration/Ep: ${duration}`;
-			let totalDurationTag = `Duration: ${totalDuration}`;
 			removeTagIfExist('Duration/Ep: ', 2);
 			removeTagIfExist('Duration: ', 2);
 
-			/* genres */
+			/* Genres */
+
 			let genres = [];
-			for(let each of itemData['genres'])
-			{
-				let genre = each['name'];
+			for( const each of meta['genres'] ){
+				const genre = each['name'];
 				genres.push(genre);
 				removeTagIfExist(genre);
 			}
+			strings['genres'] = '';
 
-			/* themes */
+			/* Themes */
+
 			let themes = [];
-			let themesRaw = $(doc).find('span.dark_text:contains("Theme") ~ [itemprop="genre"]');
-			if(themesRaw.length > 0)
-			{
-				for(let j = 0; j < themesRaw.length; j++)
-				{
-					themes[j] = themesRaw.eq(j).text().trim();
-					removeTagIfExist(themes[j]);
+			const $themeSpans = $doc.find('span.dark_text:contains("Theme") ~ [itemprop="genre"]');
+			if( $themeSpans.length > 0 ){
+				for( let span of $themeSpans ){
+					let theme = span.textContent.trim();
+					themes.push(theme);
+					removeTagIfExist(theme);
 				}
 			}
+			strings['themes'] = themes.join(', ');
 
-			/* demographic */
+			/* Demographics */
+
 			let demographics = [];
-			for(let each of itemData['demographics'])
-			{
-				let demographic = each['name'];
-				demographics.push(demographic);
-				removeTagIfExist(demographic);
+			for( let each of meta['demographics'] ){
+				let demo = each['name'];
+				demographics.push(demo);
+				removeTagIfExist(demo);
 			}
+			strings['demographics'] = demographics.join(', ');
 
-			/* rank */
-			let rank = "?";
-			let rankStartTxt = "Ranked:</span>";
-			let rankStartIndex = str.indexOf(rankStartTxt);
-			if(rankStartIndex != -1)
-			{
-				rankStartIndex += rankStartTxt.length;
-				let rankEndIndex = str.indexOf("<sup>", rankStartIndex);
-				rank = str.substring(rankStartIndex, rankEndIndex);
-				rank = rank.trim().replace("#", "");
-			}
-			let rankTag = `Ranked: ${rank}`;
+			/* Ranking */
+
+			strings['ranking'] = find(str, 'Ranked:</span>', '<sup>').trim().replace('#', '') || '?';
+			verbose['ranking'] = 'Ranked: '+strings['ranking'];
 			removeTagIfExist('Ranked: ', 2);
 			
-			/* popularity */
-			let popularity = "?";
-			let popularityStartTxt = "Popularity:</span>";
-			let popularityStartIndex = str.indexOf(popularityStartTxt);
-			if(popularityStartIndex != -1)
-			{
-				popularityStartIndex += popularityStartTxt.length;
-				let popularityEndIndex = str.indexOf("</div>", popularityStartIndex);
-				popularity = str.substring(popularityStartIndex, popularityEndIndex);
-				popularity = popularity.trim().replace("#", "");
-			}
-			let popularityTag = `Popularity: ${popularity}`;
+			/* Popularity */
+
+			strings['popularity'] = find(str, 'Popularity:</span>', '</div').trim().replace('#', '') || '?';
+			verbose['popularity'] = 'Popularity: '+strings['popularity'];
 			removeTagIfExist('Popularity: ', 2);
 			
-			/* score */
-			let score = "?";
-			let scoreEle = $(doc).find("[itemprop=\"ratingValue\"]");
-			if(scoreEle.length > 0)
-			{
-				score = scoreEle.text().trim();
+			/* Images */
+
+			const image = $doc.find('img[itemprop="image"]')[0];
+			const imageUrl = image?.getAttribute('data-src') || image?.src;
+			if( !imageUrl ){
+				this.warnings++;
+				Log.warn(`${List.type} #${id}: no image found`);
 			}
-			let scoreTag = `Score: ${score}`;
-			removeTagIfExist('Score: ', 2);
+			strings['image'] = imageUrl || '';
+			strings['image_tiny'] = imageUrl.replace(/(\.[^\.]+)$/,'t$1') || strings['image'];
+			strings['image_very_tiny'] = imageUrl.replace(/(\.[^\.]+)$/,'v$1') || strings['image'];
+			strings['image_large'] = imageUrl.replace(/(\.[^\.]+)$/,'l$1') || strings['image'];
 
 			/* Synopsis (description) */
-			let synopsis = $(doc).find("[itemprop=\"description\"]").text().trim();
-			let synopsisCss = synopsis.replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").trim();
-			
+
+			strings['synopsis'] = $doc.find("[itemprop=\"description\"]").text().trim();
+
+
+
 			/* Update Notes & Tags */
 
 			if( settings.get(['update_tags']) ){
-				if(titleEn && settings.get(['checked_tags','english_title'])) { notes.push(titleEn); }
-				if(titleFr && settings.get(['checked_tags','french_title'])) { notes.push(titleFr); }
-				if(titleEs && settings.get(['checked_tags','spanish_title'])) { notes.push(titleEs); }
-				if(titleDe && settings.get(['checked_tags','german_title'])) { notes.push(titleDe); }
-				if(titleNative && settings.get(['checked_tags','native_title'])) { notes.push(titleNative); }
-				if(season && settings.get(['checked_tags','season'])) { notes.push(season); }
-				if(year && settings.get(['checked_tags','year'])) { notes.push(year); }
-				if(studios && settings.get(['checked_tags','studio'])) { notes.push(studios); }
-				if(producers && settings.get(['checked_tags','producers'])) { notes.push(producers); }
-				if(licensors && settings.get(['checked_tags','licensors'])) { notes.push(licensors); }
-				if(serializations && settings.get(['checked_tags','serialization'])) { notes.push(serializations); }
-				if(genres && settings.get(['checked_tags','genres'])) { notes.push(genres); }
-				if(themes && settings.get(['checked_tags','themes'])) { notes.push(themes); }
-				if(demographic && settings.get(['checked_tags','demographic'])) { notes.push(demographic); }
-				if(authors && settings.get(['checked_tags','authbors'])) { notes.push(authors); }
-				if(settings.get(['checked_tags','aired'])) { notes.push(airedTag); }
-				if(settings.get(['checked_tags','published'])) { notes.push(publishedTag); }
-				if(settings.get(['checked_tags','score'])) { notes.push(scoreTag); }
-				if(settings.get(['checked_tags','rank'])) { notes.push(rankTag); }
-				if(settings.get(['checked_tags','popularity'])) { notes.push(popularityTag); }
-				if(settings.get(['checked_tags','rating'])) { notes.push(ratingTag); }
-				if(settings.get(['checked_tags','duration'])) { notes.push(durationTag); }
-				if(settings.get(['checked_tags','total_duration'])) { notes.push(totalDurationTag); }
+				if(strings['title_en'] && settings.get(['checked_tags','english_title'])) { tags.push(strings['title_en']); }
+				if(strings['title_fr'] && settings.get(['checked_tags','french_title'])) { tags.push(strings['title_fr']); }
+				if(strings['title_es'] && settings.get(['checked_tags','spanish_title'])) { tags.push(strings['title_es']); }
+				if(strings['title_de'] && settings.get(['checked_tags','german_title'])) { tags.push(strings['title_de']); }
+				if(strings['title_raw'] && settings.get(['checked_tags','native_title'])) { tags.push(strings['title_raw']); }
+				if(strings['season'] && settings.get(['checked_tags','season'])) { tags.push(strings['season']); }
+				if(strings['year'] && settings.get(['checked_tags','year'])) { tags.push(strings['year']); }
+				if(strings['studios'] && settings.get(['checked_tags','studio'])) { tags.push(strings['studios']); }
+				if(strings['producers'] && settings.get(['checked_tags','producers'])) { tags.push(strings['producers']); }
+				if(strings['licensors'] && settings.get(['checked_tags','licensors'])) { tags.push(strings['licensors']); }
+				if(strings['serializations'] && settings.get(['checked_tags','serialization'])) { tags.push(strings['serializations']); }
+				if(strings['genres'] && settings.get(['checked_tags','genres'])) { tags.push(strings['genres']); }
+				if(strings['themes'] && settings.get(['checked_tags','themes'])) { tags.push(strings['themes']); }
+				if(strings['demographic'] && settings.get(['checked_tags','demographic'])) { tags.push(strings['demographic']); }
+				if(strings['authors'] && settings.get(['checked_tags','authbors'])) { tags.push(strings['authors']); }
+				if(verbose['aired'] && settings.get(['checked_tags','aired'])) { tags.push(verbose['aired']); }
+				if(verbose['published'] && settings.get(['checked_tags','published'])) { tags.push(verbose['published']); }
+				if(settings.get(['checked_tags','score'])) { tags.push(verbose['score']); }
+				if(settings.get(['checked_tags','rank'])) { tags.push(verbose['ranking']); }
+				if(settings.get(['checked_tags','popularity'])) { tags.push(verbose['popularity']); }
+				if(settings.get(['checked_tags','rating'])) { tags.push(verbose['rating']); }
+				if(settings.get(['checked_tags','duration'])) { tags.push(verbose['duration']); }
+				if(settings.get(['checked_tags','total_duration'])) { tags.push(verbose['duration_total']); }
 				
 				let tagsRequestUrl;
 				let animeOrMangaId;
-				if(List.isAnime) {
+				if( List.isAnime ){
 					tagsRequestUrl = 'https://myanimelist.net/includes/ajax.inc.php?t=22&tags=';
 					animeOrMangaId = 'aid';
-				} else {
+				}
+				else {
 					tagsRequestUrl = 'https://myanimelist.net/includes/ajax.inc.php?t=30&tags=';
 					animeOrMangaId = 'mid';
 				}
@@ -1459,15 +1285,14 @@ class Worker {
 					body: formData
 				})
 				.then(response => {
-					if(!response.ok)
-					{
-						throw new Error(`${List.type} #${id}: Failed to update tags.`);
+					if( !response.ok ){
+						throw new Error(`Response not ok.`);
 					}
 					return true;
 				})
 				.catch(error => {
 					this.errors++;
-					Log.error(error);
+					Log.error(`${List.type} #${id}: Failed to update tags: ${error}`);
 					return false;
 				});
 			}
@@ -1475,48 +1300,46 @@ class Worker {
 			if( settings.get(['update_notes']) ){
 				let notes = [];
 
-				if(titleEn && settings.get(['checked_notes','english_title'])) { notes.push(titleEn); }
-				if(titleFr && settings.get(['checked_notes','french_title'])) { notes.push(titleFr); }
-				if(titleEs && settings.get(['checked_notes','spanish_title'])) { notes.push(titleEs); }
-				if(titleDe && settings.get(['checked_notes','german_title'])) { notes.push(titleDe); }
-				if(titleNative && settings.get(['checked_notes','native_title'])) { notes.push(titleNative); }
-				if(season && settings.get(['checked_notes','season'])) { notes.push(season); }
-				if(year && settings.get(['checked_notes','year'])) { notes.push(year); }
-				if(studios && settings.get(['checked_notes','studio'])) { notes.push(studios); }
-				if(producers && settings.get(['checked_notes','producers'])) { notes.push(producers); }
-				if(licensors && settings.get(['checked_notes','licensors'])) { notes.push(licensors); }
-				if(serializations && settings.get(['checked_notes','serialization'])) { notes.push(serializations); }
-				if(genres && settings.get(['checked_notes','genres'])) { notes.push(genres); }
-				if(themes && settings.get(['checked_notes','themes'])) { notes.push(themes); }
-				if(demographic && settings.get(['checked_notes','demographic'])) { notes.push(demographic); }
-				if(authors && settings.get(['checked_notes','authbors'])) { notes.push(authors); }
-				if(settings.get(['checked_notes','aired'])) { notes.push(airedTag); }
-				if(settings.get(['checked_notes','published'])) { notes.push(publishedTag); }
-				if(settings.get(['checked_notes','score'])) { notes.push(scoreTag); }
-				if(settings.get(['checked_notes','rank'])) { notes.push(rankTag); }
-				if(settings.get(['checked_notes','popularity'])) { notes.push(popularityTag); }
-				if(settings.get(['checked_notes','rating'])) { notes.push(ratingTag); }
-				if(settings.get(['checked_notes','duration'])) { notes.push(durationTag); }
-				if(settings.get(['checked_notes','total_duration'])) { notes.push(totalDurationTag); }
-				if(settings.get(['checked_notes','synopsis'])) { notes.push(synopsis); }
+				if(strings['title_en'] && settings.get(['checked_notes','english_title'])) { notes.push('English Title: '+strings['title_en']); }
+				if(strings['title_fr'] && settings.get(['checked_notes','french_title'])) { notes.push('French Title: '+strings['title_fr']); }
+				if(strings['title_es'] && settings.get(['checked_notes','spanish_title'])) { notes.push('Spanish Title: '+strings['title_es']); }
+				if(strings['title_de'] && settings.get(['checked_notes','german_title'])) { notes.push('German Title: '+strings['title_de']); }
+				if(strings['title_raw'] && settings.get(['checked_notes','native_title'])) { notes.push('Native Title: '+strings['title_raw']); }
+				if(strings['season'] && settings.get(['checked_notes','season'])) { notes.push('Season: '+strings['season']); }
+				if(strings['year'] && settings.get(['checked_notes','year'])) { notes.push('Year: '+strings['year']); }
+				if(strings['studios'] && settings.get(['checked_notes','studio'])) { notes.push('Studios: '+strings['studios']); }
+				if(strings['producers'] && settings.get(['checked_notes','producers'])) { notes.push('Producers: '+strings['producers']); }
+				if(strings['licensors'] && settings.get(['checked_notes','licensors'])) { notes.push('Licensors: '+strings['licensors']); }
+				if(strings['serializations'] && settings.get(['checked_notes','serialization'])) { notes.push('Serializations: '+strings['serializations']); }
+				if(strings['genres'] && settings.get(['checked_notes','genres'])) { notes.push('Genres: '+strings['genres']); }
+				if(strings['themes'] && settings.get(['checked_notes','themes'])) { notes.push('Themes: '+strings['themes']); }
+				if(strings['demographic'] && settings.get(['checked_notes','demographic'])) { notes.push('Demographics: '+strings['demographic']); }
+				if(strings['authors'] && settings.get(['checked_notes','authbors'])) { notes.push('Authors: '+strings['authors']); }
+				if(strings['aired'] && settings.get(['checked_notes','aired'])) { notes.push('Aired: '+strings['aired']); }
+				if(strings['published'] && settings.get(['checked_notes','published'])) { notes.push('Published: '+strings['published']); }
+				if(strings['score'] && settings.get(['checked_notes','score'])) { notes.push('Score: '+strings['score']); }
+				if(strings['ranking'] && settings.get(['checked_notes','rank'])) { notes.push('Ranking: '+strings['ranking']); }
+				if(strings['popularity'] && settings.get(['checked_notes','popularity'])) { notes.push('Popularity: '+strings['popularity']); }
+				if(strings['rating'] && settings.get(['checked_notes','rating'])) { notes.push('Rating: '+strings['rating']); }
+				if(strings['duration'] && settings.get(['checked_notes','duration'])) { notes.push('Duration/Ep: '+strings['duration']); }
+				if(strings['duration_total'] && settings.get(['checked_notes','total_duration'])) { notes.push('Duration: '+strings['duration_total']); }
+				if(strings['synopsis'] && settings.get(['checked_notes','synopsis'])) { notes.push(strings['synopsis']); }
 
-				let notesStr = notes.join("\n\n");
 				let notesRequestUrl = '';
 				let notesRequestDict = {
-					"comments": notesStr,
-					"status": itemData['status'],
+					"comments": notes.join("\n\n"),
+					"status": meta['status'],
 					"csrf_token": List.csrf
 				};
 
-				if(List.isAnime) {
+				if( List.isAnime ){
 					notesRequestDict['anime_id'] = id;
 					notesRequestUrl = 'https://myanimelist.net/ownlist/anime/edit_convert.json';
-				} else {
+				}
+				else {
 					notesRequestDict['manga_id'] = id;
 					notesRequestUrl = 'https://myanimelist.net/ownlist/manga/edit_convert.json';
 				}
-
-				let notesRequestContent = JSON.stringify(notesRequestDict);
 
 				let headerData = new Headers();
 				headerData.append('X-Requested-With', 'XMLHttpRequest');
@@ -1524,87 +1347,64 @@ class Worker {
 				await fetch(notesRequestUrl, {
 					method: "POST",
 					headers: headerData,
-					body: notesRequestContent
+					body: JSON.stringify(notesRequestDict)
 				})
 				.then(response => {
-					if(!response.ok)
-					{
-						throw new Error(`${List.type} #${id}: Failed update notes.`);
+					if( !response.ok ){
+						throw new Error(`Response not ok.`);
 					}
 					return true;
 				})
 				.catch(error => {
 					this.errors++;
-					Log.error(error);
+					Log.error(`${List.type} #${id}: Failed update notes: ${error}`);
 					return false;
 				});
 			}
 			
-			/* thumbs */
-			let img;
-			let imgUrl;
-			let imgUrlt;
-			let imgUrlv;
-			let imgUrll;
-			try
-			{
-				img = $(doc).find('img[itemprop="image"]')[0];
-				imgUrl = img.getAttribute("data-src") || img.src;
-			
-				imgUrlt = imgUrl.replace(".jpg", "t.jpg");
-				imgUrlv = imgUrl.replace(".jpg", "v.jpg");
-				imgUrll = imgUrl.replace(".jpg", "l.jpg");
-			}
-			catch(e)
-			{
-				imgUrl = imgUrlt = imgUrlv = imgUrll = 'none';
-				this.warnings++;
-				Log.warn(`${List.type} #${id}: no image found`);
-			}
-			
-			/* Generate CSS */
-			let cssLine = settings.get(['css_template'])
+			/* Generate and write CSS */
+			cssComponent.write(
+				settings.get(['css_template'])
 				.replaceAll('[DEL]', '')
 				.replaceAll('[ID]', id)
 				.replaceAll('[TYPE]', List.type)
-				.replaceAll('[IMGURL]', imgUrl)
-				.replaceAll('[IMGURLT]', imgUrlt)
-				.replaceAll('[IMGURLV]', imgUrlv)
-				.replaceAll('[IMGURLL]', imgUrll)
-				.replaceAll('[TITLE]', title)
-				.replaceAll(/(\[TITLEEN\]|\[TITLEENG\]|\[ENGTITLE\])/g, titleEn)
-				.replaceAll('[TITLEFR]', titleFr ? titleFr : title)
-				.replaceAll('[TITLEES]', titleEs ? titleEs : title)
-				.replaceAll('[TITLEDE]', titleDe ? titleDe : title)
-				.replaceAll('[TITLERAW]', titleNative ? titleNative : "")
-				.replaceAll('[GENRES]', genres ? genres.join(", ") : "")
-				.replaceAll('[THEMES]', themes ? themes.join(", ") : "")
-				.replaceAll('[DEMOGRAPHIC]', demographics ? demographics.join(", ") : "")
-				.replaceAll('[STUDIOS]', studios ? studios.join(", ") : "")
-				.replaceAll('[PRODUCERS]', producers ? producers.join(", ") : "")
-				.replaceAll('[LICENSORS]', licensors ? licensors.join(", ") : "")
-				.replaceAll('[SERIALIZATION]', serializations ? serializations.join(", ") : "")
-				.replaceAll('[AUTHORS]', authors ? authors.join(" & ") : "")
-				.replaceAll('[SEASON]', season)
-				.replaceAll('[YEAR]', year)
-				.replaceAll('[RANK]', rank)
-				.replaceAll(/\[POPULARITY\]|\[POP\]/g, popularity)
-				.replaceAll('[SCORE]', score)
-				.replaceAll('[STARTDATE]', startDate)
-				.replaceAll('[ENDDATE]', endDate)
-				.replaceAll('[RATING]', rating)
-				.replaceAll('[DURATIONEP]', duration)
-				.replaceAll('[DURATIONTOTAL]', totalDuration)
-				.replaceAll('[DESC]', synopsisCss);
-			
-			cssComponent.write(cssLine);
+				.replaceAll('[IMGURL]', strings['image'])
+				.replaceAll('[IMGURLT]', strings['image_tiny'])
+				.replaceAll('[IMGURLV]', strings['image_very_tiny'])
+				.replaceAll('[IMGURLL]', strings['image_large'])
+				.replaceAll('[TITLE]', meta[`${List.type}_title`])
+				.replaceAll(/\[TITLEEN\]|\[TITLEENG\]|\[ENGTITLE\]/g, strings['title_en'])
+				.replaceAll('[TITLEFR]', strings['title_fr'])
+				.replaceAll('[TITLEES]', strings['title_de'])
+				.replaceAll('[TITLEDE]', strings['title_es'])
+				.replaceAll('[TITLERAW]', strings['title_raw'])
+				.replaceAll('[GENRES]', strings['genres'])
+				.replaceAll('[THEMES]', strings['themes'])
+				.replaceAll('[DEMOGRAPHIC]', strings['demographics'])
+				.replaceAll('[STUDIOS]', strings['studios'])
+				.replaceAll('[PRODUCERS]', strings['producers'])
+				.replaceAll('[LICENSORS]', strings['licensors'])
+				.replaceAll('[SERIALIZATION]', strings['serializations'])
+				.replaceAll('[AUTHORS]', strings['authors'])
+				.replaceAll('[SEASON]', strings['season'])
+				.replaceAll('[YEAR]', strings['year'])
+				.replaceAll('[RANK]', strings['ranking'])
+				.replaceAll(/\[POPULARITY\]|\[POP\]/g, strings['popularity'])
+				.replaceAll('[SCORE]', strings['score'])
+				.replaceAll('[STARTDATE]', strings['start'])
+				.replaceAll('[ENDDATE]', strings['end'])
+				.replaceAll('[RATING]', strings['rating'])
+				.replaceAll('[DURATIONEP]', strings['duration'])
+				.replaceAll('[DURATIONTOTAL]', strings['duration_total'])
+				.replaceAll('[DESC]', encodeForCss(strings['synopsis']))
+			);
 		}
-		catch(e)
-		{
+		catch( e ){
 			this.errors++;
 			Log.error(`${List.type} #${id}: ${e}`);
+			Log.error(e.stack, false);
 		}
-		
+			
 		this.continue();
 	}
 
@@ -1631,7 +1431,7 @@ class Worker {
 			this.finish();
 			return;
 		}
-		this.timeout = setTimeout(()=>{this.scrape()}, settings.get(['delay']));
+		this.timeout = setTimeout(()=>{this.process()}, settings.get(['delay']));
 	}
 
 	finish( ){
@@ -1667,8 +1467,6 @@ class Worker {
 	}
 
 	async start( ){
-		this.errors = 0;
-		this.warnings = 0;
 		cssComponent.write(`\/*\nGenerated by MyAnimeList-Tools v${ver}\nhttps://github.com/ValerioLyndon/MyAnimeList-Tools\n\nTemplate=${settings.get(['css_template']).replace(/\*\//g, "*[DEL]/")}\nMatchTemplate=${settings.get(['match_template'])}\n*\/\n`);
 		settings.save();
 		window.addEventListener('beforeunload', warnUserBeforeLeaving);
@@ -1690,6 +1488,7 @@ class Worker {
 			clearTimeout(this.timeout);
 			this.finish();
 		});
+		
 		let categories = [];
 		for( let [categoryId, check] of Object.entries(settings.get(['checked_categories'])) )
 		{
@@ -1741,7 +1540,7 @@ class Worker {
 			for( let j = 0; j < oldLines.length; j++ ){
 				lineText = oldLines[j];
 				let match = settings.get(['match_template']).replaceAll(/\[ID\]/g, id).replaceAll(/\[TYPE\]/g, List.type);
-				lineExists = lineText.indexOf(match) > 0;
+				lineExists = lineText.indexOf(match) >= 0;
 				if( lineExists ){
 					break;
 				}
