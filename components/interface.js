@@ -7,7 +7,7 @@ class UserInterface {
 	root = document.createElement('div');
 	$container = $('<div class="c-container">');
 	$windowList = $('<div class="c-window-list js-focus">');
-	$window = $('<main class="l-column c-window">');
+	$window = $('<main class="l-column c-window js-intro">');
 
 	constructor( ){
 		this.#shadowRoot.append(this.root);
@@ -84,7 +84,7 @@ class UserInterface {
 	}
 
 	newWindow( ...children ){
-		let $window = $(`<aside class="l-column c-window">`);
+		let $window = $(`<aside class="l-column c-window js-intro">`);
 		$window.append(...children);
 		this.$windowList.append($window);
 		return $window;

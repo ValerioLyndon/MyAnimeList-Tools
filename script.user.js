@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre13_a0
+// @version      11.0-pre14_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,7 +24,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre13_a0';
+const ver = '11.0-pre14_a0';
 const verMod = '2023/Aug/25';
 
 class CustomStorage {
@@ -1409,6 +1409,7 @@ class Worker {
 	}
 
 	continue( ){
+
 		this.iteration++;
 		
 		/* update variables */
@@ -1431,7 +1432,10 @@ class Worker {
 			this.finish();
 			return;
 		}
-		this.timeout = setTimeout(()=>{this.process()}, settings.get(['delay']));
+		this.timeout = setTimeout(()=>{
+			this.timeout = false;
+			this.process()
+		}, settings.get(['delay']));
 	}
 
 	finish( ){
@@ -1443,6 +1447,7 @@ class Worker {
 		if( cssComponent.result.length > 0 ){
 			store.set(`last_${List.type}_run`, cssComponent.result);
 		}
+		Worker.$actionBtn.removeAttr('disabled');
 		Worker.$actionBtn.val('Open Results');
 		Worker.$actionBtn.off();
 		Worker.$actionBtn.on('click',()=>{
@@ -1483,10 +1488,15 @@ class Worker {
 
 		Worker.$actionBtn.val('Stop');
 		Worker.$actionBtn.one('click', ()=>{
-			Worker.$actionBtn.val('Stopping...');
-			this.data = [];
-			clearTimeout(this.timeout);
-			this.finish();
+			Worker.$actionBtn.attr('disabled','disabled');
+			Status.update('Stopping imminently...');
+			if( this.timeout ){
+				clearTimeout(this.timeout);
+				this.finish();
+			}
+			else {
+				this.data = [];
+			}
 		});
 		
 		let categories = [];
@@ -2017,7 +2027,7 @@ class UserInterface {
 	root = document.createElement('div');
 	$container = $('<div class="c-container">');
 	$windowList = $('<div class="c-window-list js-focus">');
-	$window = $('<main class="l-column c-window">');
+	$window = $('<main class="l-column c-window js-intro">');
 
 	constructor( ){
 		this.#shadowRoot.append(this.root);
@@ -2399,7 +2409,7 @@ class UserInterface {
 
 /* JS Functions */
 
-.js-focus {
+.js-focus, .js-intro {
 	transition:
 		transform .22s ease,
 		opacity .16s ease;
@@ -2408,10 +2418,10 @@ class UserInterface {
 	transform: translateX(-75px);
 	opacity: 0.7;
 }
-.root:not(.is-closed) .js-focus {
+.root:not(.is-closed) .js-intro {
 	animation: slide .22s ease;
 }
-.root.is-closed .js-focus {
+.root.is-closed .js-intro {
 	transform: translateX(75px);
 }
 
@@ -2508,7 +2518,7 @@ class UserInterface {
 	}
 
 	newWindow( ...children ){
-		let $window = $(`<aside class="l-column c-window">`);
+		let $window = $(`<aside class="l-column c-window js-intro">`);
 		$window.append(...children);
 		this.$windowList.append($window);
 		return $window;

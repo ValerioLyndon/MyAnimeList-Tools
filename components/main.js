@@ -1311,6 +1311,7 @@ class Worker {
 	}
 
 	continue( ){
+
 		this.iteration++;
 		
 		/* update variables */
@@ -1333,7 +1334,10 @@ class Worker {
 			this.finish();
 			return;
 		}
-		this.timeout = setTimeout(()=>{this.process()}, settings.get(['delay']));
+		this.timeout = setTimeout(()=>{
+			this.timeout = false;
+			this.process()
+		}, settings.get(['delay']));
 	}
 
 	finish( ){
@@ -1345,6 +1349,7 @@ class Worker {
 		if( cssComponent.result.length > 0 ){
 			store.set(`last_${List.type}_run`, cssComponent.result);
 		}
+		Worker.$actionBtn.removeAttr('disabled');
 		Worker.$actionBtn.val('Open Results');
 		Worker.$actionBtn.off();
 		Worker.$actionBtn.on('click',()=>{
@@ -1385,10 +1390,15 @@ class Worker {
 
 		Worker.$actionBtn.val('Stop');
 		Worker.$actionBtn.one('click', ()=>{
-			Worker.$actionBtn.val('Stopping...');
-			this.data = [];
-			clearTimeout(this.timeout);
-			this.finish();
+			Worker.$actionBtn.attr('disabled','disabled');
+			Status.update('Stopping imminently...');
+			if( this.timeout ){
+				clearTimeout(this.timeout);
+				this.finish();
+			}
+			else {
+				this.data = [];
+			}
 		});
 		
 		let categories = [];

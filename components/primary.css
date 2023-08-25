@@ -370,7 +370,7 @@
 
 /* JS Functions */
 
-.js-focus {
+.js-focus, .js-intro {
 	transition:
 		transform .22s ease,
 		opacity .16s ease;
@@ -379,10 +379,10 @@
 	transform: translateX(-75px);
 	opacity: 0.7;
 }
-.root:not(.is-closed) .js-focus {
+.root:not(.is-closed) .js-intro {
 	animation: slide .22s ease;
 }
-.root.is-closed .js-focus {
+.root.is-closed .js-intro {
 	transform: translateX(75px);
 }
 
