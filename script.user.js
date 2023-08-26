@@ -1623,6 +1623,20 @@ function buildMainUI( ){
 
 	/* Components Row */
 	let $components = $('<div class="l-column">');
+	let tags = new OptionalGroupRow('Tags Updater', ['update_tags'], ()=>{ buildTagSettings(); });
+	tags.check.$box.on('click', ()=>{
+		if( tags.check.$box.is(':checked') && store.get('checkpoint_tags') !== true ){
+			alert('Before you continue!! This alert only shows once.\n\nThe Tags Updater is capable of entirely WIPING your tags. If you have the Tags column disabled, it WILL wipe your tags. If you have any you don\'t want to lose your tags, please back them up first and enable tags in your list settings!');
+			store.set('checkpoint_tags', true);
+		}
+	});
+	let notes = new OptionalGroupRow('Notes Updater', ['update_notes'], ()=>{ buildNoteSettings(); });
+	notes.check.$box.on('click', ()=>{
+		if( notes.check.$box.is(':checked') && store.get('checkpoint_notes') !== true ){
+			alert('Before you continue!! This alert only shows once.\n\nThe Notes Updater will entirely WIPE your notes. If you have any you don\'t want to lose, please back them up first!');
+			store.set('checkpoint_notes', true);
+		}
+	});
 	$components.append(
 		new Header('Components', 'Enable, disable, and configure what tools run on your list.').$main,
 		new GroupRow('Global Defaults', ()=>{ buildGlobalSettings(); }).$main,
@@ -1634,8 +1648,8 @@ function buildMainUI( ){
 				buildCssExport();
 			})
 		]).$main,
-		new OptionalGroupRow('Tags Updater', ['update_tags'], ()=>{ buildTagSettings(); }).$main,
-		new OptionalGroupRow('Notes Updater', ['update_notes'], ()=>{ buildNoteSettings(); }).$main
+		tags.$main,
+		notes.$main
 	);
 
 	/* Footer Row */
