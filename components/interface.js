@@ -353,11 +353,21 @@ class Header {
 
 class Button {
 	constructor( value, attributes = {} ){
-		let button = $(`<input class="c-button" type="button" value="${value}">`);
+		let $main = $(`<input class="c-button" type="button" value="${value}">`);
 		for( let [name,value] of Object.entries(attributes) ){
-			button.attr(name,value);
+			$main.attr(name,value);
 		}
-		return button;
+		return $main;
+	}
+}
+
+class Bullets {
+	constructor( points ){
+		let $main = $(`<ul class="c-list">`);
+		for( let p of points ){
+			$main.append($(`<li class="c-list__item">${p}</li>`));
+		}
+		return $main;
 	}
 }
 

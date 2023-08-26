@@ -283,6 +283,14 @@
 	font: 11px/1.5em monospace;
 }
 
+.c-list {
+	padding-left: 20px;
+	margin: 0;
+}
+.c-list__item::marker {
+	font-size: 1.2em;
+}
+
 
 
 /* One-off Components */
