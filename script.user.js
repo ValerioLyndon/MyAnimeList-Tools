@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre17_a0
+// @version      11.0-pre17+h1_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,7 +24,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre17_a0';
+const ver = '11.0-pre17+h1_a0';
 const verMod = '2023/Aug/25';
 
 class CustomStorage {
@@ -466,7 +466,12 @@ class UserSettings {
 			"rating": false,
 			"duration": false,
 			"total_duration": false
-		}
+		},
+
+		/* headers */
+		"update_headers": true,
+		"header_template": "",
+		"header_style": ""
 	};
 	
 	constructor( ){
@@ -1656,6 +1661,17 @@ function buildMainUI( ){
 		notes.$main
 	);
 
+	if( List.isModern ){
+		$components.append(new OptionalGroupRow('Category Headers', ['update_headers'], ()=>{ buildHeaderSettings(); }, [
+			new Button('Import').on('click', ()=>{
+				buildHeaderImport();
+			}),
+			new Button('Export').on('click', ()=>{
+				buildHeaderExport();
+			})
+		]).$main);
+	}
+
 	/* Footer Row */
 	let $switchBtn = new Button('Switch Theme')
 	.on('click', ()=>{
@@ -1975,6 +1991,18 @@ function buildNoteSettings( ){
 	$options.append(
 		new Paragraph('Enabled options will be added to your notes/comments. THIS ACTION WILL WIPE YOUR NOTES. Please <a href="https://myanimelist.net/panel.php?go=export" target="_blank">export</a> a copy of your list first if you have any notes you wish to keep.'),
 		new CheckGrid(checks).$main
+	);
+	popupUI.$window.append($options);
+
+	popupUI.open();
+}
+
+function buildHeaderSettings( ){
+	let popupUI = new SubsidiaryUI(UI, 'Category Header Settings', 'Automatically add headers before each category.');
+	
+	let $options = $('<div class="l-column o-justify-start">');
+	$options.append(
+		new Paragraph('These headers will only be applied to modern lists. Classic lists disable this tool as they already have headers by default.')
 	);
 	popupUI.$window.append($options);
 
