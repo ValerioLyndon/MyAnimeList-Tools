@@ -7,7 +7,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre14_b0';
+const ver = '11.0-pre15_b0';
 const verMod = '2023/Aug/25';
 
 class CustomStorage {
@@ -1006,7 +1006,6 @@ class Worker {
 
 			/* find() should output "Oct 4, 2003 to Oct 2, 2004" or similar, which then gets split into an array */
 			strings['season'] = '';
-			verbose['season'] = 'Season: '+strings['season'];
 			strings['year'] = '';
 			strings['start'] = '';
 			strings['end'] = '';
@@ -1051,6 +1050,7 @@ class Worker {
 				verbose['published'] = 'Published: '+dateStr;
 				removeTagIfExist('Published: ', 2);
 			}
+			verbose['season'] = 'Season: '+strings['season'];
 		
 			/* Studios (anime) */
 			/* can't use meta[] array as it requires list column enabled in settings */
@@ -1636,18 +1636,16 @@ function buildMainUI( ){
 	);
 
 	/* Footer Row */
-	let $switchBtn = new Button('Switch Theme').on('click', ()=>{
+	let $switchBtn = new Button('Switch Theme')
+	.on('click', ()=>{
 		UI.swapTheme();
 	});
-	let $clearBtn = new Button('Clear Settings', {title:'Clears any stored settings from previous runs.'});
-	if( store.has(`${List.type}_settings`) || store.has(`last_${List.type}_run`) ){
-		$clearBtn.on('click', ()=> {
+	let $clearBtn = new Button('Clear Settings', {title:'Clears any stored settings from previous runs.'})
+	.on('click', ()=> {
+		buildConfirm('Are you sure?', 'You will have to set your templates and other settings again.', ()=>{
 			settings.clear();
-		});
-	}
-	else {
-		$clearBtn.attr('disabled', 'disabled');
-	}
+		})
+	});
 	let footer = new SplitRow();
 	footer.$left.append($(`<footer class="c-footer">MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</footer>`));
 	footer.$right.append(
@@ -2540,7 +2538,7 @@ class PrimaryUI extends UserInterface {
 }
 
 class SubsidiaryUI extends UserInterface {
-	constructor( parentUI, title, subtitle = false ){
+	constructor( parentUI, title, subtitle = false, autoLayout = true ){
 		super();
 		this.parentUI = parentUI;
 
@@ -2548,12 +2546,15 @@ class SubsidiaryUI extends UserInterface {
 		this.nav.$left.append(
 			new Header(title, subtitle).$main
 		);
-		this.nav.$right.append(
-			$(`<input class="c-button" type="button" value="Back">`).on('click', ()=>{
-				this.destruct();
-			})
-		);
-		this.$window.append(this.nav.$main, new Hr());
+		this.$window.append(this.nav.$main);
+		if( autoLayout ){
+			this.nav.$right.append(
+				$(`<input class="c-button" type="button" value="Back">`).on('click', ()=>{
+					this.destruct();
+				})
+			);
+			this.$window.append(new Hr());
+		}
 		this.$container.addClass('is-subsidiary');
 	}
 
@@ -2787,6 +2788,27 @@ class Button {
 		}
 		return button;
 	}
+}
+
+function buildConfirm( title, subtitle, onYes, onNo = ()=>{} ){
+	let ui = new SubsidiaryUI(UI, title, subtitle, false);
+
+	let row = $('<div class="l-row">');
+	row.append(
+		new Button('Yes')
+		.on('click', ()=>{
+			ui.destruct();
+			onYes();
+		}),
+		new Button('No')
+		.on('click', ()=>{
+			ui.destruct();
+			onNo();
+		})
+	)
+
+	ui.$window.append(row);
+	ui.open();
 }
 
 if( List.isOwner ){

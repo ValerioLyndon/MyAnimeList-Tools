@@ -109,7 +109,7 @@ class PrimaryUI extends UserInterface {
 }
 
 class SubsidiaryUI extends UserInterface {
-	constructor( parentUI, title, subtitle = false ){
+	constructor( parentUI, title, subtitle = false, autoLayout = true ){
 		super();
 		this.parentUI = parentUI;
 
@@ -117,12 +117,15 @@ class SubsidiaryUI extends UserInterface {
 		this.nav.$left.append(
 			new Header(title, subtitle).$main
 		);
-		this.nav.$right.append(
-			$(`<input class="c-button" type="button" value="Back">`).on('click', ()=>{
-				this.destruct();
-			})
-		);
-		this.$window.append(this.nav.$main, new Hr());
+		this.$window.append(this.nav.$main);
+		if( autoLayout ){
+			this.nav.$right.append(
+				$(`<input class="c-button" type="button" value="Back">`).on('click', ()=>{
+					this.destruct();
+				})
+			);
+			this.$window.append(new Hr());
+		}
 		this.$container.addClass('is-subsidiary');
 	}
 
@@ -356,4 +359,25 @@ class Button {
 		}
 		return button;
 	}
+}
+
+function buildConfirm( title, subtitle, onYes, onNo = ()=>{} ){
+	let ui = new SubsidiaryUI(UI, title, subtitle, false);
+
+	let row = $('<div class="l-row">');
+	row.append(
+		new Button('Yes')
+		.on('click', ()=>{
+			ui.destruct();
+			onYes();
+		}),
+		new Button('No')
+		.on('click', ()=>{
+			ui.destruct();
+			onNo();
+		})
+	)
+
+	ui.$window.append(row);
+	ui.open();
 }
