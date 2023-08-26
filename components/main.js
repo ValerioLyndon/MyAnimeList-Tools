@@ -1,4 +1,4 @@
-/* Re-usable Functions and Classes */
+/* Standalone Re-usable Functions and Classes */
 
 function warnUserBeforeLeaving( e ){
 	e.preventDefault();
@@ -7,6 +7,13 @@ function warnUserBeforeLeaving( e ){
 
 function isDict( unknown ){
 	return (unknown instanceof Object && !(unknown instanceof Array)) ? true : false;
+}
+
+/* sleep function for use with async await */
+function delay( ms ){
+	return new Promise(resolve=>{
+		setTimeout(resolve, ms);
+	});
 }
 
 /* Gets height of element whether it is inserted in the DOM yet or not. */
@@ -985,6 +992,7 @@ class Worker {
 
 			if( doHeaders ){
 				this.updateHeaders();
+				await delay(500);
 			}
 
 			/* CSS */
