@@ -7,7 +7,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre16_b0';
+const ver = '11.0-pre17_b0';
 const verMod = '2023/Aug/25';
 
 class CustomStorage {
@@ -461,7 +461,7 @@ class UserSettings {
 			
 				/* Check for missing settings and fill them in. This prevents errors while maintaining user settings, especially in the case of a user updating from an older version. */
 				for( let [key, value] of Object.entries(this.settings) ){
-					if( !(key in this.settings) ){
+					if( !(key in workspace) ){
 						workspace[key] = this.settings[key];
 					}
 					if( isDict(value) ){
@@ -2286,7 +2286,7 @@ class UserInterface {
 	border-radius: 9px;
 }
 .c-component.is-disabled {
-	opacity: 0.5;
+	opacity: 0.7;
 }
 
 .c-option {

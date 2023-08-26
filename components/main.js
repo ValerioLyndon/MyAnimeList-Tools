@@ -380,7 +380,7 @@ class UserSettings {
 			
 				/* Check for missing settings and fill them in. This prevents errors while maintaining user settings, especially in the case of a user updating from an older version. */
 				for( let [key, value] of Object.entries(this.settings) ){
-					if( !(key in this.settings) ){
+					if( !(key in workspace) ){
 						workspace[key] = this.settings[key];
 					}
 					if( isDict(value) ){
