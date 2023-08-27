@@ -376,7 +376,7 @@ function buildConfirm( title, subtitle, onYes, onNo = ()=>{} ){
 			ui.destruct();
 			onNo();
 		})
-	)
+	);
 
 	ui.$window.append(row);
 	ui.open();

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre18_a0
+// @version      11.0-pre19_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,8 +24,8 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre18_a0';
-const verMod = '2023/Aug/25';
+const ver = '11.0-pre19_a0';
+const verMod = '2023/Aug/27';
 
 class CustomStorage {
 	constructor( type = 'localStorage' ){
@@ -1263,7 +1263,7 @@ class Worker {
 				strings['start'] = dates[0].trim();
 				strings['end'] = dates.length === 2 ? dates[1].trim() : '';
 
-				const dateStr = dates[0].trim().replace(',', '') + dates.length === 2 ? ' to ' + dates[1].trim().replace(',', '') : ''
+				const dateStr = dates[0].trim().replace(',', '') + dates.length === 2 ? ' to ' + dates[1].trim().replace(',', '') : '';
 				verbose['aired'] = 'Aired: '+dateStr;
 				removeTagIfExist('Aired: ', 2);
 				verbose['published'] = 'Published: '+dateStr;
@@ -2826,7 +2826,7 @@ function buildConfirm( title, subtitle, onYes, onNo = ()=>{} ){
 			ui.destruct();
 			onNo();
 		})
-	)
+	);
 
 	ui.$window.append(row);
 	ui.open();

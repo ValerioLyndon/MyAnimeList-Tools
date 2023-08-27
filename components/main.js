@@ -1165,7 +1165,7 @@ class Worker {
 				strings['start'] = dates[0].trim();
 				strings['end'] = dates.length === 2 ? dates[1].trim() : '';
 
-				const dateStr = dates[0].trim().replace(',', '') + dates.length === 2 ? ' to ' + dates[1].trim().replace(',', '') : ''
+				const dateStr = dates[0].trim().replace(',', '') + dates.length === 2 ? ' to ' + dates[1].trim().replace(',', '') : '';
 				verbose['aired'] = 'Aired: '+dateStr;
 				removeTagIfExist('Aired: ', 2);
 				verbose['published'] = 'Published: '+dateStr;
