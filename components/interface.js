@@ -6,6 +6,7 @@ class UserInterface {
 	#shadowRoot = this.#attachmentPoint.attachShadow({mode: 'open'});
 	root = document.createElement('div');
 	$container = $('<div class="c-container">');
+	$backing = $('<div class="c-container__target">');
 	$windowList = $('<div class="c-window-list js-focus">');
 	$window = $('<main class="l-column c-window js-intro">');
 
@@ -13,7 +14,10 @@ class UserInterface {
 		this.#shadowRoot.append(this.root);
 		this.root.className = 'root is-closed';
 		$(this.root).append(this.$container);
-		this.$container.append(this.$windowList);
+		this.$container.append(this.$backing, this.$windowList);
+		this.$backing.on('click', ()=>{
+			this.exit();
+		});
 		this.$windowList.append(this.$window);
 
 		this.style(`
@@ -34,12 +38,14 @@ class UserInterface {
 		this.root.classList.add('is-closed');
 	}
 
-	destruct( ){
+	exit( ){
+		console.log('super exit');
 		if( this.alive ){
 			this.alive = false;
 			this.close();
 			setTimeout(()=>{
 				this.#attachmentPoint.remove();
+				console.log('remove attach');
 			}, 200);
 		}
 	}
@@ -103,8 +109,18 @@ class PrimaryUI extends UserInterface {
 	}
 
 	close( ){
-		super.close();
 		document.body.style.overflow = '';
+		super.close();
+	}
+
+	exit( ){
+		if( Worker.isActive ){
+			this.close();
+			$(this.root).append(Status.$fixed);
+		}
+		else {
+			super.exit();
+		}
 	}
 }
 
@@ -121,7 +137,7 @@ class SubsidiaryUI extends UserInterface {
 		if( autoLayout ){
 			this.nav.$right.append(
 				$(`<input class="c-button" type="button" value="Back">`).on('click', ()=>{
-					this.destruct();
+					this.exit();
 				})
 			);
 			this.$window.append(new Hr());
@@ -140,9 +156,10 @@ class SubsidiaryUI extends UserInterface {
 		this.parentUI.refocus();
 	}
 
-	destruct( ){
-		super.destruct();
+	exit( ){
+		super.exit();
 		this.parentUI.refocus();
+		console.log('subsidiary exit');
 	}
 }
 
@@ -368,12 +385,12 @@ function buildConfirm( title, subtitle, onYes, onNo = ()=>{} ){
 	row.append(
 		new Button('Yes')
 		.on('click', ()=>{
-			ui.destruct();
+			ui.exit();
 			onYes();
 		}),
 		new Button('No')
 		.on('click', ()=>{
-			ui.destruct();
+			ui.exit();
 			onNo();
 		})
 	);

@@ -7,7 +7,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre19_b0';
+const ver = '11.0-pre20_b0';
 const verMod = '2023/Aug/27';
 
 class CustomStorage {
@@ -516,7 +516,7 @@ class UserSettings {
 		store.remove(`${List.type}_settings`);
 		store.remove(`last_${List.type}_run`);
 		if( UI ){
-			UI.destruct();
+			UI.exit();
 			initialise();
 		}
 		else {
@@ -882,6 +882,7 @@ class Worker {
 	/* similarly, these buttons are re-enabled after finish */
 	static reenableAfterDone = [];
 	static $actionBtn;
+	static isActive = false;
 
 	/* CSS vars */
 	css = '';
@@ -931,6 +932,7 @@ class Worker {
 	}
 
 	async start( ){
+		Worker.isActive = true;
 		settings.save();
 		window.addEventListener('beforeunload', warnUserBeforeLeaving);
 
@@ -1092,6 +1094,7 @@ class Worker {
 	}
 
 	finish( ){
+		Worker.isActive = false;
 		window.removeEventListener('beforeunload', warnUserBeforeLeaving);
 
 		/* temporary true values until modules are implemented into runtime */
@@ -1597,16 +1600,12 @@ class Worker {
 function buildMainUI( ){
 	/* Control Row */
 	let $actionBtn = new Button('Loading...', {'disabled':'disabled'});
-	let $hideBtn = new Button('Minimise', {title:'Closes the program window while it keeps running in the background.'}).on('click', ()=>{
-		UI.close();
-		$(UI.root).append(Status.$fixed);
-	});
-	let $exitBtn = new Button('Exit', {title:'Completely exit the program.'}).on('click', ()=>{
-		UI.destruct();
+	let $exitBtn = new Button('Close', {title:'Closes the program window. If work is currently being done, the program will keep going in the background.'}).on('click', ()=>{
+		UI.exit();
 	});
 	let controls = new SplitRow();
 	controls.$left.append(Status.$main);
-	controls.$right.append($actionBtn, $hideBtn, $exitBtn);
+	controls.$right.append($actionBtn, $exitBtn);
 
 	/* Components Row */
 	let $components = $('<div class="l-column">');
@@ -1661,8 +1660,8 @@ function buildMainUI( ){
 	UI.$window.append(controls.$main, new Hr(), $components, new Hr(), footer.$main);
 	UI.open();
 	
-	Worker.disableWhileRunning.push($clearBtn, $exitBtn);
-	Worker.reenableAfterDone.push($clearBtn, $exitBtn);
+	Worker.disableWhileRunning.push($clearBtn);
+	Worker.reenableAfterDone.push($clearBtn);
 	Worker.$actionBtn = $actionBtn;
 }
 
@@ -1824,7 +1823,7 @@ function buildCssImport( ){
 			setTemplate(importedTemplate['template'], importedTemplate['matchtemplate'], cssToImport)
 			.then((successful)=> {
 				if( successful ){
-					popupUI.destruct();
+					popupUI.exit();
 				}
 			});
 		}
@@ -1939,7 +1938,7 @@ function buildTagSettings( ){
 
 	let $options = $('<div class="l-column o-justify-start">');
 	$options.append(
-		new Paragraph('Enabled options will be added to your tags. Please <a href="https://myanimelist.net/panel.php?go=export" target="_blank">export</a> a copy of your list first if you have any tags you wish to keep as this action can be highly destructive.'),
+		new Paragraph('Enabled options will be added to your tags. Please <a href="https://myanimelist.net/panel.php?go=export" target="_blank">export</a> a copy of your list first if you have any tags you wish to keep as this action can be highly exitive.'),
 		new CheckGrid(generateChecks(true)).$main,
 		new Check(['clear_tags'], "Overwrite Current Tags", "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.").$main
 	);
@@ -1969,8 +1968,8 @@ function buildResults( css, tags, notes, items, errors, warnings ){
 	popupUI.nav.$right.append(
 		new Button('Exit')
 		.on('click', ()=>{
-			popupUI.destruct();
-			UI.destruct();
+			popupUI.exit();
+			UI.exit();
 		})
 	);
 
@@ -2025,6 +2024,7 @@ class UserInterface {
 	#shadowRoot = this.#attachmentPoint.attachShadow({mode: 'open'});
 	root = document.createElement('div');
 	$container = $('<div class="c-container">');
+	$backing = $('<div class="c-container__target">');
 	$windowList = $('<div class="c-window-list js-focus">');
 	$window = $('<main class="l-column c-window js-intro">');
 
@@ -2032,7 +2032,10 @@ class UserInterface {
 		this.#shadowRoot.append(this.root);
 		this.root.className = 'root is-closed';
 		$(this.root).append(this.$container);
-		this.$container.append(this.$windowList);
+		this.$container.append(this.$backing, this.$windowList);
+		this.$backing.on('click', ()=>{
+			this.exit();
+		});
 		this.$windowList.append(this.$window);
 
 		this.style(`
@@ -2161,6 +2164,7 @@ class UserInterface {
 	text-align: left;
 	opacity: 1;
 	transition: opacity .16s ease;
+	pointer-events: none;
 }
 .c-container--blurred {
 	background-color: rgba(0,0,0,0.5);
@@ -2172,6 +2176,16 @@ class UserInterface {
 .root.is-closed .c-container {
 	opacity: 0;
 	pointer-events: none;
+}
+
+.c-container__target {
+	position: absolute;
+	inset: 0;
+	pointer-events: auto;
+	cursor: pointer;
+}
+.root.is-closed .c-container__target {
+	display: none;
 }
 
 .c-window-list {
@@ -2197,6 +2211,7 @@ class UserInterface {
 	color: var(--txt);
 	font: 13px/1.3 Roboto, Arial, Helvetica, "Segoe UI", sans-serif;
 	backdrop-filter: blur(5px);
+	pointer-events: auto;
 }
 
 .c-button {
@@ -2467,12 +2482,14 @@ class UserInterface {
 		this.root.classList.add('is-closed');
 	}
 
-	destruct( ){
+	exit( ){
+		console.log('super exit');
 		if( this.alive ){
 			this.alive = false;
 			this.close();
 			setTimeout(()=>{
 				this.#attachmentPoint.remove();
+				console.log('remove attach');
 			}, 200);
 		}
 	}
@@ -2536,8 +2553,18 @@ class PrimaryUI extends UserInterface {
 	}
 
 	close( ){
-		super.close();
 		document.body.style.overflow = '';
+		super.close();
+	}
+
+	exit( ){
+		if( Worker.isActive ){
+			this.close();
+			$(this.root).append(Status.$fixed);
+		}
+		else {
+			super.exit();
+		}
 	}
 }
 
@@ -2554,7 +2581,7 @@ class SubsidiaryUI extends UserInterface {
 		if( autoLayout ){
 			this.nav.$right.append(
 				$(`<input class="c-button" type="button" value="Back">`).on('click', ()=>{
-					this.destruct();
+					this.exit();
 				})
 			);
 			this.$window.append(new Hr());
@@ -2573,9 +2600,10 @@ class SubsidiaryUI extends UserInterface {
 		this.parentUI.refocus();
 	}
 
-	destruct( ){
-		super.destruct();
+	exit( ){
+		super.exit();
 		this.parentUI.refocus();
+		console.log('subsidiary exit');
 	}
 }
 
@@ -2801,12 +2829,12 @@ function buildConfirm( title, subtitle, onYes, onNo = ()=>{} ){
 	row.append(
 		new Button('Yes')
 		.on('click', ()=>{
-			ui.destruct();
+			ui.exit();
 			onYes();
 		}),
 		new Button('No')
 		.on('click', ()=>{
-			ui.destruct();
+			ui.exit();
 			onNo();
 		})
 	);

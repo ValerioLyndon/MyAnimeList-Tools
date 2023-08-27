@@ -435,7 +435,7 @@ class UserSettings {
 		store.remove(`${List.type}_settings`);
 		store.remove(`last_${List.type}_run`);
 		if( UI ){
-			UI.destruct();
+			UI.exit();
 			initialise();
 		}
 		else {
@@ -801,6 +801,7 @@ class Worker {
 	/* similarly, these buttons are re-enabled after finish */
 	static reenableAfterDone = [];
 	static $actionBtn;
+	static isActive = false;
 
 	/* CSS vars */
 	css = '';
@@ -850,6 +851,7 @@ class Worker {
 	}
 
 	async start( ){
+		Worker.isActive = true;
 		settings.save();
 		window.addEventListener('beforeunload', warnUserBeforeLeaving);
 
@@ -1011,6 +1013,7 @@ class Worker {
 	}
 
 	finish( ){
+		Worker.isActive = false;
 		window.removeEventListener('beforeunload', warnUserBeforeLeaving);
 
 		/* temporary true values until modules are implemented into runtime */
@@ -1516,16 +1519,12 @@ class Worker {
 function buildMainUI( ){
 	/* Control Row */
 	let $actionBtn = new Button('Loading...', {'disabled':'disabled'});
-	let $hideBtn = new Button('Minimise', {title:'Closes the program window while it keeps running in the background.'}).on('click', ()=>{
-		UI.close();
-		$(UI.root).append(Status.$fixed);
-	});
-	let $exitBtn = new Button('Exit', {title:'Completely exit the program.'}).on('click', ()=>{
-		UI.destruct();
+	let $exitBtn = new Button('Close', {title:'Closes the program window. If work is currently being done, the program will keep going in the background.'}).on('click', ()=>{
+		UI.exit();
 	});
 	let controls = new SplitRow();
 	controls.$left.append(Status.$main);
-	controls.$right.append($actionBtn, $hideBtn, $exitBtn);
+	controls.$right.append($actionBtn, $exitBtn);
 
 	/* Components Row */
 	let $components = $('<div class="l-column">');
@@ -1580,8 +1579,8 @@ function buildMainUI( ){
 	UI.$window.append(controls.$main, new Hr(), $components, new Hr(), footer.$main);
 	UI.open();
 	
-	Worker.disableWhileRunning.push($clearBtn, $exitBtn);
-	Worker.reenableAfterDone.push($clearBtn, $exitBtn);
+	Worker.disableWhileRunning.push($clearBtn);
+	Worker.reenableAfterDone.push($clearBtn);
 	Worker.$actionBtn = $actionBtn;
 }
 
@@ -1743,7 +1742,7 @@ function buildCssImport( ){
 			setTemplate(importedTemplate['template'], importedTemplate['matchtemplate'], cssToImport)
 			.then((successful)=> {
 				if( successful ){
-					popupUI.destruct();
+					popupUI.exit();
 				}
 			});
 		}
@@ -1858,7 +1857,7 @@ function buildTagSettings( ){
 
 	let $options = $('<div class="l-column o-justify-start">');
 	$options.append(
-		new Paragraph('Enabled options will be added to your tags. Please <a href="https://myanimelist.net/panel.php?go=export" target="_blank">export</a> a copy of your list first if you have any tags you wish to keep as this action can be highly destructive.'),
+		new Paragraph('Enabled options will be added to your tags. Please <a href="https://myanimelist.net/panel.php?go=export" target="_blank">export</a> a copy of your list first if you have any tags you wish to keep as this action can be highly exitive.'),
 		new CheckGrid(generateChecks(true)).$main,
 		new Check(['clear_tags'], "Overwrite Current Tags", "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.").$main
 	);
@@ -1888,8 +1887,8 @@ function buildResults( css, tags, notes, items, errors, warnings ){
 	popupUI.nav.$right.append(
 		new Button('Exit')
 		.on('click', ()=>{
-			popupUI.destruct();
-			UI.destruct();
+			popupUI.exit();
+			UI.exit();
 		})
 	);
 
