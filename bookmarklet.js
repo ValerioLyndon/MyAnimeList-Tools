@@ -481,7 +481,7 @@ class UserSettings {
 .[TYPE][data-query*='"status":7']:not([data-query*='order']):not([data-query*='tag"']):not([data-query*='"s"']) .list-item:nth-child([INDEX]) .status::before {
 	content: '[NAME]';
 }`,
-		"header_style": `.manga[data-query*='"status":7']:not([data-query*='order']):not([data-query*='tag"']):not([data-query*='"s"']) .list-item .status::before {
+		"header_style": `.data.status::before {
 	position: absolute;
 	top: 0;
 	left: 0;
