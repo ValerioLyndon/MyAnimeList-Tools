@@ -661,11 +661,10 @@ function initialise() {
 	UI = new PrimaryUI();
 	Log.prepare(UI);
 	List.determineStyle();
+	ListItems.load();
 	settings = new UserSettings();
 
 	buildMainUI();
-
-	worker = new Worker();
 }
 
 /* fetches list item data from the load.json endpoint.
@@ -715,10 +714,13 @@ class ListItems {
 	}
 
 	static #done( ){
-		Status.update(`Successfully loaded ${this.data.length} items.`, 'good', 100);
+		Status.update(`Ready to process ${this.data.length} items.`, 'good', 100);
+		Status.estimate();
+		Worker.$actionBtn.off();
 		Worker.$actionBtn.on('click', ()=>{
 			const start = ()=>{
 				Worker.$actionBtn.off('click');
+				worker = new Worker();
 				worker.start();
 			};
 
@@ -826,11 +828,10 @@ class Status {
 	
 class Worker {
 	/* UI vars */
-	/* buttons are added to this list to be later disabled upon process start */
+	/* buttons are added to this list to be later disabled upon process start and enabled upon end */
 	static disableWhileRunning = [];
-	/* similarly, these buttons are re-enabled after finish */
-	static reenableAfterDone = [];
 	static $actionBtn;
+	static $resultsBtn;
 	static isActive = false;
 
 	/* CSS vars */
@@ -896,13 +897,15 @@ class Worker {
 			$btn.attr('disabled','disabled');
 		}
 
+		Worker.$resultsBtn.css('display', 'none');
+		Worker.$actionBtn.off();
 		Worker.$actionBtn.val('Stop');
 		Worker.$actionBtn.one('click', ()=>{
 			Worker.$actionBtn.attr('disabled','disabled');
 			Status.update('Stopping imminently...');
 			if( this.timeout ){
 				clearTimeout(this.timeout);
-				this.finish();
+				this.#finish();
 			}
 			else {
 				this.data = [];
@@ -1009,11 +1012,11 @@ class Worker {
 		/* Start processing items */
 		Promise.allSettled(beforeProcessing)
 		.then(()=>{
-			this.continue();
+			this.#continue();
 		});
 	}
 
-	continue( ){
+	#continue( ){
 		this.iteration++;
 		
 		/* update variables */
@@ -1033,16 +1036,16 @@ class Worker {
 		Status.update(`Processed ${this.iteration} of ${this.data.length}`, 'working', this.percent);
 		
 		if( this.iteration >= this.data.length ){
-			this.finish();
+			this.#finish();
 			return;
 		}
 		this.timeout = setTimeout(()=>{
 			this.timeout = false;
-			this.process();
+			this.#process();
 		}, settings.get(['delay']));
 	}
 
-	finish( ){
+	#finish( ){
 		Worker.isActive = false;
 		window.removeEventListener('beforeunload', warnUserBeforeLeaving);
 
@@ -1052,20 +1055,18 @@ class Worker {
 		if( this.css.length > 0 ){
 			store.set(`last_${List.type}_run`, this.css);
 		}
-		Worker.$actionBtn.removeAttr('disabled');
-		Worker.$actionBtn.val('Open Results');
-		Worker.$actionBtn.off();
-		Worker.$actionBtn.on('click',()=>{
+		ListItems.load();
+		Worker.$actionBtn.val('Restart');
+		Worker.$resultsBtn.css('display', '');
+		Worker.$resultsBtn.on('click',()=>{
 			buildResults( settings.get(['update_css']), settings.get(['update_tags']), settings.get(['update_notes']), this.data.length, this.errors, this.warnings );
 		});
-		Status.update(`Completed with ${this.errors} errors`, 'good', 100);
-		Status.estimate();
-		for( let $btn of Worker.reenableAfterDone ){
+		for( let $btn of Worker.disableWhileRunning ){
 			$btn.removeAttr('disabled');
 		}
 	}
 
-	async process( ){
+	async #process( ){
 		const meta = this.data[this.iteration];
 		const id = meta[`${List.type}_id`];
 		let strings = {};
@@ -1076,7 +1077,7 @@ class Worker {
 			if( !str ){
 				this.errors++;
 				Log.error(`${List.type} #${id}: Failed to get entry information.`);
-				this.continue();
+				this.#continue();
 				return;
 			}
 			const $doc = $(createDOM(str));
@@ -1542,19 +1543,21 @@ class Worker {
 			Log.error(`Occured at ${e.lineNumber}`, false);
 		}
 			
-		this.continue();
+		this.#continue();
 	}
 }
 
 function buildMainUI( ){
 	/* Control Row */
 	let $actionBtn = new Button('Loading...', {'disabled':'disabled'});
+	let $resultsBtn = new Button('Open Results');
+	$resultsBtn.css('display', 'none');
 	let $exitBtn = new Button('Close', {title:'Closes the program window. If work is currently being done, the program will keep going in the background.'}).on('click', ()=>{
 		UI.exit();
 	});
 	let controls = new SplitRow();
 	controls.$left.append(Status.$main);
-	controls.$right.append($actionBtn, $exitBtn);
+	controls.$right.append($resultsBtn, $actionBtn, $exitBtn);
 
 	/* Components Row */
 	let $components = $('<div class="l-column">');
@@ -1610,8 +1613,8 @@ function buildMainUI( ){
 	UI.open();
 	
 	Worker.disableWhileRunning.push($clearBtn);
-	Worker.reenableAfterDone.push($clearBtn);
 	Worker.$actionBtn = $actionBtn;
+	Worker.$resultsBtn = $resultsBtn;
 }
 
 function buildGlobalSettings( ){

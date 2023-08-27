@@ -24,9 +24,9 @@ const verMod = '/*$$$ver_date$$$*/';
 
 var store = new CustomStorage('userscript');
 
-/*<<<main>>>*/
-
 /*<<<interface>>>*/
+
+/*<<<main>>>*/
 
 /* Add "Tools" button to list */
 

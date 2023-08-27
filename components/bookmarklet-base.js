@@ -7,9 +7,9 @@ const verMod = '/*$$$ver_date$$$*/';
 
 var store = new CustomStorage('localStorage');
 
-/*<<<main>>>*/
-
 /*<<<interface>>>*/
+
+/*<<<main>>>*/
 
 if( List.isOwner ){
 	initialise();
