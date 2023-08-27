@@ -39,13 +39,11 @@ class UserInterface {
 	}
 
 	exit( ){
-		console.log('super exit');
 		if( this.alive ){
 			this.alive = false;
 			this.close();
 			setTimeout(()=>{
 				this.#attachmentPoint.remove();
-				console.log('remove attach');
 			}, 200);
 		}
 	}
@@ -159,7 +157,6 @@ class SubsidiaryUI extends UserInterface {
 	exit( ){
 		super.exit();
 		this.parentUI.refocus();
-		console.log('subsidiary exit');
 	}
 }
 

@@ -63,8 +63,14 @@ class Log {
 	}
 
 	static sendToUI( msg = '', type = 'ERROR' ){
+		const date = new Date();
+		const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
 		if( this.#ready() ){
-			this.#$parent.prepend($(`<div class="c-log"><b>[${type}]</b> ${msg}</div>`));
+			this.#$parent.prepend($(`<div class="c-log">
+				<b class="c-log__type">${type}</b>
+				${msg}
+				<small class="c-log__time">${time}</small>
+			</div>`));
 			return;
 		}
 		this.#unsentLogs.push([msg, type]);
@@ -1509,7 +1515,7 @@ class Worker {
 		catch( e ){
 			this.errors++;
 			Log.error(`${List.type} #${id}: ${e}`);
-			Log.error(e.lineNumber, false);
+			Log.error(`Occured at ${e.lineNumber}`, false);
 		}
 			
 		this.continue();

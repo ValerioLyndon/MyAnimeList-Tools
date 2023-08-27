@@ -7,7 +7,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre21_b0';
+const ver = '11.0-pre22_b0';
 const verMod = '2023/Aug/27';
 
 class CustomStorage {
@@ -144,8 +144,14 @@ class Log {
 	}
 
 	static sendToUI( msg = '', type = 'ERROR' ){
+		const date = new Date();
+		const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
 		if( this.#ready() ){
-			this.#$parent.prepend($(`<div class="c-log"><b>[${type}]</b> ${msg}</div>`));
+			this.#$parent.prepend($(`<div class="c-log">
+				<b class="c-log__type">${type}</b>
+				${msg}
+				<small class="c-log__time">${time}</small>
+			</div>`));
 			return;
 		}
 		this.#unsentLogs.push([msg, type]);
@@ -1590,7 +1596,7 @@ class Worker {
 		catch( e ){
 			this.errors++;
 			Log.error(`${List.type} #${id}: ${e}`);
-			Log.error(e.lineNumber, false);
+			Log.error(`Occured at ${e.lineNumber}`, false);
 		}
 			
 		this.continue();
@@ -2335,6 +2341,16 @@ class UserInterface {
 	border-radius: 9px;
 	font: 11px/1.5em monospace;
 }
+.c-log__type {
+	display: inline-block;
+	padding: 0 5px;
+	background: var(--bg);
+	border-radius: 6px;
+	filter: invert(1);
+}
+.c-log__time {
+	float: right;
+}
 
 
 
@@ -2483,13 +2499,11 @@ class UserInterface {
 	}
 
 	exit( ){
-		console.log('super exit');
 		if( this.alive ){
 			this.alive = false;
 			this.close();
 			setTimeout(()=>{
 				this.#attachmentPoint.remove();
-				console.log('remove attach');
 			}, 200);
 		}
 	}
@@ -2603,7 +2617,6 @@ class SubsidiaryUI extends UserInterface {
 	exit( ){
 		super.exit();
 		this.parentUI.refocus();
-		console.log('subsidiary exit');
 	}
 }
 
