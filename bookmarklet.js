@@ -7,7 +7,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre22_b0';
+const ver = '11.0-pre23_b0';
 const verMod = '2023/Aug/27';
 
 class CustomStorage {
@@ -797,8 +797,32 @@ class ListItems {
 
 	static #done( ){
 		Status.update(`Successfully loaded ${this.data.length} items.`, 'good', 100);
-		Worker.$actionBtn.one('click', ()=>{
-			worker.start();
+		Worker.$actionBtn.on('click', ()=>{
+			const start = ()=>{
+				Worker.$actionBtn.off('click');
+				worker.start();
+			};
+
+			let enabled = [];
+			if( settings.get(['update_tags']) ){
+				enabled.push('tag updater');
+			}
+			if( settings.get(['update_notes']) ){
+				enabled.push('notes updater');
+			}
+			if( !store.get('checkpoint_start') && enabled.length > 0 ){
+				buildConfirm(
+					'Final warning.',
+					`You have enabled the ${enabled.join(' and the ')}. ${enabled.length > 1 ? 'These' : 'This'} can make destructive edits to ALL your list items. If you are okay with this, click "Yes". If you want to backup your items first, click "No".`,
+					()=>{
+						start();
+						store.set('checkpoint_start', true);
+					}
+				);
+			}
+			else {
+				start();
+			}
 		});
 		Worker.$actionBtn.val('Start');
 		Worker.$actionBtn.removeAttr('disabled');
@@ -1618,7 +1642,7 @@ function buildMainUI( ){
 	let tags = new OptionalGroupRow('Tags Updater', ['update_tags'], ()=>{ buildTagSettings(); });
 	tags.check.$box.on('click', ()=>{
 		if( tags.check.$box.is(':checked') && store.get('checkpoint_tags') !== true ){
-			alert('Before you continue!! This alert only shows once.\n\nThe Tags Updater is capable of entirely WIPING your tags. If you have the Tags column disabled, it WILL wipe your tags. If you have any you don\'t want to lose your tags, please back them up first and enable tags in your list settings!');
+			alert('Before you continue!! This alert only shows once.\n\nThe Tags Updater is capable of entirely WIPING your tags. If you have the Tags column disabled, it WILL wipe your tags. If you have any tags you don\'t want to lose, please back them up first and enable tags in your list settings!');
 			store.set('checkpoint_tags', true);
 		}
 	});
@@ -2030,7 +2054,7 @@ class UserInterface {
 	#shadowRoot = this.#attachmentPoint.attachShadow({mode: 'open'});
 	root = document.createElement('div');
 	$container = $('<div class="c-container">');
-	$backing = $('<div class="c-container__target">');
+	$backing = $('<div class="c-container__target is-interactable">');
 	$windowList = $('<div class="c-window-list js-focus">');
 	$window = $('<main class="l-column c-window js-intro">');
 
@@ -2188,7 +2212,6 @@ class UserInterface {
 	position: absolute;
 	inset: 0;
 	pointer-events: auto;
-	cursor: pointer;
 }
 .root.is-closed .c-container__target {
 	display: none;
@@ -2837,6 +2860,8 @@ class Button {
 
 function buildConfirm( title, subtitle, onYes, onNo = ()=>{} ){
 	let ui = new SubsidiaryUI(UI, title, subtitle, false);
+	ui.$backing.off('click');
+	ui.$backing.removeClass('is-interactable');
 
 	let row = $('<div class="l-row">');
 	row.append(

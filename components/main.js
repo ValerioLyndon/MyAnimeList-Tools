@@ -716,8 +716,32 @@ class ListItems {
 
 	static #done( ){
 		Status.update(`Successfully loaded ${this.data.length} items.`, 'good', 100);
-		Worker.$actionBtn.one('click', ()=>{
-			worker.start();
+		Worker.$actionBtn.on('click', ()=>{
+			const start = ()=>{
+				Worker.$actionBtn.off('click');
+				worker.start();
+			};
+
+			let enabled = [];
+			if( settings.get(['update_tags']) ){
+				enabled.push('tag updater');
+			}
+			if( settings.get(['update_notes']) ){
+				enabled.push('notes updater');
+			}
+			if( !store.get('checkpoint_start') && enabled.length > 0 ){
+				buildConfirm(
+					'Final warning.',
+					`You have enabled the ${enabled.join(' and the ')}. ${enabled.length > 1 ? 'These' : 'This'} can make destructive edits to ALL your list items. If you are okay with this, click "Yes". If you want to backup your items first, click "No".`,
+					()=>{
+						start();
+						store.set('checkpoint_start', true);
+					}
+				);
+			}
+			else {
+				start();
+			}
 		});
 		Worker.$actionBtn.val('Start');
 		Worker.$actionBtn.removeAttr('disabled');
@@ -1537,7 +1561,7 @@ function buildMainUI( ){
 	let tags = new OptionalGroupRow('Tags Updater', ['update_tags'], ()=>{ buildTagSettings(); });
 	tags.check.$box.on('click', ()=>{
 		if( tags.check.$box.is(':checked') && store.get('checkpoint_tags') !== true ){
-			alert('Before you continue!! This alert only shows once.\n\nThe Tags Updater is capable of entirely WIPING your tags. If you have the Tags column disabled, it WILL wipe your tags. If you have any you don\'t want to lose your tags, please back them up first and enable tags in your list settings!');
+			alert('Before you continue!! This alert only shows once.\n\nThe Tags Updater is capable of entirely WIPING your tags. If you have the Tags column disabled, it WILL wipe your tags. If you have any tags you don\'t want to lose, please back them up first and enable tags in your list settings!');
 			store.set('checkpoint_tags', true);
 		}
 	});

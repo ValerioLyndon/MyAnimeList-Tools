@@ -6,7 +6,7 @@ class UserInterface {
 	#shadowRoot = this.#attachmentPoint.attachShadow({mode: 'open'});
 	root = document.createElement('div');
 	$container = $('<div class="c-container">');
-	$backing = $('<div class="c-container__target">');
+	$backing = $('<div class="c-container__target is-interactable">');
 	$windowList = $('<div class="c-window-list js-focus">');
 	$window = $('<main class="l-column c-window js-intro">');
 
@@ -377,6 +377,8 @@ class Button {
 
 function buildConfirm( title, subtitle, onYes, onNo = ()=>{} ){
 	let ui = new SubsidiaryUI(UI, title, subtitle, false);
+	ui.$backing.off('click');
+	ui.$backing.removeClass('is-interactable');
 
 	let row = $('<div class="l-row">');
 	row.append(
