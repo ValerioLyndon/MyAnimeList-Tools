@@ -1,4 +1,4 @@
-const proxy = 'https://cors-anywhere.herokuapp.com/';
+const proxy = 'https://cors-anywhere-rp3l.onrender.com/';
 /* functionality vars */
 var defaultSettings = {
 	"select_categories": false,
@@ -295,6 +295,17 @@ class DropboxHandler {
 	constructor( ){
 		if( store.has('auth_dropbox') ){
 			this.token = store.get('auth_dropbox');
+
+			let request = new XMLHttpRequest();
+			request.open("POST", proxy+'https://api.dropboxapi.com/2/users/get_current_account');
+			request.setRequestHeader('Authorization', `Bearer ${this.token}`);
+			request.send();
+			// fetch(proxy+'https://api.dropboxapi.com/2/users/get_current_account', {
+			// 	headers: new Headers({Authorization: `Bearer ${this.token}`})
+			// })
+			// .then(response=>{
+			// 	console.log(response);
+			// });
 		}
 
 		/* create verifier and challenge codes */
