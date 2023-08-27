@@ -20,14 +20,16 @@ def path(sub_path):
 textReplacements = []
 with open(path('components/variables'), 'r') as file:
 	for var in file.readlines():
-		name = var.split('=')[0].lstrip()
-		value = var.split('=')[1].rstrip('\n\r')
+		split = var.split('=');
+		name = split.pop(0).lstrip()
+		value = '='.join(split).rstrip('\n\r')
 		textReplacements.append([name, value])
 
 fileReplacements = [
 	['credit', 'components/credit.js'],
 	['store', 'components/store.js'],
 	['main', 'components/main.js'],
+	['interface', 'components/interface.js'],
 	['css', 'components/primary.css']
 ]
 

@@ -24,7 +24,7 @@ class CustomStorage {
 		}
 	}
 
-	get( key ){
+	get( key, fallback ){
 		let value;
 		let valType;
 		if( this.type === 'userscript' ){
@@ -39,16 +39,13 @@ class CustomStorage {
 				value = undefined;
 			}
 		}
-		if( value === undefined ){
-			return value;
-		}
 		if( valType === 'object' ){
 			value = JSON.parse(value);
 		}
 		else if( valType === 'boolean' ){
 			value = Boolean(value);
 		}
-		return value;
+		return value === undefined ? fallback : value;
 	}
 
 	has( key ){
