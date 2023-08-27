@@ -991,7 +991,7 @@ class Worker {
 		this.percent = this.iteration / this.data.length * 100 || 0;
 
 		if( this.iteration === 0 ){
-			this.timeThen = performance.now() - settings.get(['delay']);
+			this.timeThen = performance.now() - round(settings.get(['delay']) * 1.15);
 		}
 		let timeSince = performance.now() - this.timeThen;
 		this.timeThen = performance.now();

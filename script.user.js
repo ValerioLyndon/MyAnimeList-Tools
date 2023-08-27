@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre20_a0
+// @version      11.0-pre21_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,7 +24,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre20_a0';
+const ver = '11.0-pre21_a0';
 const verMod = '2023/Aug/27';
 
 class CustomStorage {
@@ -1089,7 +1089,7 @@ class Worker {
 		this.percent = this.iteration / this.data.length * 100 || 0;
 
 		if( this.iteration === 0 ){
-			this.timeThen = performance.now() - settings.get(['delay']);
+			this.timeThen = performance.now() - round(settings.get(['delay']) * 1.15);
 		}
 		let timeSince = performance.now() - this.timeThen;
 		this.timeThen = performance.now();
