@@ -8,7 +8,7 @@ MyAnimeList-Tools
 */
 
 const ver = '10.0-pre_b0';
-const verMod = '2023/Jun/11';
+const verMod = '2023/Aug/26';
 
 class CustomStorage {
 	constructor( type = 'localStorage' ){
@@ -82,6 +82,7 @@ class CustomStorage {
 
 var store = new CustomStorage('localStorage');
 
+const proxy = 'https://cors-anywhere.herokuapp.com/';
 /* functionality vars */
 var defaultSettings = {
 	"select_categories": false,
@@ -356,19 +357,22 @@ class DropboxHandler {
 	codeVerifier;
 	codeChallenge;
 	token;
+	clientId = 'odribfnp0304xy2';
 
 	constructor( ){
-		/* create verifier code */
-		const verifierChars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-._~';
-		for( let i = 0; i < 128; i++ ){
-			let random = round(verifierChars.length * Math.random());
-			this.codeVerifier += verifierChars[random];
-		}
-
-		/* create challenge code */
+		/* create verifier and challenge codes */
 		this.createChallenge();
 	}
-	async createChallenge( verifier = this.verifier ){
+
+	async createChallenge( ){
+		let verifier = '';
+		const verifierChars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-._~';
+		for( let i = 0; i < 100; i++ ){
+			let random = round((verifierChars.length-1) * Math.random());
+			verifier += verifierChars[random];
+		}
+		this.codeVerifier = verifier;
+
 		const encoder = new TextEncoder();
 		const data = encoder.encode(verifier);
 		const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -379,19 +383,21 @@ class DropboxHandler {
 	
 	/* step 1 */
 	getCode( ){
-		window.open(`https://www.dropbox.com/oauth2/authorize?client_id=odribfnp0304xy2&response_type=code&code_challenge=${this.codeChallenge}&code_challenge_method=S256`, '_blank');
+		window.open(`https://www.dropbox.com/oauth2/authorize?client_id=${this.clientId}&response_type=code&code_challenge=${this.codeChallenge}&code_challenge_method=S256`, '_blank');
 	}
 	
 	/* step 2 */
 	async exchangeCode( code ){
+		console.log('code', code);
+		console.log('verifier', this.codeVerifier);
+		console.log('challenge', this.codeChallenge);
 		let headerData = new Headers();
-		headerData.append('Access-Control-Allow-Origin', '*');
 		headerData.append('code', code);
 		headerData.append('grant_type', 'authorization_code');
-		headerData.append('code_verifier', this.verifier);
-		headerData.append('code_challenge_method', 'S256');
+		headerData.append('code_verifier', this.codeVerifier);
+		headerData.append('client_id', this.clientId);
 		
-		let token = await fetch('https://api.dropboxapi.com/oauth2/token', {
+		let token = await fetch(proxy+'https://api.dropboxapi.com/oauth2/token', {
 			'method': 'POST',
 			headers: headerData
 		})
