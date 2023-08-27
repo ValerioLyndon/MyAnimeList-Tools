@@ -7,7 +7,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre17_b0';
+const ver = '11.0-pre18_b0';
 const verMod = '2023/Aug/25';
 
 class CustomStorage {
@@ -718,7 +718,7 @@ function encodeForCss( str ){
 
 /* Parse any and all numbers from a string into an int */
 function getInt( str ){
-	return parseInt(str.replaceAll(/\D*/g, '')) || 0;
+	return typeof str === 'string' ? parseInt(str.replaceAll(/\D*/g, '')) : 0;
 }
 
 
@@ -1340,7 +1340,7 @@ class Worker {
 
 				if( !isNaN(minutes) ){
 					let duration = minutesToStr(minutes);
-					strings['duration'] = totalDuration;
+					strings['duration'] = duration;
 					verbose['duration'] = 'Duration/Ep: '+duration;
 
 					let episodes = meta['anime_num_episodes'];
@@ -1587,7 +1587,7 @@ class Worker {
 		catch( e ){
 			this.errors++;
 			Log.error(`${List.type} #${id}: ${e}`);
-			Log.error(e.stack, false);
+			Log.error(e.lineNumber, false);
 		}
 			
 		this.continue();

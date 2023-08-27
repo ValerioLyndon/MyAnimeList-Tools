@@ -637,7 +637,7 @@ function encodeForCss( str ){
 
 /* Parse any and all numbers from a string into an int */
 function getInt( str ){
-	return parseInt(str.replaceAll(/\D*/g, '')) || 0;
+	return typeof str === 'string' ? parseInt(str.replaceAll(/\D*/g, '')) : 0;
 }
 
 
@@ -1259,7 +1259,7 @@ class Worker {
 
 				if( !isNaN(minutes) ){
 					let duration = minutesToStr(minutes);
-					strings['duration'] = totalDuration;
+					strings['duration'] = duration;
 					verbose['duration'] = 'Duration/Ep: '+duration;
 
 					let episodes = meta['anime_num_episodes'];
@@ -1506,7 +1506,7 @@ class Worker {
 		catch( e ){
 			this.errors++;
 			Log.error(`${List.type} #${id}: ${e}`);
-			Log.error(e.stack, false);
+			Log.error(e.lineNumber, false);
 		}
 			
 		this.continue();
