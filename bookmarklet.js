@@ -377,6 +377,10 @@ class DropboxHandler {
 	clientId = 'odribfnp0304xy2';
 
 	constructor( ){
+		if( store.has('auth_dropbox') ){
+			this.token = store.get('auth_dropbox');
+		}
+
 		/* create verifier and challenge codes */
 		this.createChallenge();
 	}
@@ -392,25 +396,12 @@ class DropboxHandler {
 		verifier = encodeBase64Url(verifier);
 		/* debug */
 		this.codeVerifier = verifier;
-		console.log('verifier status', /^[0-9a-zA-Z\-\.\_\~]{43,128}$/.test(verifier));
-		console.log('verifier', this.codeVerifier);
-
-		//const encoder = new TextEncoder();
-		//const data = encoder.encode(verifier);
-		//this.codeChallenge = encoded;
-
-		/* encode verifier to get challenge */
-		
-		/* encode SHA256 verifier into BASE64 to create challenge */
-		let challenge = encodeBase64Url(await encodeSha256(verifier));
-		this.codeChallenge = challenge;
-		console.log('challenge status', /^[0-9a-zA-Z\-\.\_\~]{43,128}$/.test(challenge));
-		console.log('challenge', this.codeChallenge);
+		this.codeChallenge = encodeBase64Url(await encodeSha256(verifier));
 	}
 	
 	/* step 1 */
 	getCode( ){
-		window.open(`https://www.dropbox.com/oauth2/authorize?client_id=${this.clientId}&response_type=code&code_challenge=${this.codeChallenge}&code_challenge_method=S256`, '_blank');
+		window.open(`https://www.dropbox.com/oauth2/authorize?client_id=${this.clientId}&response_type=code&code_challenge=${this.codeVerifier}&code_challenge_method=plain`, '_blank');
 	}
 	
 	/* step 2 */
@@ -1223,23 +1214,19 @@ footer {
 		if( store.has('auth_dropbox') ){
 			oauthInput.val(store.get('auth_dropbox'));
 		}
-		oauthInput.on('input', ()=>{
-			let val = oauthInput.val();
-			if( val.length > 0 ){
-				store.set('auth_dropbox', val);
-			}
-			else {
-				store.remove('auth_dropbox');
-			}
-		});
 		
 		let validateBtn = $(popup).find('#validate-btn');
 		validateBtn.click(()=>{
 			Dropbox.exchangeCode(oauthInput.val())
-			.then((token)=>{
+			.then((json)=>{
 				console.log(token);
+				let token = json['access_token'];
+				if( !token ){
+					alert('Exchange failed.');
+					return;
+				}
 				oauthInput.val(token);
-				/*store.set('auth_dropbox', token);*/
+				store.set('auth_dropbox', token);
 			});
 		});
 
