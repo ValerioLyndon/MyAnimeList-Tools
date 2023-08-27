@@ -661,10 +661,10 @@ function initialise() {
 	UI = new PrimaryUI();
 	Log.prepare(UI);
 	List.determineStyle();
-	ListItems.load();
 	settings = new UserSettings();
 
 	buildMainUI();
+	ListItems.load();
 }
 
 /* fetches list item data from the load.json endpoint.
@@ -714,6 +714,7 @@ class ListItems {
 	}
 
 	static #done( ){
+		console.log('done ListItems');
 		Status.update(`Ready to process ${this.data.length} items.`, 'good', 100);
 		Status.estimate();
 		Worker.$actionBtn.off();
@@ -844,6 +845,8 @@ class Worker {
 	imageDelay = 50;
 
 	/* info/meta vars */
+	skipped = 0;
+	skippedDone = 0;
 	errors = 0;
 	warnings = 0;
 	percent = 0;
@@ -950,6 +953,7 @@ class Worker {
 					}
 				}
 				if( skip ){
+					this.skipped++;
 					continue;
 				}
 			}
@@ -1000,6 +1004,7 @@ class Worker {
 				}
 				else {
 					this.write(lineText);
+					this.skippedDone++;
 				}
 			}
 			/* If not in existing, add to list for processing */
@@ -1012,6 +1017,16 @@ class Worker {
 		/* Start processing items */
 		Promise.allSettled(beforeProcessing)
 		.then(()=>{
+			if( this.skipped || this.skippedDone ){
+				let texts = [];
+				if( this.skipped ){
+					texts.push(`${this.skipped} were skipped due to your settings`);
+				}
+				if( this.skippedDone ){
+					texts.push(`${this.skippedDone} were added from your previous run and don't need re-processing`);
+				}
+				Log.generic(`Out of ${ListItems.data.length} items on your list, ${texts.join(' and ')}.`);
+			}
 			this.#continue();
 		});
 	}
@@ -1049,7 +1064,6 @@ class Worker {
 		Worker.isActive = false;
 		window.removeEventListener('beforeunload', warnUserBeforeLeaving);
 
-		/* temporary true values until modules are implemented into runtime */
 		buildResults( settings.get(['update_css']), settings.get(['update_tags']), settings.get(['update_notes']), this.data.length, this.errors, this.warnings );
 
 		if( this.css.length > 0 ){

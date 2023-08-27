@@ -301,6 +301,7 @@
 	filter: invert(1);
 }
 .c-log__time {
+	margin-left: 5px;
 	float: right;
 }
 
