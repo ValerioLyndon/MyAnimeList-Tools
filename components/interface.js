@@ -1,7 +1,8 @@
 /* Core class for handling popup windows and overlays, extended by Primary and Subsidiary variants
 no requirements */
 class UserInterface {
-	alive = true;
+	isAlive = true;
+	isOpen = false;
 	#attachmentPoint = document.createElement('div');
 	#shadowRoot = this.#attachmentPoint.attachShadow({mode: 'open'});
 	root = document.createElement('div');
@@ -25,18 +26,20 @@ class UserInterface {
 	}
 
 	open( ){
-		if( this.alive ){
+		if( this.isAlive ){
 			this.root.classList.remove('is-closed');
+			this.isOpen = true;
 		}
 	}
 
 	close( ){
 		this.root.classList.add('is-closed');
+		this.isOpen = false;
 	}
 
 	destruct( ){
-		if( this.alive ){
-			this.alive = false;
+		if( this.isAlive ){
+			this.isAlive = false;
 			this.close();
 			setTimeout(()=>{
 				this.#attachmentPoint.remove();

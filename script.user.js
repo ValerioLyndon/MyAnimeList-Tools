@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre17+h4_a0
+// @version      11.0-pre17+h5_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,8 +24,8 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre17+h4_a0';
-const verMod = '2023/Aug/25';
+const ver = '11.0-pre17+h5_a0';
+const verMod = '2023/Aug/27';
 
 class CustomStorage {
 	constructor( type = 'localStorage' ){
@@ -73,6 +73,9 @@ class CustomStorage {
 		}
 		else if( valType === 'boolean' ){
 			value = Boolean(value);
+		}
+		else if( valType === 'number' ){
+			value = Number(value);
 		}
 		return value === undefined ? fallback : value;
 	}
@@ -153,7 +156,7 @@ class Log {
 	}
 
 	static #ready( ){
-		if( !this.#userInterface || !this.#userInterface.alive ){
+		if( !this.#userInterface || !this.#userInterface.isAlive ){
 			return false;
 		}
 		if( this.#$parent ){
@@ -204,6 +207,7 @@ class List {
 	static isAnime = (this.type === 'anime');
 	static isOwner = ($('body').attr('data-owner') === "1");
 	static isModern = ($('#list_surround').length === 0);
+	static isPreview = new URLSearchParams(window.location.search).has('preview');
 	static style = undefined;
 	static customCssEle = this.isModern ? $('#custom-css') : $('head style:first-of-type');
 	static customCss = this.customCssEle.text().trim();
@@ -399,6 +403,7 @@ class List {
 }
 
 /* handles the "settings" storage key where user settings are kept.
+Settings that shouldn't be shared such as auth, dates, list-specific last run texts, and more, should be stored as separate objects. 
 requires the CustomStorage class */
 class UserSettings {
 	settings = {
@@ -530,7 +535,8 @@ class UserSettings {
 				this.settings = workspace;
 			}
 			catch( e ){
-				alert("Encountered an error while parsing your previous settings. Your settings have been reverted to defaults. To quickly recover your template settings, try selecting \"Last Run\" and then \"Autofill\". Other settings will need to be manually set. \n\nIf you've never run this tool before, you should never see this.");
+				Log.error("Encountered an error while parsing your previous settings. Your settings have been reverted to defaults. To quickly recover your template settings, try selecting \"Last Run\" and then \"Autofill\". Other settings will need to be manually set. \n\nIf you've never run this tool before, you should never see this.");
+				/* TODO: update this text to match new UI */
 			}
 		}
 	}
@@ -753,8 +759,8 @@ function decodeHtml( html ){
 	return txt.value;
 }
 
-function round( value, precision ){
-	let multiplier = Math.pow(10, precision || 0);
+function round( value, precision = 0 ){
+	let multiplier = Math.pow(10, precision);
 	return Math.round(value * multiplier) / multiplier;
 }
 
@@ -796,7 +802,9 @@ var worker;
 /* Runtime */
 
 function initialise() {
-	UI = new PrimaryUI();
+	if( !UI || !UI.isAlive ){
+		UI = new PrimaryUI();
+	}
 	Log.prepare(UI);
 	List.determineStyle();
 	settings = new UserSettings();
@@ -995,7 +1003,7 @@ class Worker {
 	/* utility functions */
 
 	write( line ){
-		if( !settings.get(['update_css']) ){
+		if( !this.doCss ){
 			return;
 		}
 		this.css += line + '\n';
@@ -1016,6 +1024,11 @@ class Worker {
 	/* runtime functions */
 
 	updateHeaders( ){
+		if( !List.isModern ){
+			Log.generic('Skipped header update as list is modern.', false);
+			return;
+		}
+
 		Status.update('Updating category headers...', 'working', -1);
 		/* fetch data and setup counts */
 
@@ -1071,12 +1084,18 @@ class Worker {
 
 		let css = List.customCssModified + toAppend;
 		updateCss(css);
+		store.set('last_auto_headers', Date.now());
 	}
 
-	async start( doHeaders = settings.get(['update_headers']) ){
+	async start( doCss = settings.get(['update_css']), doTags = settings.get(['update_tags']), doNotes = settings.get(['update_notes']), doHeaders = settings.get(['update_headers']) ){
+		this.doCss = doCss;
+		this.doTags = doTags;
+		this.doNotes = doNotes;
+		this.doHeaders = doHeaders;
+
 		settings.save();
 		window.addEventListener('beforeunload', warnUserBeforeLeaving);
-		const doScraper = settings.get(['update_css']) || settings.get(['update_tags']) || settings.get(['update_notes']);
+		const doScraper = this.doCss || this.doTags || this.doNotes;
 		
 		/* UI */
 
@@ -1089,7 +1108,7 @@ class Worker {
 		ListItems.afterLoad(async ()=>{
 			/* Headers */
 
-			if( doHeaders ){
+			if( this.doHeaders ){
 				this.updateHeaders();
 				if( doScraper ){
 					await delay(500);
@@ -1098,7 +1117,7 @@ class Worker {
 
 			/* CSS */
 
-			if( settings.get(['update_css']) && settings.get(['live_preview']) ){
+			if( this.doCss && settings.get(['live_preview']) ){
 				let previewText = new Textarea(false, 'CSS Output', {'readonly':'readonly'}, 12);
 				this.$preview = previewText.$box;
 				UI.newWindow(previewText.$raw);
@@ -1123,7 +1142,7 @@ class Worker {
 
 			/* Handle CSS, Tags, Notes */
 			
-			if( settings.get(['update_css']) || settings.get(['update_tags']) || settings.get(['update_notes']) ){
+			if( this.doCss || this.doTags || this.doNotes ){
 				let categories = [];
 				for( let [categoryId, check] of Object.entries(settings.get(['checked_categories'])) ){
 					if( check ){
@@ -1266,7 +1285,7 @@ class Worker {
 		window.removeEventListener('beforeunload', warnUserBeforeLeaving);
 
 		/* temporary true values until modules are implemented into runtime */
-		buildResults( settings.get(['update_css']), settings.get(['update_tags']), settings.get(['update_notes']), settings.get(['update_headers']), this.data.length, this.errors, this.warnings );
+		buildResults( this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
 
 		if( this.css.length > 0 ){
 			store.set(`last_${List.type}_run`, this.css);
@@ -1275,7 +1294,7 @@ class Worker {
 		Worker.$actionBtn.val('Open Results');
 		Worker.$actionBtn.off();
 		Worker.$actionBtn.on('click',()=>{
-			buildResults( settings.get(['update_css']), settings.get(['update_tags']), settings.get(['update_notes']), settings.get(['update_headers']), this.data.length, this.errors, this.warnings );
+			buildResults( this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
 		});
 		Status.update(`Completed with ${this.errors} errors`, 'good', 100);
 		Status.estimate();
@@ -1302,7 +1321,7 @@ class Worker {
 		
 			/* get current tags */
 			let tags = [];
-			if( settings.get(['update_tags']) && !settings.get(['clear_tags']) ){
+			if( this.doTags && !settings.get(['clear_tags']) ){
 				tags = meta['tags'].split(',');
 				tags.map(tag=>tag.trim());
 			}
@@ -1591,7 +1610,7 @@ class Worker {
 
 			/* Update Notes & Tags */
 
-			if( settings.get(['update_tags']) ){
+			if( this.doTags ){
 				if(strings['title_en'] && settings.get(['checked_tags','english_title'])) { tags.push(strings['title_en']); }
 				if(strings['title_fr'] && settings.get(['checked_tags','french_title'])) { tags.push(strings['title_fr']); }
 				if(strings['title_es'] && settings.get(['checked_tags','spanish_title'])) { tags.push(strings['title_es']); }
@@ -1653,7 +1672,7 @@ class Worker {
 				});
 			}
 
-			if( settings.get(['update_notes']) ){
+			if( this.doNotes ){
 				let notes = [];
 
 				if(strings['title_en'] && settings.get(['checked_notes','english_title'])) { notes.push('English Title: '+strings['title_en']); }
@@ -1841,7 +1860,6 @@ function buildMainUI( ){
 
 	/* Add all rows to UI */
 	UI.$window.append(controls.$main, new Hr(), $components, new Hr(), footer.$main);
-	UI.open();
 	
 	Worker.disableWhileRunning.push($clearBtn, $exitBtn);
 	Worker.reenableAfterDone.push($clearBtn, $exitBtn);
@@ -2164,6 +2182,10 @@ function buildHeaderSettings( ){
 }
 
 function buildResults( css, tags, notes, headers, items, errors, warnings ){
+	if( !UI.isOpen ){
+		return;
+	}
+
 	let popupUI = new SubsidiaryUI(UI, 'Job\'s Done!');
 	popupUI.nav.$right.append(
 		new Button('Exit')
@@ -2235,7 +2257,8 @@ function buildResults( css, tags, notes, headers, items, errors, warnings ){
 /* Core class for handling popup windows and overlays, extended by Primary and Subsidiary variants
 no requirements */
 class UserInterface {
-	alive = true;
+	isAlive = true;
+	isOpen = false;
 	#attachmentPoint = document.createElement('div');
 	#shadowRoot = this.#attachmentPoint.attachShadow({mode: 'open'});
 	root = document.createElement('div');
@@ -2681,18 +2704,20 @@ class UserInterface {
 	}
 
 	open( ){
-		if( this.alive ){
+		if( this.isAlive ){
 			this.root.classList.remove('is-closed');
+			this.isOpen = true;
 		}
 	}
 
 	close( ){
 		this.root.classList.add('is-closed');
+		this.isOpen = false;
 	}
 
 	destruct( ){
-		if( this.alive ){
-			this.alive = false;
+		if( this.isAlive ){
+			this.isAlive = false;
 			this.close();
 			setTimeout(()=>{
 				this.#attachmentPoint.remove();
@@ -3053,12 +3078,10 @@ function buildConfirm( title, subtitle, onYes, onNo = ()=>{} ){
 if( List.isOwner ){
 	let $button = $('<a href="javascript:void(0);">Tools</a>')
 	.on('click',()=>{
-		if( UI && UI.alive ){
-			UI.open();
-		}
-		else {
+		if( !UI || !UI.isAlive ){
 			initialise();
 		}
+		UI.open();
 	});
 
 	if( List.isModern ){
@@ -3068,6 +3091,7 @@ if( List.isOwner ){
 			<span class="text">Tools</span>
 		`);
 		$('.list-menu-float').append($button);
+
 	}
 	else {
 		$('#mal_cs_otherlinks div:last-of-type').append($button);
@@ -3079,4 +3103,34 @@ if( List.isOwner ){
 			left: 15px;
 		}
 	`));
+
+	automation();
+}
+
+/* Handle UI-less automatic runs of the tool. */
+function automation(  ){
+	initialise();
+
+	const doHeaders = settings.get(['update_headers']) && settings.get(['auto_headers']);
+
+	if( !doHeaders || !List.isModern ){
+		return;
+	}
+
+	const msBetweenRuns = 60 * 1000;
+
+	const timeSinceLastRun = Date.now() - store.get('last_auto_headers', 0);
+
+	if( timeSinceLastRun < msBetweenRuns ){
+		const timeUntilNextRun = round((msBetweenRuns - timeSinceLastRun) / 1000);
+		Log.generic(`Skipped automatic category headers update as the last run happened not long ago. Please wait ${timeUntilNextRun} seconds or start the tool manually.`);
+		return;
+	}
+	if( List.isPreview ) {
+		Log.generic('Skipped automatic category headers update as the tool does not run on preview windows for safety of your CSS.');
+		return;
+	}
+	
+	worker.start(false, false, false, doHeaders);
+	Log.generic('Performed automatic category header update.');
 }
