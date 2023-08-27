@@ -368,6 +368,23 @@ function sleep( ms ){
 	return new Promise(resolve => { setTimeout(resolve, ms); });
 }
 
+async function encodeSha256( string ){
+	const encoder = new TextEncoder().encode(string);
+	const hashBuffer = await crypto.subtle.digest('SHA-256', encoder);
+	const hashArray = Array.from(new Uint8Array(hashBuffer));
+	return hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function encodeBase64Url( string ){
+	return btoa(string).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+}
+
+function decodeBase64Url( base64Url ){
+	let padding = '='.repeat((4 - base64Url.length % 4) % 4);
+	let base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/');
+	return atob(base64);
+}
+
 /* File Upload Integrations */
 
 class DropboxHandler {
@@ -384,18 +401,28 @@ class DropboxHandler {
 	async createChallenge( ){
 		let verifier = '';
 		const verifierChars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-._~';
-		for( let i = 0; i < 100; i++ ){
+		for( let i = 0; i < 64; i++ ){
 			let random = round((verifierChars.length-1) * Math.random());
 			verifier += verifierChars[random];
 		}
+		console.log(verifier);
+		verifier = encodeBase64Url(verifier);
+		/* debug */
 		this.codeVerifier = verifier;
+		console.log('verifier status', /^[0-9a-zA-Z\-\.\_\~]{43,128}$/.test(verifier));
+		console.log('verifier', this.codeVerifier);
 
-		const encoder = new TextEncoder();
-		const data = encoder.encode(verifier);
-		const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-		const hashArray = Array.from(new Uint8Array(hashBuffer));
-		const encoded = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
-		this.codeChallenge = encoded;
+		//const encoder = new TextEncoder();
+		//const data = encoder.encode(verifier);
+		//this.codeChallenge = encoded;
+
+		/* encode verifier to get challenge */
+		
+		/* encode SHA256 verifier into BASE64 to create challenge */
+		let challenge = encodeBase64Url(await encodeSha256(verifier));
+		this.codeChallenge = challenge;
+		console.log('challenge status', /^[0-9a-zA-Z\-\.\_\~]{43,128}$/.test(challenge));
+		console.log('challenge', this.codeChallenge);
 	}
 	
 	/* step 1 */
@@ -406,17 +433,18 @@ class DropboxHandler {
 	/* step 2 */
 	async exchangeCode( code ){
 		console.log('code', code);
-		console.log('verifier', this.codeVerifier);
-		console.log('challenge', this.codeChallenge);
-		let headerData = new Headers();
-		headerData.append('code', code);
-		headerData.append('grant_type', 'authorization_code');
-		headerData.append('code_verifier', this.codeVerifier);
-		headerData.append('client_id', this.clientId);
 		
 		let token = await fetch(proxy+'https://api.dropboxapi.com/oauth2/token', {
-			'method': 'POST',
-			headers: headerData
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded'
+			},
+			body: new URLSearchParams({
+				'code': code,
+				'grant_type': 'authorization_code',
+				'code_verifier': this.codeVerifier,
+				'client_id': this.clientId
+			})
 		})
 		.then((response)=>{
 			if( !response.ok ){
