@@ -24,9 +24,9 @@ const verMod = '/*$$$ver_date$$$*/';
 
 var store = new CustomStorage('userscript');
 
-/*<<<main>>>*/
-
 /*<<<interface>>>*/
+
+/*<<<main>>>*/
 
 /* Add "Tools" button to list */
 
@@ -46,7 +46,6 @@ if( List.isOwner ){
 			<span class="text">Tools</span>
 		`);
 		$('.list-menu-float').append($button);
-
 	}
 	else {
 		$('#mal_cs_otherlinks div:last-of-type').append($button);
@@ -86,6 +85,7 @@ function automation(  ){
 		return;
 	}
 	
+	worker = new Worker();
 	worker.start(false, false, false, doHeaders);
 	Log.generic('Performed automatic category header update.');
 }

@@ -70,8 +70,14 @@ class Log {
 	}
 
 	static sendToUI( msg = '', type = 'ERROR' ){
+		const date = new Date();
+		const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
 		if( this.#ready() ){
-			this.#$parent.prepend($(`<div class="c-log"><b>[${type}]</b> ${msg}</div>`));
+			this.#$parent.prepend($(`<div class="c-log">
+				<b class="c-log__type">${type}</b>
+				${msg}
+				<small class="c-log__time">${time}</small>
+			</div>`));
 			return;
 		}
 		this.#unsentLogs.push([msg, type]);
@@ -476,7 +482,7 @@ class UserSettings {
 		store.remove(`${List.type}_settings`);
 		store.remove(`last_${List.type}_run`);
 		if( UI ){
-			UI.destruct();
+			UI.exit();
 			initialise();
 		}
 		else {
@@ -686,7 +692,7 @@ function encodeForCss( str ){
 
 /* Parse any and all numbers from a string into an int */
 function getInt( str ){
-	return parseInt(str.replaceAll(/\D*/g, '')) || 0;
+	return typeof str === 'string' ? parseInt(str.replaceAll(/\D*/g, '')) : 0;
 }
 
 
@@ -709,8 +715,7 @@ function initialise() {
 	settings = new UserSettings();
 
 	buildMainUI();
-
-	worker = new Worker();
+	ListItems.load();
 }
 
 /* fetches list item data from the load.json endpoint.
@@ -777,9 +782,37 @@ class ListItems {
 	}
 
 	static #done( ){
-		Status.update(`Successfully loaded ${this.data.length} items.`, 'good', 100);
-		Worker.$actionBtn.one('click', ()=>{
-			worker.start();
+		console.log('done ListItems');
+		Status.update(`Ready to process ${this.data.length} items.`, 'good', 100);
+		Status.estimate();
+		Worker.$actionBtn.off();
+		Worker.$actionBtn.on('click', ()=>{
+			const start = ()=>{
+				Worker.$actionBtn.off('click');
+				worker = new Worker();
+				worker.start();
+			};
+
+			let enabled = [];
+			if( settings.get(['update_tags']) ){
+				enabled.push('tag updater');
+			}
+			if( settings.get(['update_notes']) ){
+				enabled.push('notes updater');
+			}
+			if( !store.get('checkpoint_start') && enabled.length > 0 ){
+				buildConfirm(
+					'Final warning.',
+					`You have enabled the ${enabled.join(' and the ')}. ${enabled.length > 1 ? 'These' : 'This'} can make destructive edits to ALL your list items. If you are okay with this, click "Yes". If you want to backup your items first, click "No".`,
+					()=>{
+						start();
+						store.set('checkpoint_start', true);
+					}
+				);
+			}
+			else {
+				start();
+			}
 		});
 		Worker.$actionBtn.val('Start');
 		Worker.$actionBtn.removeAttr('disabled');
@@ -819,7 +852,7 @@ class Status {
 		this.percent = percent;
 		for( let bar of this.bars ){
 			bar.$text.text(text);
-			if( percent >=0 && percent <=100 ){
+			if( percent >= 0 && percent <= 100 ){
 				bar.$main.removeClass('is-unsure');
 			}
 			else {
@@ -867,11 +900,11 @@ class Status {
 	
 class Worker {
 	/* UI vars */
-	/* buttons are added to this list to be later disabled upon process start */
+	/* buttons are added to this list to be later disabled upon process start and enabled upon end */
 	static disableWhileRunning = [];
-	/* similarly, these buttons are re-enabled after finish */
-	static reenableAfterDone = [];
 	static $actionBtn;
+	static $resultsBtn;
+	static isActive = false;
 
 	/* CSS vars */
 	css = '';
@@ -883,6 +916,8 @@ class Worker {
 	imageDelay = 50;
 
 	/* info/meta vars */
+	skipped = 0;
+	skippedDone = 0;
 	errors = 0;
 	warnings = 0;
 	percent = 0;
@@ -987,6 +1022,7 @@ class Worker {
 	}
 
 	async start( doCss = settings.get(['update_css']), doTags = settings.get(['update_tags']), doNotes = settings.get(['update_notes']), doHeaders = settings.get(['update_headers']) ){
+		Worker.isActive = true;
 		this.doCss = doCss;
 		this.doTags = doTags;
 		this.doNotes = doNotes;
@@ -1025,14 +1061,15 @@ class Worker {
 
 			/* UI */
 
+			Worker.$resultsBtn.css('display', 'none');
+			Worker.$actionBtn.off();
 			Worker.$actionBtn.val('Stop');
-			Worker.$actionBtn.removeAttr('disabled');
 			Worker.$actionBtn.one('click', ()=>{
 				Worker.$actionBtn.attr('disabled','disabled');
 				Status.update('Stopping imminently...');
 				if( this.timeout ){
 					clearTimeout(this.timeout);
-					this.finish();
+					this.#finish();
 				}
 				else {
 					this.data = [];
@@ -1080,6 +1117,7 @@ class Worker {
 							}
 						}
 						if( skip ){
+							this.skipped++;
 							continue;
 						}
 					}
@@ -1130,6 +1168,7 @@ class Worker {
 						}
 						else {
 							this.write(lineText);
+							this.skippedDone++;
 						}
 					}
 					/* If not in existing, add to list for processing */
@@ -1142,16 +1181,26 @@ class Worker {
 				/* Start processing items */
 				Promise.allSettled(beforeProcessing)
 				.then(()=>{
-					this.continue();
+					if( this.skipped || this.skippedDone ){
+						let texts = [];
+						if( this.skipped ){
+							texts.push(`${this.skipped} were skipped due to your settings`);
+						}
+						if( this.skippedDone ){
+							texts.push(`${this.skippedDone} were added from your previous run and don't need re-processing`);
+						}
+						Log.generic(`Out of ${ListItems.data.length} items on your list, ${texts.join(' and ')}.`);
+					}
+					this.#continue();
 				});
 			}
 			else {
-				this.finish();
+				this.#finish();
 			}
 		});
 	}
 
-	continue( ){
+	#continue( ){
 		this.iteration++;
 		
 		/* update variables */
@@ -1159,7 +1208,7 @@ class Worker {
 		this.percent = this.iteration / this.data.length * 100 || 0;
 
 		if( this.iteration === 0 ){
-			this.timeThen = performance.now() - settings.get(['delay']);
+			this.timeThen = performance.now() - round(settings.get(['delay']) * 1.15);
 		}
 		let timeSince = performance.now() - this.timeThen;
 		this.timeThen = performance.now();
@@ -1171,38 +1220,36 @@ class Worker {
 		Status.update(`Processed ${this.iteration} of ${this.data.length}`, 'working', this.percent);
 		
 		if( this.iteration >= this.data.length ){
-			this.finish();
+			this.#finish();
 			return;
 		}
 		this.timeout = setTimeout(()=>{
 			this.timeout = false;
-			this.process();
+			this.#process();
 		}, settings.get(['delay']));
 	}
 
-	finish( ){
+	#finish( ){
+		Worker.isActive = false;
 		window.removeEventListener('beforeunload', warnUserBeforeLeaving);
 
-		/* temporary true values until modules are implemented into runtime */
 		buildResults( this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
 
 		if( this.css.length > 0 ){
 			store.set(`last_${List.type}_run`, this.css);
 		}
-		Worker.$actionBtn.removeAttr('disabled');
-		Worker.$actionBtn.val('Open Results');
-		Worker.$actionBtn.off();
-		Worker.$actionBtn.on('click',()=>{
+		ListItems.load();
+		Worker.$actionBtn.val('Restart');
+		Worker.$resultsBtn.css('display', '');
+		Worker.$resultsBtn.on('click',()=>{
 			buildResults( this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
 		});
-		Status.update(`Completed with ${this.errors} errors`, 'good', 100);
-		Status.estimate();
-		for( let $btn of Worker.reenableAfterDone ){
+		for( let $btn of Worker.disableWhileRunning ){
 			$btn.removeAttr('disabled');
 		}
 	}
 
-	async process( ){
+	async #process( ){
 		const meta = this.data[this.iteration];
 		const id = meta[`${List.type}_id`];
 		let strings = {};
@@ -1213,7 +1260,7 @@ class Worker {
 			if( !str ){
 				this.errors++;
 				Log.error(`${List.type} #${id}: Failed to get entry information.`);
-				this.continue();
+				this.#continue();
 				return;
 			}
 			const $doc = $(createDOM(str));
@@ -1335,7 +1382,7 @@ class Worker {
 				strings['start'] = dates[0].trim();
 				strings['end'] = dates.length === 2 ? dates[1].trim() : '';
 
-				const dateStr = dates[0].trim().replace(',', '') + dates.length === 2 ? ' to ' + dates[1].trim().replace(',', '') : ''
+				const dateStr = dates[0].trim().replace(',', '') + dates.length === 2 ? ' to ' + dates[1].trim().replace(',', '') : '';
 				verbose['aired'] = 'Aired: '+dateStr;
 				removeTagIfExist('Aired: ', 2);
 				verbose['published'] = 'Published: '+dateStr;
@@ -1429,7 +1476,7 @@ class Worker {
 
 				if( !isNaN(minutes) ){
 					let duration = minutesToStr(minutes);
-					strings['duration'] = totalDuration;
+					strings['duration'] = duration;
 					verbose['duration'] = 'Duration/Ep: '+duration;
 
 					let episodes = meta['anime_num_episodes'];
@@ -1676,33 +1723,31 @@ class Worker {
 		catch( e ){
 			this.errors++;
 			Log.error(`${List.type} #${id}: ${e}`);
-			Log.error(e.stack, false);
+			Log.error(`Occured at ${e.lineNumber}`, false);
 		}
 			
-		this.continue();
+		this.#continue();
 	}
 }
 
 function buildMainUI( ){
 	/* Control Row */
 	let $actionBtn = new Button('Loading...', {'disabled':'disabled'});
-	let $hideBtn = new Button('Minimise', {title:'Closes the program window while it keeps running in the background.'}).on('click', ()=>{
-		UI.close();
-		$(UI.root).append(Status.$fixed);
-	});
-	let $exitBtn = new Button('Exit', {title:'Completely exit the program.'}).on('click', ()=>{
-		UI.destruct();
+	let $resultsBtn = new Button('Open Results');
+	$resultsBtn.css('display', 'none');
+	let $exitBtn = new Button('Close', {title:'Closes the program window. If work is currently being done, the program will keep going in the background.'}).on('click', ()=>{
+		UI.exit();
 	});
 	let controls = new SplitRow();
 	controls.$left.append(Status.$main);
-	controls.$right.append($actionBtn, $hideBtn, $exitBtn);
+	controls.$right.append($resultsBtn, $actionBtn, $exitBtn);
 
 	/* Components Row */
 	let $components = $('<div class="l-column">');
 	let tags = new OptionalGroupRow('Tags Updater', ['update_tags'], ()=>{ buildTagSettings(); });
 	tags.check.$box.on('click', ()=>{
 		if( tags.check.$box.is(':checked') && store.get('checkpoint_tags') !== true ){
-			alert('Before you continue!! This alert only shows once.\n\nThe Tags Updater is capable of entirely WIPING your tags. If you have the Tags column disabled, it WILL wipe your tags. If you have any you don\'t want to lose your tags, please back them up first and enable tags in your list settings!');
+			alert('Before you continue!! This alert only shows once.\n\nThe Tags Updater is capable of entirely WIPING your tags. If you have the Tags column disabled, it WILL wipe your tags. If you have any tags you don\'t want to lose, please back them up first and enable tags in your list settings!');
 			store.set('checkpoint_tags', true);
 		}
 	});
@@ -1760,9 +1805,9 @@ function buildMainUI( ){
 	/* Add all rows to UI */
 	UI.$window.append(controls.$main, new Hr(), $components, new Hr(), footer.$main);
 	
-	Worker.disableWhileRunning.push($clearBtn, $exitBtn);
-	Worker.reenableAfterDone.push($clearBtn, $exitBtn);
+	Worker.disableWhileRunning.push($clearBtn);
 	Worker.$actionBtn = $actionBtn;
+	Worker.$resultsBtn = $resultsBtn;
 }
 
 function buildGlobalSettings( ){
@@ -1923,7 +1968,7 @@ function buildCssImport( ){
 			setTemplate(importedTemplate['template'], importedTemplate['matchtemplate'], cssToImport)
 			.then((successful)=> {
 				if( successful ){
-					popupUI.destruct();
+					popupUI.exit();
 				}
 			});
 		}
@@ -2089,8 +2134,8 @@ function buildResults( css, tags, notes, headers, items, errors, warnings ){
 	popupUI.nav.$right.append(
 		new Button('Exit')
 		.on('click', ()=>{
-			popupUI.destruct();
-			UI.destruct();
+			popupUI.exit();
+			UI.exit();
 		})
 	);
 

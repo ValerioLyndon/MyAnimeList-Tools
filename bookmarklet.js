@@ -7,7 +7,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre17+h5_b0';
+const ver = '11.0-pre25+h5_b0';
 const verMod = '2023/Aug/27';
 
 class CustomStorage {
@@ -82,6 +82,877 @@ class CustomStorage {
 
 var store = new CustomStorage('localStorage');
 
+/* Core class for handling popup windows and overlays, extended by Primary and Subsidiary variants
+no requirements */
+class UserInterface {
+	isAlive = true;
+	isOpen = false;
+	#attachmentPoint = document.createElement('div');
+	#shadowRoot = this.#attachmentPoint.attachShadow({mode: 'open'});
+	root = document.createElement('div');
+	$container = $('<div class="c-container">');
+	$backing = $('<div class="c-container__target is-interactable">');
+	$windowList = $('<div class="c-window-list js-focus">');
+	$window = $('<main class="l-column c-window js-intro">');
+
+	constructor( ){
+		this.#shadowRoot.append(this.root);
+		this.root.className = 'root is-closed';
+		$(this.root).append(this.$container);
+		this.$container.append(this.$backing, this.$windowList);
+		this.$backing.on('click', ()=>{
+			this.exit();
+		});
+		this.$windowList.append(this.$window);
+
+		this.style(`
+/* Absolute Basics */
+
+*, *::before, *::after {
+	scrollbar-color: var(--scroll-thumb) var(--bg2);
+	box-sizing: inherit;
+}
+.root {
+	box-sizing: border-box;
+	display: contents;
+}
+
+.dark {
+	color-scheme: dark;
+	--outline: #578dad;
+	--bg: #090909f7;
+	--bg2: #292929;
+	--group-bg: #88888832;
+	--txt: #eee;
+	--btn-bg: #222222f0;
+	--btn-brdr: #4e4e4e;
+	--fld-bg: #18181888;
+	--fld-brdr: #424242;
+	--stat-working: #3166e0;
+	--stat-good: #1b833a;
+	--stat-bad: #f24242;
+	--scroll-thumb: #555;
+}
+.light {
+	color-scheme: light;
+	--outline: #78BBE2;
+	--bg: #ffffffc8;
+	--bg2: #c0c0c0;
+	--group-bg: #88888832;
+	--txt: #111;
+	--btn-bg: #d9d9d9f0;
+	--btn-brdr: #767676;
+	--fld-bg: #f6f6f688;
+	--fld-brdr: #999;
+	--stat-working: #4277f2;
+	--stat-good: #60ce81;
+	--stat-bad: #f24242;
+	--scroll-thumb: #555;
+}
+
+*:not([type="checkbox"]):focus {
+	outline: 2px solid var(--outline);
+	outline-offset: -2px;
+}
+[type="checkbox"]:focus-visible {
+	outline: 2px solid var(--outline);
+}
+
+
+
+/* Layout */
+
+.l-column {
+	display: grid;
+	grid-auto-flow: row;
+	gap: 10px;
+	place-items: start stretch;
+}
+
+.l-row {
+	display: flex;
+	gap: 10px;
+	place-items: start left;
+}
+
+.l-split {
+	display: flex;
+	width: 100%;
+	gap: 10px;
+	align-items: stretch;
+	justify-content: space-between;
+}
+
+.l-expand {
+	flex-grow: 1;
+}
+.l-fit {
+	width: fit-content;
+	flex: 0 0 auto;
+}
+
+.l-scrollable {
+	max-height: 50vh;
+	overflow-y: auto;
+}
+
+
+
+/* Components */
+
+.c-hr {
+	height: 4px;
+	background: var(--bg2);
+	border: 0;
+	border-radius: 2px;
+	margin: 5px 0;
+}
+
+.c-title {
+	font-size: 14px;
+	margin: 0;
+}
+.c-subtitle {
+	margin: 0;
+}
+
+.c-paragraph {
+	line-height: 1.3;
+	margin: 0;
+}
+
+.c-container {
+	position: fixed;
+	inset: 0;
+	z-index: 99999;
+	display: grid;
+	place-items: start center;
+	overflow: auto;
+	text-align: left;
+	opacity: 1;
+	transition: opacity .16s ease;
+	pointer-events: none;
+}
+.c-container--blurred {
+	background-color: rgba(0,0,0,0.5);
+	backdrop-filter: blur(1.5px);
+}
+.root:not(.is-closed) .c-container {
+	animation: fade .2s ease;
+}
+.root.is-closed .c-container {
+	opacity: 0;
+	pointer-events: none;
+}
+
+.c-container__target {
+	position: absolute;
+	inset: 0;
+	pointer-events: auto;
+}
+.root.is-closed .c-container__target {
+	display: none;
+}
+
+.c-window-list {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: start;
+	gap: 15px;
+	padding: min(15vh, 200px) 10px 30px;
+}
+.is-subsidiary .c-window-list {
+	padding-top: min(20vh, 230px);
+	margin-left: min(75px, calc(100vw - 527px));
+}
+
+.c-window {
+	width: 500px;
+	height: fit-content;
+	padding: 10px;
+	background-color: var(--bg);
+	border-radius: 12px;
+	box-shadow: 0 3px 12px rgba(0,0,0,0.7);
+	color: var(--txt);
+	font: 13px/1.3 Roboto, Arial, Helvetica, "Segoe UI", sans-serif;
+	backdrop-filter: blur(5px);
+	pointer-events: auto;
+}
+
+.c-button {
+	padding: 2px 4px;
+	background: var(--btn-bg);
+	border: 1px solid var(--btn-brdr);
+	border-radius: 6px;
+	color: var(--txt);
+	cursor: pointer;
+	justify-self: start;
+}
+.c-button:disabled {
+	opacity: 0.7;
+	cursor: not-allowed;
+}
+
+.c-button {
+	padding: 2px 4px;
+	background: var(--btn-bg);
+	border: 1px solid var(--btn-brdr);
+	border-radius: 6px;
+	color: var(--txt);
+	cursor: pointer;
+	justify-self: start;
+}
+.c-button:disabled {
+	opacity: 0.7;
+	cursor: not-allowed;
+}
+
+.c-check {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	cursor: pointer;
+}
+.c-check__box {
+	margin: 0;
+}
+
+.c-radio,
+.c-field {
+	display: flex;
+	gap: 5px;
+	flex-direction: column;
+	place-items: start;
+	width: 100%;
+	white-space: nowrap;
+	font-weight: bold;
+}
+.c-field--inline {
+	width: fit-content;
+	flex-direction: row;
+	place-items: center;
+	font-weight: normal;
+}
+.c-field__box {
+	width: 100%;
+	padding: 3px;
+	background: var(--fld-bg);
+	border: 1px solid var(--fld-brdr);
+	border-radius: 6px;
+	color: var(--txt);
+	font: 400 12px/1 monospace;
+}
+.c-field__box--multiline {
+	--lines: 3;
+	min-height: 20px;
+	height: calc(8px + var(--lines) * 12px);
+	max-height: 80vh;
+	padding: 6px;
+	resize: vertical;
+	word-break: break-all;
+}
+
+.c-radio input {
+	display: none;
+}
+.c-radio__row {
+	display: flex;
+	border-radius: 6px;
+	overflow: hidden;
+}
+.c-radio__station {
+	padding: 3px 6px;
+	background: var(--group-bg);
+	cursor: pointer;
+	font-weight: normal;
+}
+.c-radio__station ~ .c-radio__station {
+	margin-left: 2px;
+}
+:checked + .c-radio__station {
+	background: var(--btn-bg);
+	filter: invert(1);
+}
+
+.c-component {
+	padding: 10px;
+	background: var(--group-bg);
+	border-radius: 9px;
+}
+.c-component.is-disabled {
+	opacity: 0.7;
+}
+
+.c-option {
+	padding: 5px;
+	background: var(--group-bg);
+	border-radius: 9px;
+}
+.c-option--fit {
+	width: fit-content;
+}
+
+.c-drawer {
+	padding-left: 5px;
+	overflow: hidden;
+	transition: height 0.16s ease;
+}
+
+.c-check-grid {
+	display: grid;
+	grid-template-columns: repeat( auto-fit, minmax(140px, 1fr) );
+	gap: 5px;
+	width: 100%;
+	padding: 10px;
+	background: var(--group-bg);
+	border-radius: 9px;
+}
+
+.c-log {
+	padding: 5px;
+	background: var(--group-bg);
+	border-radius: 9px;
+	font: 11px/1.5em monospace;
+}
+.c-log__type {
+	display: inline-block;
+	padding: 0 5px;
+	background: var(--bg);
+	border-radius: 6px;
+	filter: invert(1);
+}
+.c-log__time {
+	margin-left: 5px;
+	float: right;
+}
+
+.c-list {
+	padding-left: 20px;
+	margin: 0;
+}
+.c-list__item::marker {
+	font-size: 1.2em;
+}
+
+
+
+/* One-off Components */
+
+.c-footer {
+	font-size: 10px;
+}
+
+.c-status {
+	--percent: 0%;
+	--colour: var(--stat-working);
+	align-self: stretch;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	width: 100%;
+	padding: 2px 6px;
+	background: var(--bg2);
+	border-radius: 6px;
+	background-image: linear-gradient(
+		to right,
+		var(--colour) var(--percent),
+		transparent var(--percent)
+	);
+	white-space: nowrap;
+}
+.c-status.is-unsure {
+	background-image: linear-gradient(
+		to right,
+		var(--colour) 40%,
+		transparent 40%
+	);
+	animation: unsure-bar 999s linear infinite;
+}
+.c-status.is-fixed {
+	position: fixed;
+	left: 20px;
+	top: 20px;
+	width: 240px;
+	transform: translateX(-280px);
+}
+.is-closed .c-status.is-fixed {
+	transform: translateX(0px);
+}
+
+/* States */
+
+.is-interactable {
+	cursor: pointer;
+}
+
+/* Overrides */
+
+.o-block-gap {
+	gap: 10px;
+}
+.o-half-gap {
+	gap: 5px;
+}
+.o-text-gap {
+	gap: 3px;
+}
+
+.o-align-center {
+	align-items: center;
+}
+
+.o-justify-start {
+	justify-items: start;
+}
+
+.o-no-resize {
+	resize: none;
+}
+
+.o-wrap {
+	flex-wrap: wrap;
+}
+
+.o-bold {
+	font-weight: 700;
+}
+
+
+
+/* JS Functions */
+
+.js-focus, .js-intro {
+	transition:
+		transform .22s ease,
+		opacity .16s ease;
+}
+.js-focus.is-unfocused {
+	transform: translateX(-75px);
+	opacity: 0.7;
+}
+.root:not(.is-closed) .js-intro {
+	animation: slide .22s ease;
+}
+.root.is-closed .js-intro {
+	transform: translateX(75px);
+}
+
+
+
+/* Animations */
+
+@keyframes fade {
+	from {
+		opacity: 0;
+	} to {
+		opacity: 1;
+	}
+}
+
+@keyframes slide {
+	from {
+		transform: translateX(75px);
+	} to {
+		transform: translateX(0);
+	}
+}
+
+@keyframes unsure-bar {
+	from {
+		background-position: 20px;
+	} to {
+		background-position: 99999px;
+	}
+}
+		`);
+		this.setTheme();
+
+		document.body.append(this.#attachmentPoint);
+	}
+
+	open( ){
+		if( this.isAlive ){
+			this.root.classList.remove('is-closed');
+			this.isOpen = true;
+		}
+	}
+
+	close( ){
+		this.root.classList.add('is-closed');
+		this.isOpen = false;
+	}
+
+	exit( ){
+		if( this.isAlive ){
+			this.isAlive = false;
+			this.close();
+			setTimeout(()=>{
+				this.#attachmentPoint.remove();
+			}, 200);
+		}
+	}
+
+	style( css ){
+		let html = document.createElement('style');
+		html.className = 'css';
+		html.textContent = css;
+		this.#shadowRoot.append(html);
+		return html;
+	}
+
+	getThemePreference( ){
+		let preference = store.get('theme');
+		return preference !== undefined ?
+			preference :
+			window.matchMedia('(prefers-color-scheme: light)').matches ?
+				'light' :
+				'dark';
+	}
+
+	setTheme( theme ){
+		if( !['light', 'dark'].includes(theme) ){
+			theme = this.getThemePreference();
+		}
+		this.root.classList.remove('light', 'dark');
+		this.root.classList.add(theme);
+		store.set('theme', theme);
+	}
+
+	swapTheme( ){
+		let theme = this.getThemePreference() === 'light' ? 'dark' : 'light';
+		this.setTheme(theme);
+	}
+
+	unfocus( ){
+		this.$windowList.addClass('is-unfocused');
+	}
+
+	refocus( ){
+		this.$windowList.removeClass('is-unfocused');
+	}
+
+	newWindow( ...children ){
+		let $window = $(`<aside class="l-column c-window js-intro">`);
+		$window.append(...children);
+		this.$windowList.append($window);
+		return $window;
+	}
+}
+
+class PrimaryUI extends UserInterface {
+	constructor( ){
+		super();
+		this.$container.addClass('c-container--blurred');
+	}
+
+	open( ){
+		super.open();
+		document.body.style.overflow = 'hidden';
+	}
+
+	close( ){
+		document.body.style.overflow = '';
+		super.close();
+	}
+
+	exit( ){
+		if( Worker.isActive ){
+			this.close();
+			$(this.root).append(Status.$fixed);
+		}
+		else {
+			super.exit();
+		}
+	}
+}
+
+class SubsidiaryUI extends UserInterface {
+	constructor( parentUI, title, subtitle = false, autoLayout = true ){
+		super();
+		this.parentUI = parentUI;
+
+		this.nav = new SplitRow();
+		this.nav.$left.append(
+			new Header(title, subtitle).$main
+		);
+		this.$window.append(this.nav.$main);
+		if( autoLayout ){
+			this.nav.$right.append(
+				$(`<input class="c-button" type="button" value="Back">`).on('click', ()=>{
+					this.exit();
+				})
+			);
+			this.$window.append(new Hr());
+		}
+		this.$container.addClass('is-subsidiary');
+	}
+
+	open( ){
+		super.open();
+		this.parentUI.open();
+		this.parentUI.unfocus();
+	}
+
+	close( ){
+		super.close();
+		this.parentUI.refocus();
+	}
+
+	exit( ){
+		super.exit();
+		this.parentUI.refocus();
+	}
+}
+
+/* Common user interface constructors */
+
+class SplitRow {
+	constructor( leftCls = 'l-expand l-row', rightCls = 'l-fit l-row' ){
+		this.$main = $('<div class="l-split">');
+		this.$left = $(`<div class="${leftCls}">`);
+		this.$right = $(`<div class="${rightCls}">`);
+		this.$main.append(this.$left,this.$right);
+	}
+}
+
+class GroupRow extends SplitRow {
+	constructor( name, settingsFunc, additionalActions = [] ){
+		super();
+
+		this.$left.addClass('o-align-center');
+		this.$left.append(
+			name
+		);
+		let $button = new Button('Settings')
+		.on('click', ()=>{
+			settingsFunc();
+		});
+		this.$right.append(
+			...additionalActions,
+			$button
+		);
+		this.$main.addClass('c-component');
+		Worker.disableWhileRunning.push(...additionalActions, $button);
+	}
+}
+
+class OptionalGroupRow extends GroupRow {
+	constructor( name, settingArray, settingsFunc, additionalActions = [] ){
+		super('', settingsFunc, additionalActions);
+		this.enabled = false;
+
+		this.check = new Check(settingArray, name);
+		this.check.$raw.addClass('o-block-gap');
+		this.check.$box.on('input', ()=>{ this.checkStatus(); });
+		this.checkStatus();
+
+		this.$left.append(
+			this.check.$raw
+		);
+		Worker.disableWhileRunning.push(this.check.$box);
+	}
+
+	checkStatus( ){
+		if( this.check.$box.is(':checked') ){
+			this.$main.removeClass('is-disabled');
+		}
+		else {
+			this.$main.addClass('is-disabled');
+		}
+	}
+}
+
+class Hr {
+	static $node = $('<hr class="c-hr">');
+	constructor( ){
+		return Hr.$node.clone();
+	}
+}
+
+class Paragraph {
+	constructor( text ){
+		return $('<p class="c-paragraph">'+text.split('\n\n').join('</p><p class="c-paragraph">')+'</p>');
+	}
+}
+
+class Drawer {
+	constructor( children = [], open = false ){
+		this.$main = $('<div class="c-drawer l-column">');
+		this.$main.append(...children);
+		if( open ){
+			this.open();
+		}
+		else {
+			this.close();
+		}
+	}
+
+	open( ){
+		let height = NodeDimensions.height(this.$main);
+		this.$main.css('height', height+'px');
+		this.$main.removeClass('is-hidden');
+	}
+
+	close( ){
+		this.$main.addClass('is-hidden');
+		this.$main.css('height', '0px');
+	}
+}
+
+class CheckGrid {
+	constructor( checks ){
+		this.$main = $('<div class="c-check-grid">');
+		for( let chk of checks ){
+			this.$main.append(chk.$raw);
+		}
+	}
+}
+
+class CheckGroup {
+	constructor( settingArray, title, desc = false, checkArray ){
+		this.$main = $('<div class="c-option c-option--fit">');
+		this.$raw = $(`<div class="l-column o-text-gap">`);
+		
+		let checks = [];
+		for( let check of checkArray ){
+			check.$raw.prepend('∟');
+			checks.push(check.$raw);
+		}
+
+		let toggle = new Check(settingArray, title, desc);
+		toggle.$box.on('click', ()=>{
+			if( toggle.$box.is(':checked') ){
+				drawer.open();
+			}
+			else {
+				drawer.close();
+			}
+		});
+		let drawer = new Drawer(checks, toggle.$box.is(':checked'));
+		drawer.$main.addClass('o-text-gap');
+		
+		this.$raw.append(toggle.$raw, drawer.$main);
+		this.$main.append(this.$raw);
+	}
+}
+
+class Check {
+	constructor( settingArray, title, desc = false ){
+		this.$main = $('<div class="c-option c-option--fit">');
+		this.$raw = $(`<label class="c-check">${title}</label>`);
+		if( desc ){
+			this.$raw.attr('title', desc);
+		}
+		this.$box = $('<input class="c-check__box" type="checkbox">')
+			.prop('checked', settings.get(settingArray))
+			.on('change', ()=>{
+				settings.set(settingArray, this.$box.is(':checked'));
+			});
+
+		this.$raw.prepend(this.$box);
+		this.$main.append(this.$raw);
+	}
+}
+
+class Field {
+	constructor( settingArray = false, title = '', desc = false, style = 'block' ){
+		this.$main = $('<div class="c-option">');
+		this.$raw = $(`<label class="c-field">${title}</label>`);
+		if( desc ){
+			this.$raw.attr('title', desc);
+		}
+
+		this.$box = $(`<input class="c-field__box" type="text" spellcheck="no">`);
+		if( settingArray ){
+			this.$box.on('input', ()=>{
+				settings.set(settingArray, this.$box.val());
+			});
+			this.$box.val(settings.get(settingArray));
+		}
+		
+		if( style === 'inline' ){
+			this.$raw.addClass('c-field--inline');
+		}
+		this.$raw.append(this.$box);
+		this.$main.append(this.$raw);
+	}
+}
+
+class Textarea {
+	constructor( settingArray = false, title = '', attributes = {}, lines = 3 ){
+		this.$main = $('<div class="c-option">');
+		this.$raw = $(`<label class="c-field">${title}</label>`);
+
+		this.$box = $(`<textarea class="c-field__box c-field__box--multiline" spellcheck="no" style="--lines: ${lines}">`);
+		if( settingArray ){
+			this.$box.on('input', ()=>{
+				settings.set(settingArray, this.$box.val());
+			});
+			this.$box.val(settings.get(settingArray));
+		}
+		for( let [name,value] of Object.entries(attributes) ){
+			this.$box.attr(name,value);
+		}
+		
+		this.$raw.append(this.$box);
+		this.$main.append(this.$raw);
+	}
+}
+
+class Header {
+	constructor( title, subtitle = false ){
+		subtitle = subtitle ? `<p class="c-subtitle">${subtitle}</p>` : '';
+		this.$main = $(`<hgroup class="l-column o-text-gap">
+			<h2 class="c-title">${title}</h2>
+			${subtitle}
+		</hgroup>`);
+	}
+}
+
+class Button {
+	constructor( value, attributes = {} ){
+		let $main = $(`<input class="c-button" type="button" value="${value}">`);
+		for( let [name,value] of Object.entries(attributes) ){
+			$main.attr(name,value);
+		}
+		return $main;
+	}
+}
+
+class Bullets {
+	constructor( points ){
+		let $main = $(`<ul class="c-list">`);
+		for( let p of points ){
+			$main.append($(`<li class="c-list__item">${p}</li>`));
+		}
+		return $main;
+	}
+}
+
+function buildConfirm( title, subtitle, onYes, onNo = ()=>{} ){
+	let ui = new SubsidiaryUI(UI, title, subtitle, false);
+	ui.$backing.off('click');
+	ui.$backing.removeClass('is-interactable');
+
+	let row = $('<div class="l-row">');
+	row.append(
+		new Button('Yes')
+		.on('click', ()=>{
+			ui.exit();
+			onYes();
+		}),
+		new Button('No')
+		.on('click', ()=>{
+			ui.exit();
+			onNo();
+		})
+	);
+
+	ui.$window.append(row);
+	ui.open();
+}
+
 /* Standalone Re-usable Functions and Classes */
 
 function warnUserBeforeLeaving( e ){
@@ -154,8 +1025,14 @@ class Log {
 	}
 
 	static sendToUI( msg = '', type = 'ERROR' ){
+		const date = new Date();
+		const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
 		if( this.#ready() ){
-			this.#$parent.prepend($(`<div class="c-log"><b>[${type}]</b> ${msg}</div>`));
+			this.#$parent.prepend($(`<div class="c-log">
+				<b class="c-log__type">${type}</b>
+				${msg}
+				<small class="c-log__time">${time}</small>
+			</div>`));
 			return;
 		}
 		this.#unsentLogs.push([msg, type]);
@@ -560,7 +1437,7 @@ class UserSettings {
 		store.remove(`${List.type}_settings`);
 		store.remove(`last_${List.type}_run`);
 		if( UI ){
-			UI.destruct();
+			UI.exit();
 			initialise();
 		}
 		else {
@@ -770,7 +1647,7 @@ function encodeForCss( str ){
 
 /* Parse any and all numbers from a string into an int */
 function getInt( str ){
-	return parseInt(str.replaceAll(/\D*/g, '')) || 0;
+	return typeof str === 'string' ? parseInt(str.replaceAll(/\D*/g, '')) : 0;
 }
 
 
@@ -793,8 +1670,7 @@ function initialise() {
 	settings = new UserSettings();
 
 	buildMainUI();
-
-	worker = new Worker();
+	ListItems.load();
 }
 
 /* fetches list item data from the load.json endpoint.
@@ -861,9 +1737,37 @@ class ListItems {
 	}
 
 	static #done( ){
-		Status.update(`Successfully loaded ${this.data.length} items.`, 'good', 100);
-		Worker.$actionBtn.one('click', ()=>{
-			worker.start();
+		console.log('done ListItems');
+		Status.update(`Ready to process ${this.data.length} items.`, 'good', 100);
+		Status.estimate();
+		Worker.$actionBtn.off();
+		Worker.$actionBtn.on('click', ()=>{
+			const start = ()=>{
+				Worker.$actionBtn.off('click');
+				worker = new Worker();
+				worker.start();
+			};
+
+			let enabled = [];
+			if( settings.get(['update_tags']) ){
+				enabled.push('tag updater');
+			}
+			if( settings.get(['update_notes']) ){
+				enabled.push('notes updater');
+			}
+			if( !store.get('checkpoint_start') && enabled.length > 0 ){
+				buildConfirm(
+					'Final warning.',
+					`You have enabled the ${enabled.join(' and the ')}. ${enabled.length > 1 ? 'These' : 'This'} can make destructive edits to ALL your list items. If you are okay with this, click "Yes". If you want to backup your items first, click "No".`,
+					()=>{
+						start();
+						store.set('checkpoint_start', true);
+					}
+				);
+			}
+			else {
+				start();
+			}
 		});
 		Worker.$actionBtn.val('Start');
 		Worker.$actionBtn.removeAttr('disabled');
@@ -903,7 +1807,7 @@ class Status {
 		this.percent = percent;
 		for( let bar of this.bars ){
 			bar.$text.text(text);
-			if( percent >=0 && percent <=100 ){
+			if( percent >= 0 && percent <= 100 ){
 				bar.$main.removeClass('is-unsure');
 			}
 			else {
@@ -951,11 +1855,11 @@ class Status {
 	
 class Worker {
 	/* UI vars */
-	/* buttons are added to this list to be later disabled upon process start */
+	/* buttons are added to this list to be later disabled upon process start and enabled upon end */
 	static disableWhileRunning = [];
-	/* similarly, these buttons are re-enabled after finish */
-	static reenableAfterDone = [];
 	static $actionBtn;
+	static $resultsBtn;
+	static isActive = false;
 
 	/* CSS vars */
 	css = '';
@@ -967,6 +1871,8 @@ class Worker {
 	imageDelay = 50;
 
 	/* info/meta vars */
+	skipped = 0;
+	skippedDone = 0;
 	errors = 0;
 	warnings = 0;
 	percent = 0;
@@ -1071,6 +1977,7 @@ class Worker {
 	}
 
 	async start( doCss = settings.get(['update_css']), doTags = settings.get(['update_tags']), doNotes = settings.get(['update_notes']), doHeaders = settings.get(['update_headers']) ){
+		Worker.isActive = true;
 		this.doCss = doCss;
 		this.doTags = doTags;
 		this.doNotes = doNotes;
@@ -1109,14 +2016,15 @@ class Worker {
 
 			/* UI */
 
+			Worker.$resultsBtn.css('display', 'none');
+			Worker.$actionBtn.off();
 			Worker.$actionBtn.val('Stop');
-			Worker.$actionBtn.removeAttr('disabled');
 			Worker.$actionBtn.one('click', ()=>{
 				Worker.$actionBtn.attr('disabled','disabled');
 				Status.update('Stopping imminently...');
 				if( this.timeout ){
 					clearTimeout(this.timeout);
-					this.finish();
+					this.#finish();
 				}
 				else {
 					this.data = [];
@@ -1164,6 +2072,7 @@ class Worker {
 							}
 						}
 						if( skip ){
+							this.skipped++;
 							continue;
 						}
 					}
@@ -1214,6 +2123,7 @@ class Worker {
 						}
 						else {
 							this.write(lineText);
+							this.skippedDone++;
 						}
 					}
 					/* If not in existing, add to list for processing */
@@ -1226,16 +2136,26 @@ class Worker {
 				/* Start processing items */
 				Promise.allSettled(beforeProcessing)
 				.then(()=>{
-					this.continue();
+					if( this.skipped || this.skippedDone ){
+						let texts = [];
+						if( this.skipped ){
+							texts.push(`${this.skipped} were skipped due to your settings`);
+						}
+						if( this.skippedDone ){
+							texts.push(`${this.skippedDone} were added from your previous run and don't need re-processing`);
+						}
+						Log.generic(`Out of ${ListItems.data.length} items on your list, ${texts.join(' and ')}.`);
+					}
+					this.#continue();
 				});
 			}
 			else {
-				this.finish();
+				this.#finish();
 			}
 		});
 	}
 
-	continue( ){
+	#continue( ){
 		this.iteration++;
 		
 		/* update variables */
@@ -1243,7 +2163,7 @@ class Worker {
 		this.percent = this.iteration / this.data.length * 100 || 0;
 
 		if( this.iteration === 0 ){
-			this.timeThen = performance.now() - settings.get(['delay']);
+			this.timeThen = performance.now() - round(settings.get(['delay']) * 1.15);
 		}
 		let timeSince = performance.now() - this.timeThen;
 		this.timeThen = performance.now();
@@ -1255,38 +2175,36 @@ class Worker {
 		Status.update(`Processed ${this.iteration} of ${this.data.length}`, 'working', this.percent);
 		
 		if( this.iteration >= this.data.length ){
-			this.finish();
+			this.#finish();
 			return;
 		}
 		this.timeout = setTimeout(()=>{
 			this.timeout = false;
-			this.process();
+			this.#process();
 		}, settings.get(['delay']));
 	}
 
-	finish( ){
+	#finish( ){
+		Worker.isActive = false;
 		window.removeEventListener('beforeunload', warnUserBeforeLeaving);
 
-		/* temporary true values until modules are implemented into runtime */
 		buildResults( this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
 
 		if( this.css.length > 0 ){
 			store.set(`last_${List.type}_run`, this.css);
 		}
-		Worker.$actionBtn.removeAttr('disabled');
-		Worker.$actionBtn.val('Open Results');
-		Worker.$actionBtn.off();
-		Worker.$actionBtn.on('click',()=>{
+		ListItems.load();
+		Worker.$actionBtn.val('Restart');
+		Worker.$resultsBtn.css('display', '');
+		Worker.$resultsBtn.on('click',()=>{
 			buildResults( this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
 		});
-		Status.update(`Completed with ${this.errors} errors`, 'good', 100);
-		Status.estimate();
-		for( let $btn of Worker.reenableAfterDone ){
+		for( let $btn of Worker.disableWhileRunning ){
 			$btn.removeAttr('disabled');
 		}
 	}
 
-	async process( ){
+	async #process( ){
 		const meta = this.data[this.iteration];
 		const id = meta[`${List.type}_id`];
 		let strings = {};
@@ -1297,7 +2215,7 @@ class Worker {
 			if( !str ){
 				this.errors++;
 				Log.error(`${List.type} #${id}: Failed to get entry information.`);
-				this.continue();
+				this.#continue();
 				return;
 			}
 			const $doc = $(createDOM(str));
@@ -1419,7 +2337,7 @@ class Worker {
 				strings['start'] = dates[0].trim();
 				strings['end'] = dates.length === 2 ? dates[1].trim() : '';
 
-				const dateStr = dates[0].trim().replace(',', '') + dates.length === 2 ? ' to ' + dates[1].trim().replace(',', '') : ''
+				const dateStr = dates[0].trim().replace(',', '') + dates.length === 2 ? ' to ' + dates[1].trim().replace(',', '') : '';
 				verbose['aired'] = 'Aired: '+dateStr;
 				removeTagIfExist('Aired: ', 2);
 				verbose['published'] = 'Published: '+dateStr;
@@ -1513,7 +2431,7 @@ class Worker {
 
 				if( !isNaN(minutes) ){
 					let duration = minutesToStr(minutes);
-					strings['duration'] = totalDuration;
+					strings['duration'] = duration;
 					verbose['duration'] = 'Duration/Ep: '+duration;
 
 					let episodes = meta['anime_num_episodes'];
@@ -1760,33 +2678,31 @@ class Worker {
 		catch( e ){
 			this.errors++;
 			Log.error(`${List.type} #${id}: ${e}`);
-			Log.error(e.stack, false);
+			Log.error(`Occured at ${e.lineNumber}`, false);
 		}
 			
-		this.continue();
+		this.#continue();
 	}
 }
 
 function buildMainUI( ){
 	/* Control Row */
 	let $actionBtn = new Button('Loading...', {'disabled':'disabled'});
-	let $hideBtn = new Button('Minimise', {title:'Closes the program window while it keeps running in the background.'}).on('click', ()=>{
-		UI.close();
-		$(UI.root).append(Status.$fixed);
-	});
-	let $exitBtn = new Button('Exit', {title:'Completely exit the program.'}).on('click', ()=>{
-		UI.destruct();
+	let $resultsBtn = new Button('Open Results');
+	$resultsBtn.css('display', 'none');
+	let $exitBtn = new Button('Close', {title:'Closes the program window. If work is currently being done, the program will keep going in the background.'}).on('click', ()=>{
+		UI.exit();
 	});
 	let controls = new SplitRow();
 	controls.$left.append(Status.$main);
-	controls.$right.append($actionBtn, $hideBtn, $exitBtn);
+	controls.$right.append($resultsBtn, $actionBtn, $exitBtn);
 
 	/* Components Row */
 	let $components = $('<div class="l-column">');
 	let tags = new OptionalGroupRow('Tags Updater', ['update_tags'], ()=>{ buildTagSettings(); });
 	tags.check.$box.on('click', ()=>{
 		if( tags.check.$box.is(':checked') && store.get('checkpoint_tags') !== true ){
-			alert('Before you continue!! This alert only shows once.\n\nThe Tags Updater is capable of entirely WIPING your tags. If you have the Tags column disabled, it WILL wipe your tags. If you have any you don\'t want to lose your tags, please back them up first and enable tags in your list settings!');
+			alert('Before you continue!! This alert only shows once.\n\nThe Tags Updater is capable of entirely WIPING your tags. If you have the Tags column disabled, it WILL wipe your tags. If you have any tags you don\'t want to lose, please back them up first and enable tags in your list settings!');
 			store.set('checkpoint_tags', true);
 		}
 	});
@@ -1844,9 +2760,9 @@ function buildMainUI( ){
 	/* Add all rows to UI */
 	UI.$window.append(controls.$main, new Hr(), $components, new Hr(), footer.$main);
 	
-	Worker.disableWhileRunning.push($clearBtn, $exitBtn);
-	Worker.reenableAfterDone.push($clearBtn, $exitBtn);
+	Worker.disableWhileRunning.push($clearBtn);
 	Worker.$actionBtn = $actionBtn;
+	Worker.$resultsBtn = $resultsBtn;
 }
 
 function buildGlobalSettings( ){
@@ -2007,7 +2923,7 @@ function buildCssImport( ){
 			setTemplate(importedTemplate['template'], importedTemplate['matchtemplate'], cssToImport)
 			.then((successful)=> {
 				if( successful ){
-					popupUI.destruct();
+					popupUI.exit();
 				}
 			});
 		}
@@ -2173,8 +3089,8 @@ function buildResults( css, tags, notes, headers, items, errors, warnings ){
 	popupUI.nav.$right.append(
 		new Button('Exit')
 		.on('click', ()=>{
-			popupUI.destruct();
-			UI.destruct();
+			popupUI.exit();
+			UI.exit();
 		})
 	);
 
@@ -2235,825 +3151,6 @@ function buildResults( css, tags, notes, headers, items, errors, warnings ){
 	popupUI.$window.append($info);
 
 	popupUI.open();
-}
-
-/* Core class for handling popup windows and overlays, extended by Primary and Subsidiary variants
-no requirements */
-class UserInterface {
-	isAlive = true;
-	isOpen = false;
-	#attachmentPoint = document.createElement('div');
-	#shadowRoot = this.#attachmentPoint.attachShadow({mode: 'open'});
-	root = document.createElement('div');
-	$container = $('<div class="c-container">');
-	$windowList = $('<div class="c-window-list js-focus">');
-	$window = $('<main class="l-column c-window js-intro">');
-
-	constructor( ){
-		this.#shadowRoot.append(this.root);
-		this.root.className = 'root is-closed';
-		$(this.root).append(this.$container);
-		this.$container.append(this.$windowList);
-		this.$windowList.append(this.$window);
-
-		this.style(`
-/* Absolute Basics */
-
-*, *::before, *::after {
-	scrollbar-color: var(--scroll-thumb) var(--bg2);
-	box-sizing: inherit;
-}
-.root {
-	box-sizing: border-box;
-	display: contents;
-}
-
-.dark {
-	color-scheme: dark;
-	--outline: #578dad;
-	--bg: #090909f7;
-	--bg2: #292929;
-	--group-bg: #88888832;
-	--txt: #eee;
-	--btn-bg: #222222f0;
-	--btn-brdr: #4e4e4e;
-	--fld-bg: #18181888;
-	--fld-brdr: #424242;
-	--stat-working: #3166e0;
-	--stat-good: #1b833a;
-	--stat-bad: #f24242;
-	--scroll-thumb: #555;
-}
-.light {
-	color-scheme: light;
-	--outline: #78BBE2;
-	--bg: #ffffffc8;
-	--bg2: #c0c0c0;
-	--group-bg: #88888832;
-	--txt: #111;
-	--btn-bg: #d9d9d9f0;
-	--btn-brdr: #767676;
-	--fld-bg: #f6f6f688;
-	--fld-brdr: #999;
-	--stat-working: #4277f2;
-	--stat-good: #60ce81;
-	--stat-bad: #f24242;
-	--scroll-thumb: #555;
-}
-
-*:not([type="checkbox"]):focus {
-	outline: 2px solid var(--outline);
-	outline-offset: -2px;
-}
-[type="checkbox"]:focus-visible {
-	outline: 2px solid var(--outline);
-}
-
-
-
-/* Layout */
-
-.l-column {
-	display: grid;
-	grid-auto-flow: row;
-	gap: 10px;
-	place-items: start stretch;
-}
-
-.l-row {
-	display: flex;
-	gap: 10px;
-	place-items: start left;
-}
-
-.l-split {
-	display: flex;
-	width: 100%;
-	gap: 10px;
-	align-items: stretch;
-	justify-content: space-between;
-}
-
-.l-expand {
-	flex-grow: 1;
-}
-.l-fit {
-	width: fit-content;
-	flex: 0 0 auto;
-}
-
-.l-scrollable {
-	max-height: 50vh;
-	overflow-y: auto;
-}
-
-
-
-/* Components */
-
-.c-hr {
-	height: 4px;
-	background: var(--bg2);
-	border: 0;
-	border-radius: 2px;
-	margin: 5px 0;
-}
-
-.c-title {
-	font-size: 14px;
-	margin: 0;
-}
-.c-subtitle {
-	margin: 0;
-}
-
-.c-paragraph {
-	line-height: 1.3;
-	margin: 0;
-}
-
-.c-container {
-	position: fixed;
-	inset: 0;
-	z-index: 99999;
-	display: grid;
-	place-items: start center;
-	overflow: auto;
-	text-align: left;
-	opacity: 1;
-	transition: opacity .16s ease;
-}
-.c-container--blurred {
-	background-color: rgba(0,0,0,0.5);
-	backdrop-filter: blur(1.5px);
-}
-.root:not(.is-closed) .c-container {
-	animation: fade .2s ease;
-}
-.root.is-closed .c-container {
-	opacity: 0;
-	pointer-events: none;
-}
-
-.c-window-list {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: start;
-	gap: 15px;
-	padding: min(15vh, 200px) 10px 30px;
-}
-.is-subsidiary .c-window-list {
-	padding-top: min(20vh, 230px);
-	margin-left: min(75px, calc(100vw - 527px));
-}
-
-.c-window {
-	width: 500px;
-	height: fit-content;
-	padding: 10px;
-	background-color: var(--bg);
-	border-radius: 12px;
-	box-shadow: 0 3px 12px rgba(0,0,0,0.7);
-	color: var(--txt);
-	font: 13px/1.3 Roboto, Arial, Helvetica, "Segoe UI", sans-serif;
-	backdrop-filter: blur(5px);
-}
-
-.c-button {
-	padding: 2px 4px;
-	background: var(--btn-bg);
-	border: 1px solid var(--btn-brdr);
-	border-radius: 6px;
-	color: var(--txt);
-	cursor: pointer;
-	justify-self: start;
-}
-.c-button:disabled {
-	opacity: 0.7;
-	cursor: not-allowed;
-}
-
-.c-check {
-	display: flex;
-	align-items: center;
-	gap: 5px;
-	cursor: pointer;
-}
-.c-check__box {
-	margin: 0;
-}
-
-.c-radio,
-.c-field {
-	display: flex;
-	gap: 5px;
-	flex-direction: column;
-	place-items: start;
-	width: 100%;
-	white-space: nowrap;
-	font-weight: bold;
-}
-.c-field--inline {
-	width: fit-content;
-	flex-direction: row;
-	place-items: center;
-	font-weight: normal;
-}
-.c-field__box {
-	width: 100%;
-	padding: 3px;
-	background: var(--fld-bg);
-	border: 1px solid var(--fld-brdr);
-	border-radius: 6px;
-	color: var(--txt);
-	font: 400 12px/1 monospace;
-}
-.c-field__box--multiline {
-	--lines: 3;
-	min-height: 20px;
-	height: calc(8px + var(--lines) * 12px);
-	max-height: 80vh;
-	padding: 6px;
-	resize: vertical;
-	word-break: break-all;
-}
-
-.c-radio input {
-	display: none;
-}
-.c-radio__row {
-	display: flex;
-	border-radius: 6px;
-	overflow: hidden;
-}
-.c-radio__station {
-	padding: 3px 6px;
-	background: var(--group-bg);
-	cursor: pointer;
-	font-weight: normal;
-}
-.c-radio__station ~ .c-radio__station {
-	margin-left: 2px;
-}
-:checked + .c-radio__station {
-	background: var(--btn-bg);
-	filter: invert(1);
-}
-
-.c-component {
-	padding: 10px;
-	background: var(--group-bg);
-	border-radius: 9px;
-}
-.c-component.is-disabled {
-	opacity: 0.7;
-}
-
-.c-option {
-	padding: 5px;
-	background: var(--group-bg);
-	border-radius: 9px;
-}
-.c-option--fit {
-	width: fit-content;
-}
-
-.c-drawer {
-	padding-left: 5px;
-	overflow: hidden;
-	transition: height 0.16s ease;
-}
-
-.c-check-grid {
-	display: grid;
-	grid-template-columns: repeat( auto-fit, minmax(140px, 1fr) );
-	gap: 5px;
-	width: 100%;
-	padding: 10px;
-	background: var(--group-bg);
-	border-radius: 9px;
-}
-
-.c-log {
-	padding: 5px;
-	background: var(--group-bg);
-	border-radius: 9px;
-	font: 11px/1.5em monospace;
-}
-
-.c-list {
-	padding-left: 20px;
-	margin: 0;
-}
-.c-list__item::marker {
-	font-size: 1.2em;
-}
-
-
-
-/* One-off Components */
-
-.c-footer {
-	font-size: 10px;
-}
-
-.c-status {
-	--percent: 0%;
-	--colour: var(--stat-working);
-	align-self: stretch;
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	width: 100%;
-	padding: 2px 6px;
-	background: var(--bg2);
-	border-radius: 6px;
-	background-image: linear-gradient(
-		to right,
-		var(--colour) var(--percent),
-		transparent var(--percent)
-	);
-	white-space: nowrap;
-}
-.c-status.is-unsure {
-	background-image: linear-gradient(
-		to right,
-		var(--colour) 40%,
-		transparent 40%
-	);
-	animation: unsure-bar 999s linear infinite;
-}
-.c-status.is-fixed {
-	position: fixed;
-	left: 20px;
-	top: 20px;
-	width: 240px;
-	transform: translateX(-280px);
-}
-.is-closed .c-status.is-fixed {
-	transform: translateX(0px);
-}
-
-/* States */
-
-.is-interactable {
-	cursor: pointer;
-}
-
-/* Overrides */
-
-.o-block-gap {
-	gap: 10px;
-}
-.o-half-gap {
-	gap: 5px;
-}
-.o-text-gap {
-	gap: 3px;
-}
-
-.o-align-center {
-	align-items: center;
-}
-
-.o-justify-start {
-	justify-items: start;
-}
-
-.o-no-resize {
-	resize: none;
-}
-
-.o-wrap {
-	flex-wrap: wrap;
-}
-
-.o-bold {
-	font-weight: 700;
-}
-
-
-
-/* JS Functions */
-
-.js-focus, .js-intro {
-	transition:
-		transform .22s ease,
-		opacity .16s ease;
-}
-.js-focus.is-unfocused {
-	transform: translateX(-75px);
-	opacity: 0.7;
-}
-.root:not(.is-closed) .js-intro {
-	animation: slide .22s ease;
-}
-.root.is-closed .js-intro {
-	transform: translateX(75px);
-}
-
-
-
-/* Animations */
-
-@keyframes fade {
-	from {
-		opacity: 0;
-	} to {
-		opacity: 1;
-	}
-}
-
-@keyframes slide {
-	from {
-		transform: translateX(75px);
-	} to {
-		transform: translateX(0);
-	}
-}
-
-@keyframes unsure-bar {
-	from {
-		background-position: 20px;
-	} to {
-		background-position: 99999px;
-	}
-}
-		`);
-		this.setTheme();
-
-		document.body.append(this.#attachmentPoint);
-	}
-
-	open( ){
-		if( this.isAlive ){
-			this.root.classList.remove('is-closed');
-			this.isOpen = true;
-		}
-	}
-
-	close( ){
-		this.root.classList.add('is-closed');
-		this.isOpen = false;
-	}
-
-	destruct( ){
-		if( this.isAlive ){
-			this.isAlive = false;
-			this.close();
-			setTimeout(()=>{
-				this.#attachmentPoint.remove();
-			}, 200);
-		}
-	}
-
-	style( css ){
-		let html = document.createElement('style');
-		html.className = 'css';
-		html.textContent = css;
-		this.#shadowRoot.append(html);
-		return html;
-	}
-
-	getThemePreference( ){
-		let preference = store.get('theme');
-		return preference !== undefined ?
-			preference :
-			window.matchMedia('(prefers-color-scheme: light)').matches ?
-				'light' :
-				'dark';
-	}
-
-	setTheme( theme ){
-		if( !['light', 'dark'].includes(theme) ){
-			theme = this.getThemePreference();
-		}
-		this.root.classList.remove('light', 'dark');
-		this.root.classList.add(theme);
-		store.set('theme', theme);
-	}
-
-	swapTheme( ){
-		let theme = this.getThemePreference() === 'light' ? 'dark' : 'light';
-		this.setTheme(theme);
-	}
-
-	unfocus( ){
-		this.$windowList.addClass('is-unfocused');
-	}
-
-	refocus( ){
-		this.$windowList.removeClass('is-unfocused');
-	}
-
-	newWindow( ...children ){
-		let $window = $(`<aside class="l-column c-window js-intro">`);
-		$window.append(...children);
-		this.$windowList.append($window);
-		return $window;
-	}
-}
-
-class PrimaryUI extends UserInterface {
-	constructor( ){
-		super();
-		this.$container.addClass('c-container--blurred');
-	}
-
-	open( ){
-		super.open();
-		document.body.style.overflow = 'hidden';
-	}
-
-	close( ){
-		super.close();
-		document.body.style.overflow = '';
-	}
-}
-
-class SubsidiaryUI extends UserInterface {
-	constructor( parentUI, title, subtitle = false, autoLayout = true ){
-		super();
-		this.parentUI = parentUI;
-
-		this.nav = new SplitRow();
-		this.nav.$left.append(
-			new Header(title, subtitle).$main
-		);
-		this.$window.append(this.nav.$main);
-		if( autoLayout ){
-			this.nav.$right.append(
-				$(`<input class="c-button" type="button" value="Back">`).on('click', ()=>{
-					this.destruct();
-				})
-			);
-			this.$window.append(new Hr());
-		}
-		this.$container.addClass('is-subsidiary');
-	}
-
-	open( ){
-		super.open();
-		this.parentUI.open();
-		this.parentUI.unfocus();
-	}
-
-	close( ){
-		super.close();
-		this.parentUI.refocus();
-	}
-
-	destruct( ){
-		super.destruct();
-		this.parentUI.refocus();
-	}
-}
-
-/* Common user interface constructors */
-
-class SplitRow {
-	constructor( leftCls = 'l-expand l-row', rightCls = 'l-fit l-row' ){
-		this.$main = $('<div class="l-split">');
-		this.$left = $(`<div class="${leftCls}">`);
-		this.$right = $(`<div class="${rightCls}">`);
-		this.$main.append(this.$left,this.$right);
-	}
-}
-
-class GroupRow extends SplitRow {
-	constructor( name, settingsFunc, additionalActions = [] ){
-		super();
-
-		this.$left.addClass('o-align-center');
-		this.$left.append(
-			name
-		);
-		let $button = new Button('Settings')
-		.on('click', ()=>{
-			settingsFunc();
-		});
-		this.$right.append(
-			...additionalActions,
-			$button
-		);
-		this.$main.addClass('c-component');
-		Worker.disableWhileRunning.push(...additionalActions, $button);
-	}
-}
-
-class OptionalGroupRow extends GroupRow {
-	constructor( name, settingArray, settingsFunc, additionalActions = [] ){
-		super('', settingsFunc, additionalActions);
-		this.enabled = false;
-
-		this.check = new Check(settingArray, name);
-		this.check.$raw.addClass('o-block-gap');
-		this.check.$box.on('input', ()=>{ this.checkStatus(); });
-		this.checkStatus();
-
-		this.$left.append(
-			this.check.$raw
-		);
-		Worker.disableWhileRunning.push(this.check.$box);
-	}
-
-	checkStatus( ){
-		if( this.check.$box.is(':checked') ){
-			this.$main.removeClass('is-disabled');
-		}
-		else {
-			this.$main.addClass('is-disabled');
-		}
-	}
-}
-
-class Hr {
-	static $node = $('<hr class="c-hr">');
-	constructor( ){
-		return Hr.$node.clone();
-	}
-}
-
-class Paragraph {
-	constructor( text ){
-		return $('<p class="c-paragraph">'+text.split('\n\n').join('</p><p class="c-paragraph">')+'</p>');
-	}
-}
-
-class Drawer {
-	constructor( children = [], open = false ){
-		this.$main = $('<div class="c-drawer l-column">');
-		this.$main.append(...children);
-		if( open ){
-			this.open();
-		}
-		else {
-			this.close();
-		}
-	}
-
-	open( ){
-		let height = NodeDimensions.height(this.$main);
-		this.$main.css('height', height+'px');
-		this.$main.removeClass('is-hidden');
-	}
-
-	close( ){
-		this.$main.addClass('is-hidden');
-		this.$main.css('height', '0px');
-	}
-}
-
-class CheckGrid {
-	constructor( checks ){
-		this.$main = $('<div class="c-check-grid">');
-		for( let chk of checks ){
-			this.$main.append(chk.$raw);
-		}
-	}
-}
-
-class CheckGroup {
-	constructor( settingArray, title, desc = false, checkArray ){
-		this.$main = $('<div class="c-option c-option--fit">');
-		this.$raw = $(`<div class="l-column o-text-gap">`);
-		
-		let checks = [];
-		for( let check of checkArray ){
-			check.$raw.prepend('∟');
-			checks.push(check.$raw);
-		}
-
-		let toggle = new Check(settingArray, title, desc);
-		toggle.$box.on('click', ()=>{
-			if( toggle.$box.is(':checked') ){
-				drawer.open();
-			}
-			else {
-				drawer.close();
-			}
-		});
-		let drawer = new Drawer(checks, toggle.$box.is(':checked'));
-		drawer.$main.addClass('o-text-gap');
-		
-		this.$raw.append(toggle.$raw, drawer.$main);
-		this.$main.append(this.$raw);
-	}
-}
-
-class Check {
-	constructor( settingArray, title, desc = false ){
-		this.$main = $('<div class="c-option c-option--fit">');
-		this.$raw = $(`<label class="c-check">${title}</label>`);
-		if( desc ){
-			this.$raw.attr('title', desc);
-		}
-		this.$box = $('<input class="c-check__box" type="checkbox">')
-			.prop('checked', settings.get(settingArray))
-			.on('change', ()=>{
-				settings.set(settingArray, this.$box.is(':checked'));
-			});
-
-		this.$raw.prepend(this.$box);
-		this.$main.append(this.$raw);
-	}
-}
-
-class Field {
-	constructor( settingArray = false, title = '', desc = false, style = 'block' ){
-		this.$main = $('<div class="c-option">');
-		this.$raw = $(`<label class="c-field">${title}</label>`);
-		if( desc ){
-			this.$raw.attr('title', desc);
-		}
-
-		this.$box = $(`<input class="c-field__box" type="text" spellcheck="no">`);
-		if( settingArray ){
-			this.$box.on('input', ()=>{
-				settings.set(settingArray, this.$box.val());
-			});
-			this.$box.val(settings.get(settingArray));
-		}
-		
-		if( style === 'inline' ){
-			this.$raw.addClass('c-field--inline');
-		}
-		this.$raw.append(this.$box);
-		this.$main.append(this.$raw);
-	}
-}
-
-class Textarea {
-	constructor( settingArray = false, title = '', attributes = {}, lines = 3 ){
-		this.$main = $('<div class="c-option">');
-		this.$raw = $(`<label class="c-field">${title}</label>`);
-
-		this.$box = $(`<textarea class="c-field__box c-field__box--multiline" spellcheck="no" style="--lines: ${lines}">`);
-		if( settingArray ){
-			this.$box.on('input', ()=>{
-				settings.set(settingArray, this.$box.val());
-			});
-			this.$box.val(settings.get(settingArray));
-		}
-		for( let [name,value] of Object.entries(attributes) ){
-			this.$box.attr(name,value);
-		}
-		
-		this.$raw.append(this.$box);
-		this.$main.append(this.$raw);
-	}
-}
-
-class Header {
-	constructor( title, subtitle = false ){
-		subtitle = subtitle ? `<p class="c-subtitle">${subtitle}</p>` : '';
-		this.$main = $(`<hgroup class="l-column o-text-gap">
-			<h2 class="c-title">${title}</h2>
-			${subtitle}
-		</hgroup>`);
-	}
-}
-
-class Button {
-	constructor( value, attributes = {} ){
-		let $main = $(`<input class="c-button" type="button" value="${value}">`);
-		for( let [name,value] of Object.entries(attributes) ){
-			$main.attr(name,value);
-		}
-		return $main;
-	}
-}
-
-class Bullets {
-	constructor( points ){
-		let $main = $(`<ul class="c-list">`);
-		for( let p of points ){
-			$main.append($(`<li class="c-list__item">${p}</li>`));
-		}
-		return $main;
-	}
-}
-
-function buildConfirm( title, subtitle, onYes, onNo = ()=>{} ){
-	let ui = new SubsidiaryUI(UI, title, subtitle, false);
-
-	let row = $('<div class="l-row">');
-	row.append(
-		new Button('Yes')
-		.on('click', ()=>{
-			ui.destruct();
-			onYes();
-		}),
-		new Button('No')
-		.on('click', ()=>{
-			ui.destruct();
-			onNo();
-		})
-	)
-
-	ui.$window.append(row);
-	ui.open();
 }
 
 if( List.isOwner ){
