@@ -62,7 +62,7 @@ if( List.isOwner ){
 }
 
 /* Handle UI-less automatic runs of the tool. */
-function automation(  ){
+function automation( ){
 	initialise();
 
 	const doHeaders = settings.get(['update_headers']) && settings.get(['auto_headers']);
@@ -77,7 +77,7 @@ function automation(  ){
 
 	if( timeSinceLastRun < msBetweenRuns ){
 		const timeUntilNextRun = round((msBetweenRuns - timeSinceLastRun) / 1000);
-		Log.generic(`Skipped automatic category headers update as the last run happened not long ago. Please wait ${timeUntilNextRun} seconds or start the tool manually.`);
+		Log.generic(`Skipped automatic category headers update as the last run happened not long ago. Please start the tool manually or wait until the delay has reset in ${timeUntilNextRun} seconds.`);
 		return;
 	}
 	if( List.isPreview ) {

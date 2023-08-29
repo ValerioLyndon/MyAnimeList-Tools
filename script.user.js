@@ -1754,7 +1754,7 @@ class ListItems {
 	}
 
 	static #done( ){
-		console.log('done ListItems');
+		console.log('done', Worker.$actionBtn);
 		Status.update(`Ready to process ${this.data.length} items.`, 'good', 100);
 		Status.estimate();
 		Worker.$actionBtn.off();
@@ -1820,15 +1820,16 @@ class Status {
 	}
 
 	static update( text, type = this.type, percent = this.percent ){
+		console.log('update', arguments);
 		this.type = type;
 		this.percent = percent;
 		for( let bar of this.bars ){
 			bar.$text.text(text);
-			if( percent >= 0 && percent <= 100 ){
-				bar.$main.removeClass('is-unsure');
+			if( percent < 0 || percent > 100 ){
+				bar.$main.addClass('is-unsure');
 			}
 			else {
-				bar.$main.addClass('is-unsure');
+				bar.$main.removeClass('is-unsure');
 			}
 			bar.$main.css({
 				'--percent': `${percent}%`,
@@ -1929,7 +1930,7 @@ class Worker {
 
 	/* runtime functions */
 
-	updateHeaders( ){
+	async updateHeaders( ){
 		if( !List.isModern ){
 			Log.generic('Skipped header update as list is modern.', false);
 			return;
@@ -1991,6 +1992,7 @@ class Worker {
 		let css = List.customCssModified + toAppend;
 		updateCss(css);
 		store.set('last_auto_headers', Date.now());
+		console.log('finished updating headers');
 	}
 
 	async start( doCss = settings.get(['update_css']), doTags = settings.get(['update_tags']), doNotes = settings.get(['update_notes']), doHeaders = settings.get(['update_headers']) ){
@@ -2016,7 +2018,7 @@ class Worker {
 			/* Headers */
 
 			if( this.doHeaders ){
-				this.updateHeaders();
+				await this.updateHeaders();
 				if( doScraper ){
 					await delay(500);
 				}
@@ -3204,7 +3206,7 @@ if( List.isOwner ){
 }
 
 /* Handle UI-less automatic runs of the tool. */
-function automation(  ){
+function automation( ){
 	initialise();
 
 	const doHeaders = settings.get(['update_headers']) && settings.get(['auto_headers']);
@@ -3219,7 +3221,7 @@ function automation(  ){
 
 	if( timeSinceLastRun < msBetweenRuns ){
 		const timeUntilNextRun = round((msBetweenRuns - timeSinceLastRun) / 1000);
-		Log.generic(`Skipped automatic category headers update as the last run happened not long ago. Please wait ${timeUntilNextRun} seconds or start the tool manually.`);
+		Log.generic(`Skipped automatic category headers update as the last run happened not long ago. Please start the tool manually or wait until the delay has reset in ${timeUntilNextRun} seconds.`);
 		return;
 	}
 	if( List.isPreview ) {

@@ -782,7 +782,6 @@ class ListItems {
 	}
 
 	static #done( ){
-		console.log('done ListItems');
 		Status.update(`Ready to process ${this.data.length} items.`, 'good', 100);
 		Status.estimate();
 		Worker.$actionBtn.off();
@@ -852,11 +851,11 @@ class Status {
 		this.percent = percent;
 		for( let bar of this.bars ){
 			bar.$text.text(text);
-			if( percent >= 0 && percent <= 100 ){
-				bar.$main.removeClass('is-unsure');
+			if( percent < 0 || percent > 100 ){
+				bar.$main.addClass('is-unsure');
 			}
 			else {
-				bar.$main.addClass('is-unsure');
+				bar.$main.removeClass('is-unsure');
 			}
 			bar.$main.css({
 				'--percent': `${percent}%`,
@@ -957,7 +956,7 @@ class Worker {
 
 	/* runtime functions */
 
-	updateHeaders( ){
+	async updateHeaders( ){
 		if( !List.isModern ){
 			Log.generic('Skipped header update as list is modern.', false);
 			return;
@@ -1044,7 +1043,7 @@ class Worker {
 			/* Headers */
 
 			if( this.doHeaders ){
-				this.updateHeaders();
+				await this.updateHeaders();
 				if( doScraper ){
 					await delay(500);
 				}
