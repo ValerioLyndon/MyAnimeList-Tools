@@ -538,6 +538,15 @@ async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 	return true;
 }
 
+/* Does not send CSS update to MAL as that is part of the regular process of the header updates. */
+async function setHeaderTemplate(newTemplate, newStyle) {
+	settings.set(['header_template'], newTemplate);
+	settings.set(['header_style'], newStyle);
+	
+	alert('Import succeeded.');
+	return true;
+}
+
 async function updateCss( css ){
 	if( css === List.customCss ){
 		return true;
@@ -1939,7 +1948,7 @@ function buildCssImport( ){
 	let $form = $('<div class="l-column">');
 	let $blurb = new Paragraph('Input a template here. This will update the tool settings and may add some additional code to your MAL Custom CSS. You may wish to backup your Custom CSS before doing this.');
 	let field = new Field(false, 'Data to Import');
-	field.$box.attr('placeholder', '{css:"",template:"","match_template:""}');
+	field.$box.attr('placeholder', '{"css":"","template":"","matchtemplate":""}');
 	let $button = new Button('Import').on('click', ()=>{
 		value = field.$box.val();
 
@@ -2020,16 +2029,16 @@ function buildCssExport( ){
 
 	/* Structure */
 
-	$row.append(
-		$button,
-		outputField.$raw
-	);
 	$form.append(
 		new Paragraph('CSS designers can use this to create a template for others to quickly import. The template and match template are required, but you may leave the CSS Styling field blank if desired.'),
 		tmplField.$raw,
 		matchField.$raw,
 		cssField.$raw,
 		$row
+	);
+	$row.append(
+		$button,
+		outputField.$raw
 	);
 	popupUI.$window.append($form);
 
@@ -2111,12 +2120,109 @@ function buildHeaderSettings( ){
 	$options.append(
 		new Paragraph('These headers will only be applied to modern lists. Classic lists disable this tool as they already have headers by default. For help understanding and creating templates, see the <a href="/*$$$thread$$$*/" target="_blank">thread</a>.'),
 		new Check(['auto_headers'], 'Automatically Update Headers', 'Every time you load your anime or manga list, this script will run and update your CSS with new header locations.').$main,
-		new Textarea(['header_template'], 'Template', {'title':'CSS Template used for each header. Replacements are:\n[INDEX], [NAME], [TYPE]'}).$main,
-		new Textarea(['header_style'], 'Styling', {'title':'CSS Styling applied once to your Custom CSS.'}).$main
+		new Textarea(['header_template'], 'Template for Each Header', {'title':'CSS Template used for each header. Replacements are:\n[INDEX], [NAME], [TYPE]'}, 15).$main,
+		new Textarea(['header_style'], 'Styling for All Headers', {'title':'CSS Styling applied once to your Custom CSS.'}, 15).$main
 	);
 	popupUI.$window.append($options);
 
 	/* TODO: Add custom names for each category here. */
+
+	popupUI.open();
+}
+
+function buildHeaderImport( ){
+	let popupUI = new SubsidiaryUI(UI, 'Import Header Styling');
+
+	/* Elements */
+
+	let $form = $('<div class="l-column">');
+	let $blurb = new Paragraph('Input a template here. This will update the tool settings with your imported templates and styles.');
+	let field = new Field(false, 'Data to Import');
+	field.$box.attr('placeholder', '{"header_template":"","header_style":""}');
+	let $button = new Button('Import').on('click', ()=>{
+		value = field.$box.val();
+
+		if( value.length < 1 ){
+			alert('Nothing detected in import field.');
+			return false;
+		}
+		try {
+			importedTemplate = JSON.parse(value);
+		}
+		catch(e){
+			alert(`Import failed. If you are using an official template, report this problem to the developer with the following information.\n\nError message for reference:\n${e}\n\nValue for reference:\n${value}`);
+			return false;
+		}
+
+		if( !("header_template" in importedTemplate) || !("header_style" in importedTemplate) ){
+			alert(`Import failed due to incorrect syntax or missing information.`);
+			return false;
+		}
+		else {
+			setHeaderTemplate(importedTemplate['header_template'], importedTemplate['header_style'])
+			.then((successful)=> {
+				if( successful ){
+					popupUI.exit();
+				}
+			});
+		}
+	});
+
+	/* Structure */
+
+	$form.append(
+		$blurb,
+		field.$raw,
+		$button
+	);
+	popupUI.$window.append($form);
+
+	popupUI.open();
+}
+
+function buildHeaderExport( ){
+	let popupUI = new SubsidiaryUI(UI, 'Export Header Styling');
+
+	/* Elements */
+
+	let $row = $('<div class="l-row">');
+	let $form = $('<div class="l-column">');
+	let tmplField = new Textarea(false, 'Template for Each Header', {}, 15);
+	tmplField.$box.val(settings.get(['header_template']));
+	let styleField = new Textarea(false, 'Styling for All Headers', {}, 15);
+	styleField.$box.val(settings.get(['header_style']));
+	let outputField = new Field();
+	outputField.$box.attr('readonly','readonly');
+	let $button = new Button('Generate Template', {title:'Generates text and copies to your clipboard.'}).on('click', ()=>{
+		let output = {
+			"header_template": tmplField.$box.val(),
+			"header_style": styleField.$box.val()
+		};
+
+		if( output['header_template'].length < 1 ){
+			alert('Please fill out the "Template for Each Header" field. It is also recommended to fill the "Styling for All Headers" section.');
+			return false;
+		}
+		
+		outputField.$box.val(JSON.stringify(output));
+		
+		outputField.$box.trigger('select');
+		navigator.clipboard.writeText(outputField.$box.val());
+	});
+
+	/* Structure */
+
+	$form.append(
+		new Paragraph('CSS designers can use this to create a template for others to quickly import.'),
+		tmplField.$raw,
+		styleField.$raw,
+		$row
+	);
+	$row.append(
+		$button,
+		outputField.$raw
+	);
+	popupUI.$window.append($form);
 
 	popupUI.open();
 }
