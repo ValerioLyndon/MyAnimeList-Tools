@@ -7,7 +7,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre28_b0';
+const ver = '11.0-pre29_b0';
 const verMod = '2023/Aug/28';
 
 class CustomStorage {
@@ -986,6 +986,7 @@ class UIState {
 
 	static setWorking( callback ){
 		this.resetActions();
+		window.addEventListener('beforeunload', this.warnUserBeforeLeaving);
 		for( let $btn of UIState.disableWhileRunning ){
 			$btn.attr('disabled','disabled');
 		}
@@ -999,6 +1000,7 @@ class UIState {
 
 	static setIdle( ){
 		this.resetActions();
+		window.removeEventListener('beforeunload', this.warnUserBeforeLeaving);
 		Status.update(`Ready to process ${ListItems.data.length} items.`, 'good', 100);
 		Status.estimate();
 		for( let $btn of UIState.disableWhileRunning ){
@@ -1047,6 +1049,11 @@ class UIState {
 	static setFailed( message ){
 		this.$actionBtn.val('Failed');
 		Status.update(message, 'bad');
+	}
+
+	static warnUserBeforeLeaving( e ){
+		e.preventDefault();
+		return (e.returnValue = "");
 	}
 }
 
@@ -1126,12 +1133,7 @@ class Status {
 	}
 }
 
-/* Standalone Re-usable Functions and Classes */
-
-function warnUserBeforeLeaving( e ){
-	e.preventDefault();
-	return (e.returnValue = "");
-}
+/* Standalone Re-usable Functions and Classes */ 
 
 function isDict( unknown ){
 	return (unknown instanceof Object && !(unknown instanceof Array)) ? true : false;
@@ -1763,29 +1765,22 @@ async function updateCss( css ){
 
 /* wrapper for common fetch requests to remove some boilerplate */
 async function request( url, result = 'html' ){
-	let pageText = await fetch(url)
-	.then(response => {
-		if( !response.ok ){
-			throw new Error();
-		}
-		return response.text();
-	})
-	.then(text => {
-		return text;
-	})
-	.catch(() => {
-		return false;
-	});
-
-	if( !pageText ){
+	const response = await fetch(url);
+	if( !response || !response.ok ){
 		return false;
 	}
+	if( result === 'json' ){
+		return response.json();
+	}
+	const text = response.text();
+
 	if( result === 'html' ){
-		return createDOM(pageText);
+		return createDOM(text);
 	}
 	if( result === 'string' ){
-		return pageText;
+		return text;
 	}
+	return false;
 }
 
 function createDOM( string ){
@@ -2048,7 +2043,6 @@ class Worker {
 		this.doHeaders = doHeaders;
 
 		settings.save();
-		window.addEventListener('beforeunload', warnUserBeforeLeaving);
 		const doScraper = this.doCss || this.doTags || this.doNotes;
 		
 		/* UI */
@@ -2241,7 +2235,6 @@ class Worker {
 
 	#finish( ){
 		UIState.isWorking = false;
-		window.removeEventListener('beforeunload', warnUserBeforeLeaving);
 
 		const results = ()=>{
 			buildResults( this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );

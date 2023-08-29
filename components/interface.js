@@ -442,6 +442,7 @@ class UIState {
 
 	static setWorking( callback ){
 		this.resetActions();
+		window.addEventListener('beforeunload', this.warnUserBeforeLeaving);
 		for( let $btn of UIState.disableWhileRunning ){
 			$btn.attr('disabled','disabled');
 		}
@@ -455,6 +456,7 @@ class UIState {
 
 	static setIdle( ){
 		this.resetActions();
+		window.removeEventListener('beforeunload', this.warnUserBeforeLeaving);
 		Status.update(`Ready to process ${ListItems.data.length} items.`, 'good', 100);
 		Status.estimate();
 		for( let $btn of UIState.disableWhileRunning ){
@@ -503,6 +505,11 @@ class UIState {
 	static setFailed( message ){
 		this.$actionBtn.val('Failed');
 		Status.update(message, 'bad');
+	}
+
+	static warnUserBeforeLeaving( e ){
+		e.preventDefault();
+		return (e.returnValue = "");
 	}
 }
 
