@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre25+h5_a0
+// @version      11.0-pre25+h6_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,8 +24,8 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre25+h5_a0';
-const verMod = '2023/Aug/27';
+const ver = '11.0-pre25+h6_a0';
+const verMod = '2023/Aug/28';
 
 class CustomStorage {
 	constructor( type = 'localStorage' ){
@@ -1009,6 +1009,7 @@ class NodeDimensions {
 Requires use of the prepare() function to enable UI logging. */
 class Log {
 	static #userInterface = false; /* must be an instace of UserInterface */
+	static #awaitingRefresh = true;
 	static #$parent = false;
 	static #unsentLogs = [];
 
@@ -1016,28 +1017,24 @@ class Log {
 	only builds UI if there are messages to be sent, otherwise waits for future sendToUI() call */
 	static prepare( userInterface ){
 		this.#userInterface = userInterface;
-		if( this.#unsentLogs.length === 0 ){
-			return;
-		}
-		this.#ready();
-		for( let [msg, type] of this.#unsentLogs ){
+		while( this.#unsentLogs.length > 0 ){
+			let [msg, type] = this.#unsentLogs.shift();
 			this.sendToUI(msg, type);
 		}
-		this.#unsentLogs = [];
 	}
 
 	static #ready( ){
 		if( !this.#userInterface || !this.#userInterface.isAlive ){
 			return false;
 		}
-		if( this.#$parent ){
-			return true;
+		if( this.#awaitingRefresh ){
+			this.#$parent = $('<div class="l-column o-half-gap l-scrollable">');
+			this.#userInterface.newWindow(
+				new Header('Process Log', 'Information, warnings, and errors are output here when something of note occurs.').$main,
+				this.#$parent
+			);
+			this.#awaitingRefresh = false;
 		}
-		this.#$parent = $('<div class="l-column o-half-gap l-scrollable">');
-		this.#userInterface.newWindow(
-			new Header('Process Log', 'Information, warnings, and errors are output here when something of note occurs.').$main,
-			this.#$parent
-		);
 		return true;
 	}
 
@@ -1754,7 +1751,6 @@ class ListItems {
 	}
 
 	static #done( ){
-		console.log('done', Worker.$actionBtn);
 		Status.update(`Ready to process ${this.data.length} items.`, 'good', 100);
 		Status.estimate();
 		Worker.$actionBtn.off();
@@ -1820,7 +1816,6 @@ class Status {
 	}
 
 	static update( text, type = this.type, percent = this.percent ){
-		console.log('update', arguments);
 		this.type = type;
 		this.percent = percent;
 		for( let bar of this.bars ){
@@ -1992,7 +1987,6 @@ class Worker {
 		let css = List.customCssModified + toAppend;
 		updateCss(css);
 		store.set('last_auto_headers', Date.now());
-		console.log('finished updating headers');
 	}
 
 	async start( doCss = settings.get(['update_css']), doTags = settings.get(['update_tags']), doNotes = settings.get(['update_notes']), doHeaders = settings.get(['update_headers']) ){

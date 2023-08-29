@@ -37,6 +37,7 @@ class NodeDimensions {
 Requires use of the prepare() function to enable UI logging. */
 class Log {
 	static #userInterface = false; /* must be an instace of UserInterface */
+	static #awaitingRefresh = true;
 	static #$parent = false;
 	static #unsentLogs = [];
 
@@ -44,28 +45,24 @@ class Log {
 	only builds UI if there are messages to be sent, otherwise waits for future sendToUI() call */
 	static prepare( userInterface ){
 		this.#userInterface = userInterface;
-		if( this.#unsentLogs.length === 0 ){
-			return;
-		}
-		this.#ready();
-		for( let [msg, type] of this.#unsentLogs ){
+		while( this.#unsentLogs.length > 0 ){
+			let [msg, type] = this.#unsentLogs.shift();
 			this.sendToUI(msg, type);
 		}
-		this.#unsentLogs = [];
 	}
 
 	static #ready( ){
 		if( !this.#userInterface || !this.#userInterface.isAlive ){
 			return false;
 		}
-		if( this.#$parent ){
-			return true;
+		if( this.#awaitingRefresh ){
+			this.#$parent = $('<div class="l-column o-half-gap l-scrollable">');
+			this.#userInterface.newWindow(
+				new Header('Process Log', 'Information, warnings, and errors are output here when something of note occurs.').$main,
+				this.#$parent
+			);
+			this.#awaitingRefresh = false;
 		}
-		this.#$parent = $('<div class="l-column o-half-gap l-scrollable">');
-		this.#userInterface.newWindow(
-			new Header('Process Log', 'Information, warnings, and errors are output here when something of note occurs.').$main,
-			this.#$parent
-		);
 		return true;
 	}
 
