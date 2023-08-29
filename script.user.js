@@ -141,8 +141,8 @@ class UserInterface {
 	--bg2: #292929;
 	--group-bg: #88888832;
 	--txt: #eee;
-	--btn-bg: #222222f0;
-	--btn-brdr: #4e4e4e;
+	--btn-bg: #8884;
+	--btn-brdr: #3986edab;
 	--fld-bg: #18181888;
 	--fld-brdr: #424242;
 	--stat-working: #3166e0;
@@ -157,8 +157,8 @@ class UserInterface {
 	--bg2: #c0c0c0;
 	--group-bg: #88888832;
 	--txt: #111;
-	--btn-bg: #d9d9d9f0;
-	--btn-brdr: #767676;
+	--btn-bg: #fffe;
+	--btn-brdr: #0060dfaa;
 	--fld-bg: #f6f6f688;
 	--fld-brdr: #999;
 	--stat-working: #4277f2;
@@ -300,31 +300,21 @@ class UserInterface {
 }
 
 .c-button {
-	padding: 2px 4px;
+	padding: 1px 4px;
 	background: var(--btn-bg);
-	border: 1px solid var(--btn-brdr);
+	border: 2px solid transparent;
 	border-radius: 6px;
 	color: var(--txt);
 	cursor: pointer;
 	justify-self: start;
+	transition: border-color 0.08s ease;
 }
 .c-button:disabled {
 	opacity: 0.7;
 	cursor: not-allowed;
 }
-
-.c-button {
-	padding: 2px 4px;
-	background: var(--btn-bg);
-	border: 1px solid var(--btn-brdr);
-	border-radius: 6px;
-	color: var(--txt);
-	cursor: pointer;
-	justify-self: start;
-}
-.c-button:disabled {
-	opacity: 0.7;
-	cursor: not-allowed;
+.c-button:hover {
+	border-color: var(--btn-brdr);
 }
 
 .c-check {
