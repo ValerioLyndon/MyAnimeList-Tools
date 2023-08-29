@@ -777,8 +777,7 @@ class ListItems {
 			this.#delay += 3000;
 
 			if( this.#failures > 3 ){
-				Worker.$actionBtn.val('Failed');
-				Status.update(`Failed to fetch list info.`, 'bad', 100);
+				UIState.setFailed('Failed to fetch list info.');
 				return;
 			}
 
@@ -788,129 +787,14 @@ class ListItems {
 	}
 
 	static #done( ){
-		Status.update(`Ready to process ${this.data.length} items.`, 'good', 100);
-		Status.estimate();
-		Worker.$actionBtn.off();
-		Worker.$actionBtn.on('click', ()=>{
-			const start = ()=>{
-				Worker.$actionBtn.off('click');
-				worker = new Worker();
-				worker.start();
-			};
-
-			let enabled = [];
-			if( settings.get(['update_tags']) ){
-				enabled.push('tag updater');
-			}
-			if( settings.get(['update_notes']) ){
-				enabled.push('notes updater');
-			}
-			if( !store.get('checkpoint_start') && enabled.length > 0 ){
-				buildConfirm(
-					'Final warning.',
-					`You have enabled the ${enabled.join(' and the ')}. ${enabled.length > 1 ? 'These' : 'This'} can make destructive edits to ALL your list items. If you are okay with this, click "Yes". If you want to backup your items first, click "No".`,
-					()=>{
-						start();
-						store.set('checkpoint_start', true);
-					}
-				);
-			}
-			else {
-				start();
-			}
-		});
-		Worker.$actionBtn.val('Start');
-		Worker.$actionBtn.removeAttr('disabled');
+		UIState.setIdle();
 		while( this.#callbacks.length > 0 ){
 			this.#callbacks.pop()();
 		}
 	}
 }
-
-class Status {
-	static percent = 0;
-	static type = 'working';
-	static bars = [];
-
-	static {
-		this.$main = this.#new();
-		this.$fixed = this.#new();
-		this.$fixed.addClass('is-fixed is-interactable');
-		this.$fixed.on('click', ()=>{
-			UI.open();
-			this.hideFixed();
-		});
-	}
-
-	static #new( ){
-		let $bar = $('<div class="c-status">');
-		let $text = $('<span class="c-status__text">');
-		let $time = $('<span class="c-status__time">');
-		$bar.append($text, $time);
-
-		this.bars.push({'$main': $bar, '$text': $text, '$time': $time});
-		return $bar;
-	}
-
-	static update( text, type = this.type, percent = this.percent ){
-		this.type = type;
-		this.percent = percent;
-		for( let bar of this.bars ){
-			bar.$text.text(text);
-			if( percent < 0 || percent > 100 ){
-				bar.$main.addClass('is-unsure');
-			}
-			else {
-				bar.$main.removeClass('is-unsure');
-			}
-			bar.$main.css({
-				'--percent': `${percent}%`,
-				'--colour': `var(--stat-${type})`
-			});
-		}
-	}
-
-	static estimate( remaining = 0, msSinceLast = 0 ){
-		if( remaining === 0 && msSinceLast === 0 ){
-			for( let bar of this.bars ){
-				bar.$time.text('');
-			}
-			return;
-		}
-
-		let seconds = remaining * (msSinceLast / 1000);
-		let formatted = '?';
-		if( seconds <= 60 ){
-			formatted = `${round(seconds)}s`;
-		}
-		else if( seconds > 60 && seconds < 3600 ){
-			formatted = `${round(seconds / 60, 1)}m`;
-		}
-		else if( seconds > 3600 ){
-			formatted = `${round(seconds / 60 / 60, 1)}h`;
-		}
-		for( let bar of this.bars ){
-			bar.$time.text(`~ ${formatted} left`);
-		}
-	}
-
-	static showFixed( ){
-		this.$fixed.removeClass('is-aside');
-	}
-
-	static hideFixed( ){
-		this.$fixed.addClass('is-aside');
-	}
-}
 	
 class Worker {
-	/* UI vars */
-	/* buttons are added to this list to be later disabled upon process start and enabled upon end */
-	static disableWhileRunning = [];
-	static $actionBtn;
-	static $resultsBtn;
-	static isActive = false;
-
 	/* CSS vars */
 	css = '';
 	$preview = false;
@@ -932,10 +816,12 @@ class Worker {
 	iteration = -1;
 	data = [];
 	timeout;
+	silent;
 
 	/* setup */
 
-	constructor( ){
+	constructor( silent ){
+		this.silent = silent;
 		ListItems.load();
 	}
 
@@ -1027,7 +913,7 @@ class Worker {
 	}
 
 	async start( doCss = settings.get(['update_css']), doTags = settings.get(['update_tags']), doNotes = settings.get(['update_notes']), doHeaders = settings.get(['update_headers']) ){
-		Worker.isActive = true;
+		UIState.isWorking = true;
 		this.doCss = doCss;
 		this.doTags = doTags;
 		this.doNotes = doNotes;
@@ -1039,11 +925,7 @@ class Worker {
 		
 		/* UI */
 
-		for( let $btn of Worker.disableWhileRunning ){
-			$btn.attr('disabled','disabled');
-		}
-		Worker.$actionBtn.val('Working...');
-		Worker.$actionBtn.attr('disabled','disabled');
+		UIState.setLoading();
 		
 		ListItems.afterLoad(async ()=>{
 			/* Headers */
@@ -1066,12 +948,7 @@ class Worker {
 
 			/* UI */
 
-			Worker.$resultsBtn.css('display', 'none');
-			Worker.$actionBtn.off();
-			Worker.$actionBtn.val('Stop');
-			Worker.$actionBtn.one('click', ()=>{
-				Worker.$actionBtn.attr('disabled','disabled');
-				Status.update('Stopping imminently...');
+			UIState.setWorking(()=>{
 				if( this.timeout ){
 					clearTimeout(this.timeout);
 					this.#finish();
@@ -1235,22 +1112,22 @@ class Worker {
 	}
 
 	#finish( ){
-		Worker.isActive = false;
+		UIState.isWorking = false;
 		window.removeEventListener('beforeunload', warnUserBeforeLeaving);
 
-		buildResults( this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
+		const results = ()=>{
+			buildResults( this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
+		};
+		if( !this.silent ){
+			results();
+			UIState.setDone(results);
+		}
+		else {
+			UIState.setIdle();
+		}
 
 		if( this.css.length > 0 ){
 			store.set(`last_${List.type}_run`, this.css);
-		}
-		ListItems.load();
-		Worker.$actionBtn.val('Restart');
-		Worker.$resultsBtn.css('display', '');
-		Worker.$resultsBtn.on('click',()=>{
-			buildResults( this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
-		});
-		for( let $btn of Worker.disableWhileRunning ){
-			$btn.removeAttr('disabled');
 		}
 	}
 
@@ -1737,15 +1614,9 @@ class Worker {
 
 function buildMainUI( ){
 	/* Control Row */
-	let $actionBtn = new Button('Loading...', {'disabled':'disabled'});
-	let $resultsBtn = new Button('Open Results');
-	$resultsBtn.css('display', 'none');
-	let $exitBtn = new Button('Close', {title:'Closes the program window. If work is currently being done, the program will keep going in the background.'}).on('click', ()=>{
-		UI.exit();
-	});
 	let controls = new SplitRow();
 	controls.$left.append(Status.$main);
-	controls.$right.append($resultsBtn, $actionBtn, $exitBtn);
+	controls.$right.append(UIState.$resultsBtn, UIState.$actionBtn, UIState.$exitBtn);
 
 	/* Components Row */
 	let $components = $('<div class="l-column">');
@@ -1810,9 +1681,7 @@ function buildMainUI( ){
 	/* Add all rows to UI */
 	UI.$window.append(controls.$main, new Hr(), $components, new Hr(), footer.$main);
 	
-	Worker.disableWhileRunning.push($clearBtn);
-	Worker.$actionBtn = $actionBtn;
-	Worker.$resultsBtn = $resultsBtn;
+	UIState.disableWhileRunning.push($clearBtn);
 }
 
 function buildGlobalSettings( ){
@@ -2228,10 +2097,6 @@ function buildHeaderExport( ){
 }
 
 function buildResults( css, tags, notes, headers, items, errors, warnings ){
-	if( !UI.isOpen ){
-		return;
-	}
-
 	let popupUI = new SubsidiaryUI(UI, 'Job\'s Done!');
 	popupUI.nav.$right.append(
 		new Button('Exit')

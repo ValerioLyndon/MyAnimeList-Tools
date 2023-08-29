@@ -115,7 +115,7 @@ class PrimaryUI extends UserInterface {
 	}
 
 	exit( ){
-		if( Worker.isActive ){
+		if( UIState.isWorking ){
 			this.close();
 			$(this.root).append(Status.$fixed);
 		}
@@ -191,7 +191,7 @@ class GroupRow extends SplitRow {
 			$button
 		);
 		this.$main.addClass('c-component');
-		Worker.disableWhileRunning.push(...additionalActions, $button);
+		UIState.disableWhileRunning.push(...additionalActions, $button);
 	}
 }
 
@@ -208,7 +208,7 @@ class OptionalGroupRow extends GroupRow {
 		this.$left.append(
 			this.check.$raw
 		);
-		Worker.disableWhileRunning.push(this.check.$box);
+		UIState.disableWhileRunning.push(this.check.$box);
 	}
 
 	checkStatus( ){
@@ -409,4 +409,175 @@ function buildConfirm( title, subtitle, onYes, onNo = ()=>{} ){
 
 	ui.$window.append(row);
 	ui.open();
+}
+
+class UIState {
+	static $actionBtn = new Button('Loading...');
+	static $resultsBtn = new Button('Open Results');
+	static $exitBtn = new Button('Close', {title:'Closes the program window. If work is currently being done, the program will keep going in the background.'})
+	.on('click', ()=>{
+		UI.exit();
+	});
+	static isWorking = false;
+	static userStarts = 0;
+	/* buttons are added to this list to be later disabled upon process start and enabled upon end */
+	static disableWhileRunning = [];
+
+	static {
+		this.setLoading();
+	}
+
+	static resetActions( ){
+		this.$actionBtn.off();
+		this.$actionBtn.removeAttr('disabled');
+		this.$resultsBtn.off();
+		this.$resultsBtn.css('display', 'none');
+	}
+
+	static setLoading( ){
+		this.resetActions();
+		this.$actionBtn.val('Loading...');
+		this.$actionBtn.attr('disabled','disabled');
+	}
+
+	static setWorking( callback ){
+		this.resetActions();
+		for( let $btn of UIState.disableWhileRunning ){
+			$btn.attr('disabled','disabled');
+		}
+		this.$actionBtn.val('Stop');
+		this.$actionBtn.one('click', ()=>{
+			this.$actionBtn.attr('disabled','disabled');
+			Status.update('Stopping imminently...');
+			callback();
+		});
+	}
+
+	static setIdle( ){
+		this.resetActions();
+		Status.update(`Ready to process ${ListItems.data.length} items.`, 'good', 100);
+		Status.estimate();
+		for( let $btn of UIState.disableWhileRunning ){
+			$btn.removeAttr('disabled');
+		}
+		this.$actionBtn.val(this.userStarts > 0 ? 'Restart' : 'Start');
+		this.$actionBtn.on('click', ()=>{
+			const start = ()=>{
+				this.$actionBtn.off('click');
+				worker = new Worker();
+				worker.start();
+				this.userStarts++;
+			};
+
+			let enabled = [];
+			if( settings.get(['update_tags']) ){
+				enabled.push('tag updater');
+			}
+			if( settings.get(['update_notes']) ){
+				enabled.push('notes updater');
+			}
+			if( !store.get('checkpoint_start') && enabled.length > 0 ){
+				buildConfirm(
+					'Final warning.',
+					`You have enabled the ${enabled.join(' and the ')}. ${enabled.length > 1 ? 'These' : 'This'} can make destructive edits to ALL your list items. If you are okay with this, click "Yes". If you want to backup your items first, click "No".`,
+					()=>{
+						start();
+						store.set('checkpoint_start', true);
+					}
+				);
+			}
+			else {
+				start();
+			}
+		});
+	}
+
+	static setDone( callback ){
+		this.setIdle();
+		this.$resultsBtn.css('display', '');
+		this.$resultsBtn.on('click', ()=>{
+			callback();
+		});
+	}
+
+	static setFailed( message ){
+		this.$actionBtn.val('Failed');
+		Status.update(message, 'bad');
+	}
+}
+
+class Status {
+	static percent = 0;
+	static type = 'working';
+	static bars = [];
+
+	static {
+		this.$main = this.#new();
+		this.$fixed = this.#new();
+		this.$fixed.addClass('is-fixed is-interactable');
+		this.$fixed.on('click', ()=>{
+			UI.open();
+			this.hideFixed();
+		});
+	}
+
+	static #new( ){
+		let $bar = $('<div class="c-status">');
+		let $text = $('<span class="c-status__text">');
+		let $time = $('<span class="c-status__time">');
+		$bar.append($text, $time);
+
+		this.bars.push({'$main': $bar, '$text': $text, '$time': $time});
+		return $bar;
+	}
+
+	static update( text, type = this.type, percent = this.percent ){
+		this.type = type;
+		this.percent = percent;
+		for( let bar of this.bars ){
+			bar.$text.text(text);
+			if( percent < 0 || percent > 100 ){
+				bar.$main.addClass('is-unsure');
+			}
+			else {
+				bar.$main.removeClass('is-unsure');
+			}
+			bar.$main.css({
+				'--percent': `${percent}%`,
+				'--colour': `var(--stat-${type})`
+			});
+		}
+	}
+
+	static estimate( remaining = 0, msSinceLast = 0 ){
+		if( remaining === 0 && msSinceLast === 0 ){
+			for( let bar of this.bars ){
+				bar.$time.text('');
+			}
+			return;
+		}
+
+		let seconds = remaining * (msSinceLast / 1000);
+		let formatted = '?';
+		if( seconds <= 60 ){
+			formatted = `${round(seconds)}s`;
+		}
+		else if( seconds > 60 && seconds < 3600 ){
+			formatted = `${round(seconds / 60, 1)}m`;
+		}
+		else if( seconds > 3600 ){
+			formatted = `${round(seconds / 60 / 60, 1)}h`;
+		}
+		for( let bar of this.bars ){
+			bar.$time.text(`~ ${formatted} left`);
+		}
+	}
+
+	static showFixed( ){
+		this.$fixed.removeClass('is-aside');
+	}
+
+	static hideFixed( ){
+		this.$fixed.addClass('is-aside');
+	}
 }

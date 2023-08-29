@@ -85,7 +85,7 @@ function automation( ){
 		return;
 	}
 	
-	worker = new Worker();
+	worker = new Worker(true);
 	worker.start(false, false, false, doHeaders);
 	Log.generic('Performed automatic category header update.');
 }

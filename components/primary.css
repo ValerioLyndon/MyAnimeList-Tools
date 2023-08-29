@@ -134,7 +134,9 @@
 }
 .root.is-closed .c-container {
 	opacity: 0;
-	pointer-events: none;
+}
+.root.is-closed *:not(.c-status) {
+	pointer-events: none !important;
 }
 
 .c-container__target {
@@ -372,7 +374,7 @@
 	transform: translateX(0px);
 }
 
-/* States */
+/* UIStates */
 
 .is-interactable {
 	cursor: pointer;
