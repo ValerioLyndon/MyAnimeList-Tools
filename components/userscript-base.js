@@ -33,12 +33,10 @@ var store = new CustomStorage('userscript');
 if( List.isOwner ){
 	let $button = $('<a href="javascript:void(0);">Tools</a>')
 	.on('click',()=>{
-		if( UI && UI.alive ){
-			UI.open();
-		}
-		else {
+		if( !UI || !UI.isAlive ){
 			initialise();
 		}
+		UI.open();
 	});
 
 	if( List.isModern ){
@@ -59,4 +57,35 @@ if( List.isOwner ){
 			left: 15px;
 		}
 	`));
+
+	automation();
+}
+
+/* Handle UI-less automatic runs of the tool. */
+function automation( ){
+	initialise();
+
+	const doHeaders = settings.get(['update_headers']) && settings.get(['auto_headers']);
+
+	if( !doHeaders || !List.isModern ){
+		return;
+	}
+
+	const msBetweenRuns = 60 * 1000;
+
+	const timeSinceLastRun = Date.now() - store.get('last_auto_headers', 0);
+
+	if( timeSinceLastRun < msBetweenRuns ){
+		const timeUntilNextRun = round((msBetweenRuns - timeSinceLastRun) / 1000);
+		Log.generic(`Skipped automatic category headers update as the last run happened not long ago. Please start the tool manually or wait until the delay has reset in ${timeUntilNextRun} seconds.`);
+		return;
+	}
+	if( List.isPreview ) {
+		Log.generic('Skipped automatic category headers update as the tool does not run on preview windows for safety of your CSS.');
+		return;
+	}
+	
+	worker = new Worker();
+	worker.start(false, false, false, doHeaders);
+	Log.generic('Performed automatic category header update.');
 }

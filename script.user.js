@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre25_a0
+// @version      11.0-pre26_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,8 +24,8 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre25_a0';
-const verMod = '2023/Aug/27';
+const ver = '11.0-pre26_a0';
+const verMod = '2023/Aug/28';
 
 class CustomStorage {
 	constructor( type = 'localStorage' ){
@@ -74,6 +74,9 @@ class CustomStorage {
 		else if( valType === 'boolean' ){
 			value = Boolean(value);
 		}
+		else if( valType === 'number' ){
+			value = Number(value);
+		}
 		return value === undefined ? fallback : value;
 	}
 
@@ -99,7 +102,8 @@ var store = new CustomStorage('userscript');
 /* Core class for handling popup windows and overlays, extended by Primary and Subsidiary variants
 no requirements */
 class UserInterface {
-	alive = true;
+	isAlive = true;
+	isOpen = false;
 	#attachmentPoint = document.createElement('div');
 	#shadowRoot = this.#attachmentPoint.attachShadow({mode: 'open'});
 	root = document.createElement('div');
@@ -307,6 +311,20 @@ class UserInterface {
 	cursor: not-allowed;
 }
 
+.c-button {
+	padding: 2px 4px;
+	background: var(--btn-bg);
+	border: 1px solid var(--btn-brdr);
+	border-radius: 6px;
+	color: var(--txt);
+	cursor: pointer;
+	justify-self: start;
+}
+.c-button:disabled {
+	opacity: 0.7;
+	cursor: not-allowed;
+}
+
 .c-check {
 	display: flex;
 	align-items: center;
@@ -424,6 +442,14 @@ class UserInterface {
 .c-log__time {
 	margin-left: 5px;
 	float: right;
+}
+
+.c-list {
+	padding-left: 20px;
+	margin: 0;
+}
+.c-list__item::marker {
+	font-size: 1.2em;
 }
 
 
@@ -563,18 +589,20 @@ class UserInterface {
 	}
 
 	open( ){
-		if( this.alive ){
+		if( this.isAlive ){
 			this.root.classList.remove('is-closed');
+			this.isOpen = true;
 		}
 	}
 
 	close( ){
 		this.root.classList.add('is-closed');
+		this.isOpen = false;
 	}
 
 	exit( ){
-		if( this.alive ){
-			this.alive = false;
+		if( this.isAlive ){
+			this.isAlive = false;
 			this.close();
 			setTimeout(()=>{
 				this.#attachmentPoint.remove();
@@ -901,11 +929,21 @@ class Header {
 
 class Button {
 	constructor( value, attributes = {} ){
-		let button = $(`<input class="c-button" type="button" value="${value}">`);
+		let $main = $(`<input class="c-button" type="button" value="${value}">`);
 		for( let [name,value] of Object.entries(attributes) ){
-			button.attr(name,value);
+			$main.attr(name,value);
 		}
-		return button;
+		return $main;
+	}
+}
+
+class Bullets {
+	constructor( points ){
+		let $main = $(`<ul class="c-list">`);
+		for( let p of points ){
+			$main.append($(`<li class="c-list__item">${p}</li>`));
+		}
+		return $main;
 	}
 }
 
@@ -932,7 +970,7 @@ function buildConfirm( title, subtitle, onYes, onNo = ()=>{} ){
 	ui.open();
 }
 
-/* Re-usable Functions and Classes */
+/* Standalone Re-usable Functions and Classes */
 
 function warnUserBeforeLeaving( e ){
 	e.preventDefault();
@@ -941,6 +979,13 @@ function warnUserBeforeLeaving( e ){
 
 function isDict( unknown ){
 	return (unknown instanceof Object && !(unknown instanceof Array)) ? true : false;
+}
+
+/* sleep function for use with async await */
+function delay( ms ){
+	return new Promise(resolve=>{
+		setTimeout(resolve, ms);
+	});
 }
 
 /* Gets height of element whether it is inserted in the DOM yet or not. */
@@ -964,6 +1009,7 @@ class NodeDimensions {
 Requires use of the prepare() function to enable UI logging. */
 class Log {
 	static #userInterface = false; /* must be an instace of UserInterface */
+	static #awaitingRefresh = true;
 	static #$parent = false;
 	static #unsentLogs = [];
 
@@ -971,28 +1017,24 @@ class Log {
 	only builds UI if there are messages to be sent, otherwise waits for future sendToUI() call */
 	static prepare( userInterface ){
 		this.#userInterface = userInterface;
-		if( this.#unsentLogs.length === 0 ){
-			return;
-		}
-		this.#ready();
-		for( let [msg, type] of this.#unsentLogs ){
+		while( this.#unsentLogs.length > 0 ){
+			let [msg, type] = this.#unsentLogs.shift();
 			this.sendToUI(msg, type);
 		}
-		this.#unsentLogs = [];
 	}
 
 	static #ready( ){
-		if( !this.#userInterface || !this.#userInterface.alive ){
+		if( !this.#userInterface || !this.#userInterface.isAlive ){
 			return false;
 		}
-		if( this.#$parent ){
-			return true;
+		if( this.#awaitingRefresh ){
+			this.#$parent = $('<div class="l-column o-half-gap l-scrollable">');
+			this.#userInterface.newWindow(
+				new Header('Process Log', 'Information, warnings, and errors are output here when something of note occurs.').$main,
+				this.#$parent
+			);
+			this.#awaitingRefresh = false;
 		}
-		this.#$parent = $('<div class="l-column o-half-gap l-scrollable">');
-		this.#userInterface.newWindow(
-			new Header('Process Log', 'Information, warnings, and errors are output here when something of note occurs.').$main,
-			this.#$parent
-		);
 		return true;
 	}
 
@@ -1039,10 +1081,17 @@ class List {
 	static isAnime = (this.type === 'anime');
 	static isOwner = ($('body').attr('data-owner') === "1");
 	static isModern = ($('#list_surround').length === 0);
+	static isPreview = new URLSearchParams(window.location.search).has('preview');
 	static style = undefined;
 	static customCssEle = this.isModern ? $('#custom-css') : $('head style:first-of-type');
 	static customCss = this.customCssEle.text().trim();
-	static customCssModified = this.customCss.replaceAll(/\/\*MYANIMELIST-TOOLS START\*\/(.|\n)*\/\*MYANIMELIST-TOOLS END\*\//g, '').trim();
+	static #headerRegex = this.isAnime ?
+		   /\/\*LIST-TOOLS HEADERS ANIME START\*\/(.|\n)*?\/\*LIST-TOOLS HEADERS ANIME END\*\//g :
+		   /\/\*LIST-TOOLS HEADERS MANGA START\*\/(.|\n)*?\/\*LIST-TOOLS HEADERS MANGA END\*\//g;
+	static customCssModified = this.customCss
+	       .replaceAll(/\/\*MYANIMELIST-TOOLS START\*\/(.|\n)*?\/\*MYANIMELIST-TOOLS END\*\//g, '')
+		   .replaceAll(this.#headerRegex, '')
+		   .trim();
 	static csrf = $('meta[name="csrf_token"]').attr('content');
 
 	static async determineStyle( ){
@@ -1228,6 +1277,7 @@ class List {
 }
 
 /* handles the "settings" storage key where user settings are kept.
+Settings that shouldn't be shared such as auth, dates, list-specific last run texts, and more, should be stored as separate objects. 
 requires the CustomStorage class */
 class UserSettings {
 	settings = {
@@ -1308,8 +1358,33 @@ class UserSettings {
 			"rating": false,
 			"duration": false,
 			"total_duration": false
-		}
-	};
+		},
+
+		/* headers */
+		"update_headers": false,
+		"auto_headers": true,
+		"header_template": `.[TYPE][data-query*='"status":7']:not([data-query*='order']):not([data-query*='tag"']):not([data-query*='"s"']) .list-item:nth-child([INDEX]) td {
+	padding-top: 43px;
+}
+.[TYPE][data-query*='"status":7']:not([data-query*='order']):not([data-query*='tag"']):not([data-query*='"s"']) .list-item:nth-child([INDEX]) .status {
+	position: relative;
+}
+.[TYPE][data-query*='"status":7']:not([data-query*='order']):not([data-query*='tag"']):not([data-query*='"s"']) .list-item:nth-child([INDEX]) .status::before {
+	content: '[NAME]';
+}`,
+		"header_style": `.data.status::before {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 1023px;
+	height: 38px;
+	background: #4065ba;
+	border-bottom: 1px solid #ebebeb;
+	color: #FFF;
+	font: bold 2em/38px 'Helvetica neue', Helvetica, "lucida grande", tahoma, verdana, arial, sans-serif;
+	text-transform: uppercase;
+}`
+	}
 	
 	constructor( ){
 		this.updateOlderFormats();
@@ -1334,7 +1409,8 @@ class UserSettings {
 				this.settings = workspace;
 			}
 			catch( e ){
-				alert("Encountered an error while parsing your previous settings. Your settings have been reverted to defaults. To quickly recover your template settings, try selecting \"Last Run\" and then \"Autofill\". Other settings will need to be manually set. \n\nIf you've never run this tool before, you should never see this.");
+				Log.error("Encountered an error while parsing your previous settings. Your settings have been reverted to defaults. To quickly recover your template settings, try selecting \"Last Run\" and then \"Autofill\". Other settings will need to be manually set. \n\nIf you've never run this tool before, you should never see this.");
+				/* TODO: update this text to match new UI */
 			}
 		}
 	}
@@ -1424,92 +1500,109 @@ async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 			return false;
 		}
 
-		let finalCss = List.customCssModified;
+		let css = List.customCssModified;
 		if( newCss.length > 0 ){
-			finalCss += '\n\n/*MYANIMELIST-TOOLS START*/\n\n' + newCss + '\n\n/*MYANIMELIST-TOOLS END*/';
+			css += '\n\n/*MYANIMELIST-TOOLS START*/\n\n' + newCss + '\n\n/*MYANIMELIST-TOOLS END*/';
 		}
-		if( finalCss.length >= 65535 ){
-			alert('Your MAL Custom CSS may be longer than the max allowed length. If your CSS has been cut off at the end, you will need to resolve this issue.');
-		}
-
-		/* Send new CSS to MAL */
-		if( List.isModern ){
-			let styleUrl = `https://myanimelist.net/ownlist/style/theme/${List.style}`;
-
-			let stylePage = await request(styleUrl);
-			let bg_attach = $(stylePage).find('#style_edit_theme_background_image_attachment').find('[selected]').val() || '';
-			let bg_vert = $(stylePage).find('#style_edit_theme_background_image_vertical_position').find('[selected]').val() || '';
-			let bg_hori = $(stylePage).find('#style_edit_theme_background_image_horizontal_position').find('[selected]').val() || '';
-			let bg_repeat = $(stylePage).find('#style_edit_theme_background_image_repeat').find('[selected]').val() || '';
-			
-			let formData = new FormData();
-			formData.append("style_edit_theme[show_cover_image]", "1");
-			formData.append("style_edit_theme[cover_image]", new File([], ""));
-			formData.append("style_edit_theme[show_background_image]", "1");
-			formData.append("style_edit_theme[background_image]", new File([], ""));
-			formData.append("style_edit_theme[background_image_attachment]", bg_attach);
-			formData.append("style_edit_theme[background_image_vertical_position]", bg_vert);
-			formData.append("style_edit_theme[background_image_horizontal_position]", bg_hori);
-			formData.append("style_edit_theme[background_image_repeat]", bg_repeat);
-			formData.append("style_edit_theme[css]", finalCss);
-			formData.append("style_edit_theme[save]", "");
-			formData.append("csrf_token", List.csrf);
-			
-			let post = await fetch(styleUrl, {
-				method: "POST",
-				body: formData
-			})
-			.then(response => {
-				if( !response.ok) {
-					throw new Error(`Failed to send modern CSS update request.`);
-				}
-				return true;
-			})
-			.catch(error => {
-				Log.error(error);
-				return false;
-			});
-			if( !post ){
-				return false;
-			}
-		}
-		else {
-			let styleUrl = `https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv&id=${List.style}`;
-			
-			let headerData = new Headers();
-			headerData.append('Content-Type', 'application/x-www-form-urlencoded');
-			headerData.append('Referer', styleUrl);
-
-			let formData = new URLSearchParams();
-			formData.append('cssText', finalCss);
-			formData.append('subForm', 'Update CSS');
-			formData.append('csrf_token', List.csrf);
-			
-			let post = await fetch(styleUrl, {
-				method: "POST",
-				headers: headerData,
-				body: formData
-			})
-			.then(response => {
-				if( !response.ok ){
-					throw new Error(`Failed to send classic CSS update request.`);
-				}
-				return true;
-			})
-			.catch(error => {
-				Log.error(error);
-				return false;
-			});
-			if( !post ){
-				return false;
-			}
-		}
-
-		/* Temporarily update the page's CSS to make sure no page reload is required */
-		List.customCssEle.text(finalCss);
+		updateCss(css);
 	}
 	alert('Import succeeded.');
 	return true;
+}
+
+/* Does not send CSS update to MAL as that is part of the regular process of the header updates. */
+async function setHeaderTemplate(newTemplate, newStyle) {
+	settings.set(['header_template'], newTemplate);
+	settings.set(['header_style'], newStyle);
+	
+	alert('Import succeeded.');
+	return true;
+}
+
+async function updateCss( css ){
+	if( css === List.customCss ){
+		return true;
+	}
+	if( css.length >= 65535 ){
+		alert('Your MAL Custom CSS may be longer than the max allowed length. If your CSS has been cut off at the end, you will need to resolve this issue.');
+	}
+
+	/* Send new CSS to MAL */
+	if( List.isModern ){
+		let styleUrl = `https://myanimelist.net/ownlist/style/theme/${List.style}`;
+
+		let stylePage = await request(styleUrl);
+		let bg_attach = $(stylePage).find('#style_edit_theme_background_image_attachment').find('[selected]').val() || '';
+		let bg_vert = $(stylePage).find('#style_edit_theme_background_image_vertical_position').find('[selected]').val() || '';
+		let bg_hori = $(stylePage).find('#style_edit_theme_background_image_horizontal_position').find('[selected]').val() || '';
+		let bg_repeat = $(stylePage).find('#style_edit_theme_background_image_repeat').find('[selected]').val() || '';
+		
+		let formData = new FormData();
+		formData.append("style_edit_theme[show_cover_image]", "1");
+		formData.append("style_edit_theme[cover_image]", new File([], ""));
+		formData.append("style_edit_theme[show_background_image]", "1");
+		formData.append("style_edit_theme[background_image]", new File([], ""));
+		formData.append("style_edit_theme[background_image_attachment]", bg_attach);
+		formData.append("style_edit_theme[background_image_vertical_position]", bg_vert);
+		formData.append("style_edit_theme[background_image_horizontal_position]", bg_hori);
+		formData.append("style_edit_theme[background_image_repeat]", bg_repeat);
+		formData.append("style_edit_theme[css]", css);
+		formData.append("style_edit_theme[save]", "");
+		formData.append("csrf_token", List.csrf);
+		
+		let post = await fetch(styleUrl, {
+			method: "POST",
+			body: formData
+		})
+		.then(response => {
+			if( !response.ok) {
+				throw new Error(`Failed to send modern CSS update request.`);
+			}
+			return true;
+		})
+		.catch(error => {
+			Log.error(error);
+			return false;
+		});
+		if( !post ){
+			return false;
+		}
+	}
+	else {
+		let styleUrl = `https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv&id=${List.style}`;
+		
+		let headerData = new Headers();
+		headerData.append('Content-Type', 'application/x-www-form-urlencoded');
+		headerData.append('Referer', styleUrl);
+
+		let formData = new URLSearchParams();
+		formData.append('cssText', css);
+		formData.append('subForm', 'Update CSS');
+		formData.append('csrf_token', List.csrf);
+		
+		let post = await fetch(styleUrl, {
+			method: "POST",
+			headers: headerData,
+			body: formData
+		})
+		.then(response => {
+			if( !response.ok ){
+				throw new Error(`Failed to send classic CSS update request.`);
+			}
+			return true;
+		})
+		.catch(error => {
+			Log.error(error);
+			return false;
+		});
+		if( !post ){
+			return false;
+		}
+	}
+
+	/* Temporarily update the page's CSS to make sure no page reload is required */
+	List.customCssEle.text(css);
+	List.customCss = css;
 }
 
 /* wrapper for common fetch requests to remove some boilerplate */
@@ -1549,8 +1642,8 @@ function decodeHtml( html ){
 	return txt.value;
 }
 
-function round( value, precision ){
-	let multiplier = Math.pow(10, precision || 0);
+function round( value, precision = 0 ){
+	let multiplier = Math.pow(10, precision);
 	return Math.round(value * multiplier) / multiplier;
 }
 
@@ -1592,7 +1685,9 @@ var worker;
 /* Runtime */
 
 function initialise() {
-	UI = new PrimaryUI();
+	if( !UI || !UI.isAlive ){
+		UI = new PrimaryUI();
+	}
 	Log.prepare(UI);
 	List.determineStyle();
 	settings = new UserSettings();
@@ -1609,13 +1704,30 @@ class ListItems {
 	static #offset = 0;
 	static #failures = 0;
 	static #delay = 0;
+	static #working = false;
 	static #loaded = false;
+	static #callbacks = [];
+
+	static afterLoad( func ){
+		if( this.#loaded ){
+			func();
+			return true;
+		}
+		this.#callbacks.push(func);
+		if( !this.#working ){
+			this.load();
+		}
+	}
 
 	static load( ){
 		if( this.#loaded ){
 			this.#done();
 			return true;
 		}
+		if( this.#working ){
+			return true;
+		}
+		this.#working = true;
 
 		let url = this.#url + this.#offset;
 
@@ -1648,7 +1760,6 @@ class ListItems {
 	}
 
 	static #done( ){
-		console.log('done ListItems');
 		Status.update(`Ready to process ${this.data.length} items.`, 'good', 100);
 		Status.estimate();
 		Worker.$actionBtn.off();
@@ -1682,6 +1793,9 @@ class ListItems {
 		});
 		Worker.$actionBtn.val('Start');
 		Worker.$actionBtn.removeAttr('disabled');
+		while( this.#callbacks.length > 0 ){
+			this.#callbacks.pop()();
+		}
 	}
 }
 
@@ -1715,10 +1829,10 @@ class Status {
 		this.percent = percent;
 		for( let bar of this.bars ){
 			bar.$text.text(text);
-			if( percent === -1 ){
+			if( percent < 0 || percent > 100 ){
 				bar.$main.addClass('is-unsure');
 			}
-			if( percent > 0 ){
+			else {
 				bar.$main.removeClass('is-unsure');
 			}
 			bar.$main.css({
@@ -1791,10 +1905,16 @@ class Worker {
 	data = [];
 	timeout;
 
+	/* setup */
+
+	constructor( ){
+		ListItems.load();
+	}
+
 	/* utility functions */
 
 	write( line ){
-		if( !settings.get(['update_css']) ){
+		if( !this.doCss ){
 			return;
 		}
 		this.css += line + '\n';
@@ -1814,154 +1934,246 @@ class Worker {
 
 	/* runtime functions */
 
-	constructor( ){
-		ListItems.load();
+	async updateHeaders( ){
+		if( !List.isModern ){
+			Log.generic('Skipped header update as list is modern.', false);
+			return;
+		}
+
+		Status.update('Updating category headers...', 'working', -1);
+		/* fetch data and setup counts */
+
+		const names = List.type === 'anime' ? {
+			1: 'Watching',
+			2: 'Completed',
+			3: 'On Hold',
+			4: 'Dropped',
+			6: 'Plan To Watch'
+		} : {
+			1: 'Reading',
+			2: 'Completed',
+			3: 'On Hold',
+			4: 'Dropped',
+			6: 'Plan To Read'
+		};
+
+		let countsPer = {
+			1: 0,
+			2: 0,
+			3: 0,
+			4: 0,
+			6: 0
+		};
+
+		for( const item of ListItems.data ){
+			const id = item['status'];
+			countsPer[id]++;
+			if( id === 6 ){
+				break; /* break early once planning is reached to save computation */
+			}
+		}
+
+		/* create CSS styling and update CSS */
+
+		const template = settings.get(['header_template']);
+
+		let toAppend = `\n\n/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} START*/\n\n` + settings.get(['header_style']);
+
+		let position = 2;
+		for( const [id, count] of Object.entries(countsPer) ){
+			if( count === 0 ){
+				continue;
+			}
+			toAppend += '\n' + template
+				.replaceAll('[INDEX]', position)
+				.replaceAll('[NAME]', names[id])
+				.replaceAll('[TYPE]', List.type);
+
+			position += count;
+		}
+		toAppend += `\n\n/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} END*/`;
+
+		let css = List.customCssModified + toAppend;
+		updateCss(css);
+		store.set('last_auto_headers', Date.now());
 	}
 
-	async start( ){
+	async start( doCss = settings.get(['update_css']), doTags = settings.get(['update_tags']), doNotes = settings.get(['update_notes']), doHeaders = settings.get(['update_headers']) ){
 		Worker.isActive = true;
+		this.doCss = doCss;
+		this.doTags = doTags;
+		this.doNotes = doNotes;
+		this.doHeaders = doHeaders;
+
 		settings.save();
 		window.addEventListener('beforeunload', warnUserBeforeLeaving);
-
-		if( settings.get(['live_preview']) ){
-			let previewText = new Textarea(false, 'CSS Output', {'readonly':'readonly'}, 12);
-			this.$preview = previewText.$box;
-			UI.newWindow(previewText.$raw);
-		}
-		this.write(`\/*\nGenerated by MyAnimeList-Tools v${ver}\nhttps://github.com/ValerioLyndon/MyAnimeList-Tools\n\nTemplate=${settings.get(['css_template']).replace(/\*\//g, "*[DEL]/")}\nMatchTemplate=${settings.get(['match_template'])}\n*\/\n`);
+		const doScraper = this.doCss || this.doTags || this.doNotes;
+		
+		/* UI */
 
 		for( let $btn of Worker.disableWhileRunning ){
 			$btn.attr('disabled','disabled');
 		}
-
-		Worker.$resultsBtn.css('display', 'none');
-		Worker.$actionBtn.off();
-		Worker.$actionBtn.val('Stop');
-		Worker.$actionBtn.one('click', ()=>{
-			Worker.$actionBtn.attr('disabled','disabled');
-			Status.update('Stopping imminently...');
-			if( this.timeout ){
-				clearTimeout(this.timeout);
-				this.#finish();
-			}
-			else {
-				this.data = [];
-			}
-		});
+		Worker.$actionBtn.val('Working...');
+		Worker.$actionBtn.attr('disabled','disabled');
 		
-		let categories = [];
-		for( let [categoryId, check] of Object.entries(settings.get(['checked_categories'])) ){
-			if( check ){
-				categories.push(parseInt(categoryId));
-			}
-		}
+		ListItems.afterLoad(async ()=>{
+			/* Headers */
 
-		let beforeProcessing = [];
-
-		/* Skip old lines */
-
-		let lastRun = settings.get(['use_last_run']) === true ?
-			store.get([`last_${List.type}_run`]) ?
-				store.get([`last_${List.type}_run`]) : '' : '';
-
-		let oldLines = lastRun.replace(/\/\*[\s\S]*?Generated by MyAnimeList-Tools[\s\S]*?\*\/\s+/,'').split("\n");
-		this.imagesTotal = oldLines.length;
-		Status.update(`Checking your input for matches...`, 'working', 0);
-
-		for( let i = 0; i < ListItems.data.length; i++ ){
-			let item = ListItems.data[i];
-			let id = item[`${List.type}_id`];
-			
-			/* Skip item if category does not match selected user options */
-			if( settings.get(['select_categories']) ){
-				let skip = true;
-				let rewatchKey = List.isAnime ? 'is_rewatching' : 'is_rereading';
-				for( let categoryId of categories ){
-					/* if rewatching then set status to watching, since this is how it appears to the user */
-					if( item[rewatchKey] === 1 ){
-						item['status'] = 1;
-					}
-					if( item['status'] === categoryId ){
-						skip = false;
-						break;
-					}
-				}
-				if( skip ){
-					this.skipped++;
-					continue;
+			if( this.doHeaders ){
+				await this.updateHeaders();
+				if( doScraper ){
+					await delay(500);
 				}
 			}
 
-			/* Check old CSS for any existing lines so they can be skipped later. */
-			let lineExists;
-			let lineText;
-			for( let j = 0; j < oldLines.length; j++ ){
-				lineText = oldLines[j];
-				let match = settings.get(['match_template']).replaceAll(/\[ID\]/g, id).replaceAll(/\[TYPE\]/g, List.type);
-				lineExists = lineText.indexOf(match) >= 0;
-				if( lineExists ){
-					break;
-				}
+			/* CSS */
+
+			if( this.doCss && settings.get(['live_preview']) ){
+				let previewText = new Textarea(false, 'CSS Output', {'readonly':'readonly'}, 12);
+				this.$preview = previewText.$box;
+				UI.newWindow(previewText.$raw);
 			}
+			this.write(`\/*\nGenerated by MyAnimeList-Tools v${ver}\nhttps://github.com/ValerioLyndon/MyAnimeList-Tools\n\nTemplate=${settings.get(['css_template']).replace(/\*\//g, "*[DEL]/")}\nMatchTemplate=${settings.get(['match_template'])}\n*\/\n`);
 
-			/* Add to processing list or skip any existing lines.
-			If validating old images, that step will also occur here. */
-			if( lineExists ){
-				if( settings.get(['use_last_run']) && settings.get(['check_existing']) ){
-					let imgUrl = lineText.match(/http.*?\.(?:jpe?g|webp)/);
-					if( imgUrl.length === 0 ){
-						this.data.push(item);
-						this.imagesTotal--;
-						continue;
-					}
+			/* UI */
 
-					/* Validate image by loading it in the HTML */
-					let imageLoad = new Promise((resolve)=>{
-						let tempImg = document.createElement('img');
-						tempImg.addEventListener('load', ()=>{
-							this.write(lineText);
-							this.updateImageStatus();
-							resolve(true);
-						});
-						tempImg.addEventListener('error', ()=>{
-							this.data.push(item);
-							this.updateImageStatus();
-							resolve(false);
-						});
-						tempImg.src = imgUrl;
-					});
-
-					/* Add to Promise stack to await resolution */
-					beforeProcessing.push(imageLoad);
-					/* Add delay to prevent image loading spam */
-					await sleep(this.imageDelay);
+			Worker.$resultsBtn.css('display', 'none');
+			Worker.$actionBtn.off();
+			Worker.$actionBtn.val('Stop');
+			Worker.$actionBtn.one('click', ()=>{
+				Worker.$actionBtn.attr('disabled','disabled');
+				Status.update('Stopping imminently...');
+				if( this.timeout ){
+					clearTimeout(this.timeout);
+					this.#finish();
 				}
 				else {
-					this.write(lineText);
-					this.skippedDone++;
+					this.data = [];
 				}
-			}
-			/* If not in existing, add to list for processing */
-			else {
-				this.imagesTotal--;
-				this.data.push(item);
-			}
-		}
+			});
 
-		/* Start processing items */
-		Promise.allSettled(beforeProcessing)
-		.then(()=>{
-			if( this.skipped || this.skippedDone ){
-				let texts = [];
-				if( this.skipped ){
-					texts.push(`${this.skipped} were skipped due to your settings`);
+			/* Handle CSS, Tags, Notes */
+			
+			if( this.doCss || this.doTags || this.doNotes ){
+				let categories = [];
+				for( let [categoryId, check] of Object.entries(settings.get(['checked_categories'])) ){
+					if( check ){
+						categories.push(parseInt(categoryId));
+					}
 				}
-				if( this.skippedDone ){
-					texts.push(`${this.skippedDone} were added from your previous run and don't need re-processing`);
+
+				let beforeProcessing = [];
+
+				/* Skip old lines */
+
+				let lastRun = settings.get(['use_last_run']) === true ?
+					store.get([`last_${List.type}_run`]) ?
+						store.get([`last_${List.type}_run`]) : '' : '';
+
+				let oldLines = lastRun.replace(/\/\*[\s\S]*?Generated by MyAnimeList-Tools[\s\S]*?\*\/\s+/,'').split("\n");
+				this.imagesTotal = oldLines.length;
+				Status.update(`Checking your input for matches...`, 'working', 0);
+
+				for( let i = 0; i < ListItems.data.length; i++ ){
+					let item = ListItems.data[i];
+					let id = item[`${List.type}_id`];
+					
+					/* Skip item if category does not match selected user options */
+					if( settings.get(['select_categories']) ){
+						let skip = true;
+						let rewatchKey = List.isAnime ? 'is_rewatching' : 'is_rereading';
+						for( let categoryId of categories ){
+							/* if rewatching then set status to watching, since this is how it appears to the user */
+							if( item[rewatchKey] === 1 ){
+								item['status'] = 1;
+							}
+							if( item['status'] === categoryId ){
+								skip = false;
+								break;
+							}
+						}
+						if( skip ){
+							this.skipped++;
+							continue;
+						}
+					}
+
+					/* Check old CSS for any existing lines so they can be skipped later. */
+					let lineExists;
+					let lineText;
+					for( let j = 0; j < oldLines.length; j++ ){
+						lineText = oldLines[j];
+						let match = settings.get(['match_template']).replaceAll(/\[ID\]/g, id).replaceAll(/\[TYPE\]/g, List.type);
+						lineExists = lineText.indexOf(match) >= 0;
+						if( lineExists ){
+							break;
+						}
+					}
+
+					/* Add to processing list or skip any existing lines.
+					If validating old images, that step will also occur here. */
+					if( lineExists ){
+						if( settings.get(['use_last_run']) && settings.get(['check_existing']) ){
+							let imgUrl = lineText.match(/http.*?\.(?:jpe?g|webp)/);
+							if( imgUrl.length === 0 ){
+								this.data.push(item);
+								this.imagesTotal--;
+								continue;
+							}
+
+							/* Validate image by loading it in the HTML */
+							let imageLoad = new Promise((resolve)=>{
+								let tempImg = document.createElement('img');
+								tempImg.addEventListener('load', ()=>{
+									this.write(lineText);
+									this.updateImageStatus();
+									resolve(true);
+								});
+								tempImg.addEventListener('error', ()=>{
+									this.data.push(item);
+									this.updateImageStatus();
+									resolve(false);
+								});
+								tempImg.src = imgUrl;
+							});
+
+							/* Add to Promise stack to await resolution */
+							beforeProcessing.push(imageLoad);
+							/* Add delay to prevent image loading spam */
+							await sleep(this.imageDelay);
+						}
+						else {
+							this.write(lineText);
+							this.skippedDone++;
+						}
+					}
+					/* If not in existing, add to list for processing */
+					else {
+						this.imagesTotal--;
+						this.data.push(item);
+					}
 				}
-				Log.generic(`Out of ${ListItems.data.length} items on your list, ${texts.join(' and ')}.`);
+
+				/* Start processing items */
+				Promise.allSettled(beforeProcessing)
+				.then(()=>{
+					if( this.skipped || this.skippedDone ){
+						let texts = [];
+						if( this.skipped ){
+							texts.push(`${this.skipped} were skipped due to your settings`);
+						}
+						if( this.skippedDone ){
+							texts.push(`${this.skippedDone} were added from your previous run and don't need re-processing`);
+						}
+						Log.generic(`Out of ${ListItems.data.length} items on your list, ${texts.join(' and ')}.`);
+					}
+					this.#continue();
+				});
 			}
-			this.#continue();
+			else {
+				this.#finish();
+			}
 		});
 	}
 
@@ -1998,7 +2210,7 @@ class Worker {
 		Worker.isActive = false;
 		window.removeEventListener('beforeunload', warnUserBeforeLeaving);
 
-		buildResults( settings.get(['update_css']), settings.get(['update_tags']), settings.get(['update_notes']), this.data.length, this.errors, this.warnings );
+		buildResults( this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
 
 		if( this.css.length > 0 ){
 			store.set(`last_${List.type}_run`, this.css);
@@ -2007,7 +2219,7 @@ class Worker {
 		Worker.$actionBtn.val('Restart');
 		Worker.$resultsBtn.css('display', '');
 		Worker.$resultsBtn.on('click',()=>{
-			buildResults( settings.get(['update_css']), settings.get(['update_tags']), settings.get(['update_notes']), this.data.length, this.errors, this.warnings );
+			buildResults( this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
 		});
 		for( let $btn of Worker.disableWhileRunning ){
 			$btn.removeAttr('disabled');
@@ -2032,7 +2244,7 @@ class Worker {
 		
 			/* get current tags */
 			let tags = [];
-			if( settings.get(['update_tags']) && !settings.get(['clear_tags']) ){
+			if( this.doTags && !settings.get(['clear_tags']) ){
 				tags = meta['tags'].split(',');
 				tags.map(tag=>tag.trim());
 			}
@@ -2321,7 +2533,7 @@ class Worker {
 
 			/* Update Notes & Tags */
 
-			if( settings.get(['update_tags']) ){
+			if( this.doTags ){
 				if(strings['title_en'] && settings.get(['checked_tags','english_title'])) { tags.push(strings['title_en']); }
 				if(strings['title_fr'] && settings.get(['checked_tags','french_title'])) { tags.push(strings['title_fr']); }
 				if(strings['title_es'] && settings.get(['checked_tags','spanish_title'])) { tags.push(strings['title_es']); }
@@ -2383,7 +2595,7 @@ class Worker {
 				});
 			}
 
-			if( settings.get(['update_notes']) ){
+			if( this.doNotes ){
 				let notes = [];
 
 				if(strings['title_en'] && settings.get(['checked_notes','english_title'])) { notes.push('English Title: '+strings['title_en']); }
@@ -2538,6 +2750,17 @@ function buildMainUI( ){
 		notes.$main
 	);
 
+	if( List.isModern ){
+		$components.append(new OptionalGroupRow('Category Headers', ['update_headers'], ()=>{ buildHeaderSettings(); }, [
+			new Button('Import').on('click', ()=>{
+				buildHeaderImport();
+			}),
+			new Button('Export').on('click', ()=>{
+				buildHeaderExport();
+			})
+		]).$main);
+	}
+
 	/* Footer Row */
 	let $switchBtn = new Button('Switch Theme')
 	.on('click', ()=>{
@@ -2558,7 +2781,6 @@ function buildMainUI( ){
 
 	/* Add all rows to UI */
 	UI.$window.append(controls.$main, new Hr(), $components, new Hr(), footer.$main);
-	UI.open();
 	
 	Worker.disableWhileRunning.push($clearBtn);
 	Worker.$actionBtn = $actionBtn;
@@ -2698,7 +2920,7 @@ function buildCssImport( ){
 	let $form = $('<div class="l-column">');
 	let $blurb = new Paragraph('Input a template here. This will update the tool settings and may add some additional code to your MAL Custom CSS. You may wish to backup your Custom CSS before doing this.');
 	let field = new Field(false, 'Data to Import');
-	field.$box.attr('placeholder', '{css:"",template:"","match_template:""}');
+	field.$box.attr('placeholder', '{"css":"","template":"","matchtemplate":""}');
 	let $button = new Button('Import').on('click', ()=>{
 		value = field.$box.val();
 
@@ -2779,16 +3001,16 @@ function buildCssExport( ){
 
 	/* Structure */
 
-	$row.append(
-		$button,
-		outputField.$raw
-	);
 	$form.append(
 		new Paragraph('CSS designers can use this to create a template for others to quickly import. The template and match template are required, but you may leave the CSS Styling field blank if desired.'),
 		tmplField.$raw,
 		matchField.$raw,
 		cssField.$raw,
 		$row
+	);
+	$row.append(
+		$button,
+		outputField.$raw
 	);
 	popupUI.$window.append($form);
 
@@ -2838,7 +3060,7 @@ function buildTagSettings( ){
 
 	let $options = $('<div class="l-column o-justify-start">');
 	$options.append(
-		new Paragraph('Enabled options will be added to your tags. Please <a href="https://myanimelist.net/panel.php?go=export" target="_blank">export</a> a copy of your list first if you have any tags you wish to keep as this action can be highly exitive.'),
+		new Paragraph('Enabled options will be added to your tags. Please <a href="https://myanimelist.net/panel.php?go=export" target="_blank">export</a> a copy of your list first if you have any tags you wish to keep as this action can be highly destructive.'),
 		new CheckGrid(generateChecks(true)).$main,
 		new Check(['clear_tags'], "Overwrite Current Tags", "Overwrite all of your current tags with the new ones. If all other tag options are unchecked, this will completely remove all tags.\n\nDO NOT use this if you have any tags you want to keep.").$main
 	);
@@ -2863,7 +3085,125 @@ function buildNoteSettings( ){
 	popupUI.open();
 }
 
-function buildResults( css, tags, notes, items, errors, warnings ){
+function buildHeaderSettings( ){
+	let popupUI = new SubsidiaryUI(UI, 'Category Header Settings', 'Automatically add headers before each category.');
+	
+	let $options = $('<div class="l-column">');
+	$options.append(
+		new Paragraph('These headers will only be applied to modern lists. Classic lists disable this tool as they already have headers by default. For help understanding and creating templates, see the <a href="https://myanimelist.net/forum/?topicid=1905478" target="_blank">thread</a>.'),
+		new Check(['auto_headers'], 'Automatically Update Headers', 'Every time you load your anime or manga list, this script will run and update your CSS with new header locations.').$main,
+		new Textarea(['header_template'], 'Template for Each Header', {'title':'CSS Template used for each header. Replacements are:\n[INDEX], [NAME], [TYPE]'}, 15).$main,
+		new Textarea(['header_style'], 'Styling for All Headers', {'title':'CSS Styling applied once to your Custom CSS.'}, 15).$main
+	);
+	popupUI.$window.append($options);
+
+	/* TODO: Add custom names for each category here. */
+
+	popupUI.open();
+}
+
+function buildHeaderImport( ){
+	let popupUI = new SubsidiaryUI(UI, 'Import Header Styling');
+
+	/* Elements */
+
+	let $form = $('<div class="l-column">');
+	let $blurb = new Paragraph('Input a template here. This will update the tool settings with your imported templates and styles.');
+	let field = new Field(false, 'Data to Import');
+	field.$box.attr('placeholder', '{"header_template":"","header_style":""}');
+	let $button = new Button('Import').on('click', ()=>{
+		value = field.$box.val();
+
+		if( value.length < 1 ){
+			alert('Nothing detected in import field.');
+			return false;
+		}
+		try {
+			importedTemplate = JSON.parse(value);
+		}
+		catch(e){
+			alert(`Import failed. If you are using an official template, report this problem to the developer with the following information.\n\nError message for reference:\n${e}\n\nValue for reference:\n${value}`);
+			return false;
+		}
+
+		if( !("header_template" in importedTemplate) || !("header_style" in importedTemplate) ){
+			alert(`Import failed due to incorrect syntax or missing information.`);
+			return false;
+		}
+		else {
+			setHeaderTemplate(importedTemplate['header_template'], importedTemplate['header_style'])
+			.then((successful)=> {
+				if( successful ){
+					popupUI.exit();
+				}
+			});
+		}
+	});
+
+	/* Structure */
+
+	$form.append(
+		$blurb,
+		field.$raw,
+		$button
+	);
+	popupUI.$window.append($form);
+
+	popupUI.open();
+}
+
+function buildHeaderExport( ){
+	let popupUI = new SubsidiaryUI(UI, 'Export Header Styling');
+
+	/* Elements */
+
+	let $row = $('<div class="l-row">');
+	let $form = $('<div class="l-column">');
+	let tmplField = new Textarea(false, 'Template for Each Header', {}, 15);
+	tmplField.$box.val(settings.get(['header_template']));
+	let styleField = new Textarea(false, 'Styling for All Headers', {}, 15);
+	styleField.$box.val(settings.get(['header_style']));
+	let outputField = new Field();
+	outputField.$box.attr('readonly','readonly');
+	let $button = new Button('Generate Template', {title:'Generates text and copies to your clipboard.'}).on('click', ()=>{
+		let output = {
+			"header_template": tmplField.$box.val(),
+			"header_style": styleField.$box.val()
+		};
+
+		if( output['header_template'].length < 1 ){
+			alert('Please fill out the "Template for Each Header" field. It is also recommended to fill the "Styling for All Headers" section.');
+			return false;
+		}
+		
+		outputField.$box.val(JSON.stringify(output));
+		
+		outputField.$box.trigger('select');
+		navigator.clipboard.writeText(outputField.$box.val());
+	});
+
+	/* Structure */
+
+	$form.append(
+		new Paragraph('CSS designers can use this to create a template for others to quickly import.'),
+		tmplField.$raw,
+		styleField.$raw,
+		$row
+	);
+	$row.append(
+		$button,
+		outputField.$raw
+	);
+	popupUI.$window.append($form);
+
+	popupUI.open();
+}
+
+function buildResults( css, tags, notes, headers, items, errors, warnings ){
+	if( !UI.isOpen ){
+		return;
+	}
+
 	let popupUI = new SubsidiaryUI(UI, 'Job\'s Done!');
 	popupUI.nav.$right.append(
 		new Button('Exit')
@@ -2875,20 +3215,36 @@ function buildResults( css, tags, notes, items, errors, warnings ){
 
 	let $info = $('<div class="l-column">');
 
-	let helpText = `Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors.`;
-	let resultText = 'Tool completed with no issues.';
-	let errorPercent = errors / items * 100;
+	const errorPercent = errors / items * 100;
+	const errorText = `\n\nOut of ${this.iteration} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors.`;
+	let scraperText = '';
 	if( errors < 1 && warnings > 0 ){
-		resultText = `Tool completed with ${warnings} warning(s).\n\nIt is likely that all updates were successful. However, if you notice missing images, try running the tool again.`;
+		scraperText = `Scraping jobs encountered ${warnings} warning(s).\n\nIt is likely that all updates were successful. However, if you notice missing images, try running the tool again.`;
 	}
 	else if( errors > 0 && warnings < 1 ){
-		resultText = `Tool completed with ${errors} error(s).\n\nOut of ${items} processsed items, that represents a ${errorPercent}% error rate. ${helpText}`;
+		scraperText = `Scraping jobs encountered ${errors} error(s).${errorText}`;
 	}
 	else if( errors > 0 && warnings > 0 ){
-		resultText = `Tool completed with ${errors} error(s) and ${warnings} warning(s).\n\nOut of ${this.iteration} processsed items, that represents a ${errorPercent}% error rate. ${helpText}`;
+		scraperText = `Scraping jobs encountered ${errors} error(s) and ${warnings} warning(s).${errorText}`;
 	}
-	$info.append(new Paragraph(resultText));
 
+	let tasks = [];
+	if( headers ){
+		tasks.push('Category headers updated.');
+	}
+	if( css ){
+		tasks.push('CSS generated.');
+	}
+	if( tags ){
+		tasks.push('Tags updated.');
+	}
+	if( notes ){
+		tasks.push('Notes updated.');
+	}
+	$info.append(new Bullets(tasks));
+	if( scraperText && (css || tags || notes) ){
+		$info.append(scraperText);
+	}
 	if( tags || notes ){
 		$info.append(new Paragraph('Changes to tags or notes require a page refresh to display.'));
 	}
@@ -2921,12 +3277,10 @@ function buildResults( css, tags, notes, items, errors, warnings ){
 if( List.isOwner ){
 	let $button = $('<a href="javascript:void(0);">Tools</a>')
 	.on('click',()=>{
-		if( UI && UI.alive ){
-			UI.open();
-		}
-		else {
+		if( !UI || !UI.isAlive ){
 			initialise();
 		}
+		UI.open();
 	});
 
 	if( List.isModern ){
@@ -2947,4 +3301,35 @@ if( List.isOwner ){
 			left: 15px;
 		}
 	`));
+
+	automation();
+}
+
+/* Handle UI-less automatic runs of the tool. */
+function automation( ){
+	initialise();
+
+	const doHeaders = settings.get(['update_headers']) && settings.get(['auto_headers']);
+
+	if( !doHeaders || !List.isModern ){
+		return;
+	}
+
+	const msBetweenRuns = 60 * 1000;
+
+	const timeSinceLastRun = Date.now() - store.get('last_auto_headers', 0);
+
+	if( timeSinceLastRun < msBetweenRuns ){
+		const timeUntilNextRun = round((msBetweenRuns - timeSinceLastRun) / 1000);
+		Log.generic(`Skipped automatic category headers update as the last run happened not long ago. Please start the tool manually or wait until the delay has reset in ${timeUntilNextRun} seconds.`);
+		return;
+	}
+	if( List.isPreview ) {
+		Log.generic('Skipped automatic category headers update as the tool does not run on preview windows for safety of your CSS.');
+		return;
+	}
+	
+	worker = new Worker();
+	worker.start(false, false, false, doHeaders);
+	Log.generic('Performed automatic category header update.');
 }

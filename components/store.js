@@ -45,6 +45,9 @@ class CustomStorage {
 		else if( valType === 'boolean' ){
 			value = Boolean(value);
 		}
+		else if( valType === 'number' ){
+			value = Number(value);
+		}
 		return value === undefined ? fallback : value;
 	}
 
