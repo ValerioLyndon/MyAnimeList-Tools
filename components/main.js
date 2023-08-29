@@ -1,9 +1,4 @@
-/* Standalone Re-usable Functions and Classes */
-
-function warnUserBeforeLeaving( e ){
-	e.preventDefault();
-	return (e.returnValue = "");
-}
+/* Standalone Re-usable Functions and Classes */ 
 
 function isDict( unknown ){
 	return (unknown instanceof Object && !(unknown instanceof Array)) ? true : false;
@@ -635,29 +630,22 @@ async function updateCss( css ){
 
 /* wrapper for common fetch requests to remove some boilerplate */
 async function request( url, result = 'html' ){
-	let pageText = await fetch(url)
-	.then(response => {
-		if( !response.ok ){
-			throw new Error();
-		}
-		return response.text();
-	})
-	.then(text => {
-		return text;
-	})
-	.catch(() => {
-		return false;
-	});
-
-	if( !pageText ){
+	const response = await fetch(url);
+	if( !response || !response.ok ){
 		return false;
 	}
+	if( result === 'json' ){
+		return response.json();
+	}
+	const text = response.text();
+
 	if( result === 'html' ){
-		return createDOM(pageText);
+		return createDOM(text);
 	}
 	if( result === 'string' ){
-		return pageText;
+		return text;
 	}
+	return false;
 }
 
 function createDOM( string ){
@@ -699,6 +687,35 @@ function encodeForCss( str ){
 /* Parse any and all numbers from a string into an int */
 function getInt( str ){
 	return typeof str === 'string' ? parseInt(str.replaceAll(/\D*/g, '')) : 0;
+}
+
+async function checkUpdates( ){
+	const msBetweenRuns = 24 * 60 * 60 * 1000;
+	store.set('checked_updates', Date.now());
+	const currentBase = ver.split('_')[0];
+	const currentlyUserscript = ver.split('_')[1].startsWith('a');
+	const json = await request('https://api.github.com/repos/ValerioLyndon/MyAnimeList-Tools/releases', 'json');
+	for( const release of json ){
+		const version = release['tag_name'].replace('v', '').split('_');
+		const baseVersion = Number(version[0]);
+		const installVersion = version.length > 0 ? version[1] : false;
+		if( baseVersion < currentBase ){
+			return false;
+		}
+
+		if( installVersion ){
+			const installNum = Number(installVersion.substring(1));
+			const installIsUserscript = installVersion.startsWith('a');
+			console.log(installNum, installIsUserscript, currentlyUserscript);
+			if (installIsUserscript === currentlyUserscript && installNum > 1) {
+				return release;
+			}
+		}
+		else {
+			return release;
+		}
+	}
+	return false;
 }
 
 
@@ -920,7 +937,6 @@ class Worker {
 		this.doHeaders = doHeaders;
 
 		settings.save();
-		window.addEventListener('beforeunload', warnUserBeforeLeaving);
 		const doScraper = this.doCss || this.doTags || this.doNotes;
 		
 		/* UI */
@@ -1113,7 +1129,6 @@ class Worker {
 
 	#finish( ){
 		UIState.isWorking = false;
-		window.removeEventListener('beforeunload', warnUserBeforeLeaving);
 
 		const results = ()=>{
 			buildResults( this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
@@ -1677,6 +1692,13 @@ function buildMainUI( ){
 		$switchBtn,
 		$clearBtn
 	);
+
+	checkUpdates()
+	.then(update=>{
+		if( update ){
+			footer.$left.children().eq(0).append($(`<br/><a href="${update['html_url']}">Update available: ${update['tag_name']}</a>`));
+		}
+	});
 
 	/* Add all rows to UI */
 	UI.$window.append(controls.$main, new Hr(), $components, new Hr(), footer.$main);

@@ -17,7 +17,8 @@
 
 /*<<<credit>>>*/
 
-const ver = '/*$$$ver_core$$$*/_a/*$$$ver_user$$$*/';
+//const ver = '/*$$$ver_core$$$*/_a/*$$$ver_user$$$*/';
+const ver = '10.0_a0';
 const verMod = '/*$$$ver_date$$$*/';
 
 /*<<<store>>>*/
