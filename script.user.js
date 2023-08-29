@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre29_a0
+// @version      11.0-pre30_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,8 +24,8 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre29_a0';
-const verMod = '2023/Aug/28';
+const ver = '11.0-pre30_a0';
+const verMod = '2023/Aug/29';
 
 class CustomStorage {
 	constructor( type = 'localStorage' ){
@@ -1534,6 +1534,7 @@ class UserSettings {
 			"duration": false,
 			"total_duration": false
 		},
+		"clear_notes": false,
 
 		/* headers */
 		"update_headers": false,
@@ -2639,6 +2640,10 @@ class Worker {
 			}
 
 			if( this.doNotes ){
+				let rawNotes = meta['editable_notes'];
+				const startTxt = '[size=1][color=transparent]MYANIMELIST-TOOLS START[/color][/size]';
+				const endTxt = '[size=1][color=transparent]MYANIMELIST-TOOLS END[/color][/size]';
+				const normalisedNotes = rawNotes.replaceAll(/\[size=1\]\[color=transparent\]MYANIMELIST-TOOLS START\[\/color\]\[\/size\](.|\n)*?\[size=1\]\[color=transparent\]MYANIMELIST-TOOLS END\[\/color\]\[\/size\]/g,'').trimEnd();
 				let notes = [];
 
 				if(strings['title_en'] && settings.get(['checked_notes','english_title'])) { notes.push('English Title: '+strings['title_en']); }
@@ -2666,9 +2671,16 @@ class Worker {
 				if(strings['duration_total'] && settings.get(['checked_notes','total_duration'])) { notes.push('Duration: '+strings['duration_total']); }
 				if(strings['synopsis'] && settings.get(['checked_notes','synopsis'])) { notes.push(strings['synopsis']); }
 
+				let notesString = settings.get(['clear_notes']) ? '' : normalisedNotes;
+				if( notes.length > 0 ){
+					notesString += '\n\n' + startTxt;
+					notesString += notes.join('\n\n');
+					notesString += endTxt;
+				}
+
 				let notesRequestUrl = '';
 				let notesRequestDict = {
-					"comments": notes.join("\n\n"),
+					"comments": notesString,
 					"status": meta['status'],
 					"csrf_token": List.csrf
 				};
@@ -2768,7 +2780,7 @@ function buildMainUI( ){
 	let notes = new OptionalGroupRow('Notes Updater', ['update_notes'], ()=>{ buildNoteSettings(); });
 	notes.check.$box.on('click', ()=>{
 		if( notes.check.$box.is(':checked') && store.get('checkpoint_notes') !== true ){
-			alert('Before you continue!! This alert only shows once.\n\nThe Notes Updater will entirely WIPE your notes. If you have any you don\'t want to lose, please back them up first!');
+			alert('Before you continue!! This alert only shows once.\n\nThe Notes Updater is capable of entirely WIPING your notes. If you have any you don\'t want to lose, please back them up first!');
 			store.set('checkpoint_notes', true);
 		}
 	});
@@ -3112,8 +3124,9 @@ function buildNoteSettings( ){
 	
 	let $options = $('<div class="l-column o-justify-start">');
 	$options.append(
-		new Paragraph('Enabled options will be added to your notes/comments. THIS ACTION WILL WIPE YOUR NOTES. Please <a href="https://myanimelist.net/panel.php?go=export" target="_blank">export</a> a copy of your list first if you have any notes you wish to keep.'),
-		new CheckGrid(checks).$main
+		new Paragraph('Enabled options will be added to your notes/comments. Please <a href="https://myanimelist.net/panel.php?go=export" target="_blank">export</a> a copy of your list first if you have any notes you wish to keep as this action can be highly destructive.'),
+		new CheckGrid(checks).$main,
+		new Check(['clear_notes'], "Overwrite Current Notes", "Overwrite all of your current notes with the new ones. If all other tag options are unchecked, this will completely remove all notes.\n\nDO NOT use this if you have any notes you want to keep.").$main
 	);
 	popupUI.$window.append($options);
 
