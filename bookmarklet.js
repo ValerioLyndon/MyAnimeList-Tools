@@ -7,7 +7,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre30+f1_b0';
+const ver = '11.0-pre30+f2_b0';
 const verMod = '2023/Aug/30';
 
 class CustomStorage {
@@ -81,6 +81,15 @@ class CustomStorage {
 }
 
 var store = new CustomStorage('localStorage');
+
+/* Some re-usable functions use in UI building blocks */
+
+function addAttrs( $ele, attrs = {} ){
+	for( let [name, value] of Object.entries(attrs) ){
+		$ele.attr(name, value);
+	}
+	return $ele;
+}
 
 /* Core class for handling popup windows and overlays, extended by Primary and Subsidiary variants
 no requirements */
@@ -350,21 +359,28 @@ class UserInterface {
 }
 .c-radio__row {
 	display: flex;
-	border-radius: 6px;
-	overflow: hidden;
 }
 .c-radio__station {
-	padding: 3px 6px;
+	padding: 1px 4px;
 	background: var(--group-bg);
+	border: 2px solid transparent;
 	cursor: pointer;
 	font-weight: normal;
+	transition: all 0.08s ease;
+}
+.c-radio__station:first-of-type {
+	border-radius: 6px 0 0 6px;
+}
+.c-radio__station:last-of-type {
+	border-radius: 0 6px 6px 0;
 }
 .c-radio__station ~ .c-radio__station {
 	margin-left: 2px;
 }
+.c-radio__station:hover,
 :checked + .c-radio__station {
 	background: var(--btn-bg);
-	filter: invert(1);
+	border-color: var(--btn-brdr);
 }
 
 .c-component {
@@ -472,10 +488,14 @@ class UserInterface {
 	transform: translateX(0px);
 }
 
-/* UIStates */
+/* Actions */
 
 .is-interactable {
 	cursor: pointer;
+}
+
+.is-loading {
+	cursor: progress;
 }
 
 /* Overrides */
@@ -847,6 +867,37 @@ class Check {
 	}
 }
 
+class Radio {
+	constructor( settingArray, title = '', options = {} ){
+		this.$main = $(`<div class="c-radio">${title}</div>`);
+		let $options = $('<div class="c-radio__row">');
+		let value = settings.get(settingArray);
+		let htmlId = settingArray.join('');
+
+		for( let [newValue, meta] of Object.entries(options) ){
+			let $input = $(`<input type="radio" name="${htmlId}" id="${htmlId+newValue}" />`);
+			$input.on('input', ()=>{ settings.set(settingArray, newValue); });
+			let $station = $(`<label class="c-radio__station" for="${htmlId+newValue}">${meta['name']}</label>`);
+
+			if( value === newValue ){
+				$input.prop('checked', true);
+				if( 'func' in meta ){
+					meta['func']();
+				}
+			}
+			if( 'desc' in meta ){
+				$station.attr('title', meta['desc']);
+			}
+			if( 'func' in meta ){
+				$input.on('click', ()=>{ meta['func'](); });
+			}
+
+			$options.append($input, $station);
+		}
+		this.$main.append($options);
+	}
+}
+
 class Field {
 	constructor( settingArray = false, title = '', desc = false, style = 'block' ){
 		this.$main = $('<div class="c-option">');
@@ -883,9 +934,7 @@ class Textarea {
 			});
 			this.$box.val(settings.get(settingArray));
 		}
-		for( let [name,value] of Object.entries(attributes) ){
-			this.$box.attr(name,value);
-		}
+		addAttrs(this.$box, attributes);
 		
 		this.$raw.append(this.$box);
 		this.$main.append(this.$raw);
@@ -905,9 +954,7 @@ class Header {
 class Button {
 	constructor( value, attributes = {} ){
 		let $main = $(`<input class="c-button" type="button" value="${value}">`);
-		for( let [name,value] of Object.entries(attributes) ){
-			$main.attr(name,value);
-		}
+		addAttrs($main, attributes);
 		return $main;
 	}
 }
@@ -1143,14 +1190,32 @@ class NodeDimensions {
 	static $dummy = $('<div style="position: fixed; left: -9999px; display: none; width: 480px;">');
 	static height( node ){
 		node = node instanceof $ ? node[0] : node;
-		if( node.parentElement ){
+		/* return height immediately where possible */
+		const container = node.getRootNode() instanceof ShadowRoot ? node.getRootNode().host : node;
+		if( document.body.contains(container) ){
+			console.log('easily got height')
 			return node.scrollHeight;
 		}
+		/* move node into DOM so that height can be checked */
+		let parent = node.parentElement;
+		let previous = node.previousElementSibling;
+		let next = node.nextElementSibling;
 		UI.$window.append(this.$dummy);
 		this.$dummy.css('display', 'block');
 		this.$dummy.append(node);
 		let height = node.scrollHeight;
 		this.$dummy.css('display', 'none');
+		/* return node to previous position */
+		if( previous ){
+			previous.insertAdjacentElement('afterend', node); 
+		}
+		else if( next ){
+			next.insertAdjacentElement('beforebegin', node); 
+		}
+		else if( parent ){
+			parent.append(node);
+		}
+		console.log('had to fuck height')
 		return height;
 	}
 }
@@ -1444,6 +1509,11 @@ class UserSettings {
 			"6": false
 		},
 		"delay": "3000",
+
+		/* file hosts */
+		"uploader": "none",
+		"automatic_upload": true,
+		"automatic_import": true,
 
 		/* css */
 		"update_css": true,
@@ -1816,20 +1886,22 @@ function decodeBase64Url( base64Url ){
 
 /* File Upload Integrations */
 
-class DropboxHandler {
-	codeVerifier;
-	codeChallenge;
-	token;
-	clientId = 'odribfnp0304xy2';
+var Dropbox = new class {
+	#codeVerifier;
+	#codeChallenge;
+	#token;
+	#clientId = 'odribfnp0304xy2';
+	authenticated = false;
 
 	constructor( ){
 		if( store.has('auth_dropbox') ){
-			this.token = store.get('auth_dropbox');
+			this.#token = store.get('auth_dropbox');
+			this.confirmAuthentication();
 
-			let request = new XMLHttpRequest();
-			request.open("POST", proxy+'https://api.dropboxapi.com/2/users/get_current_account');
-			request.setRequestHeader('Authorization', `Bearer ${this.token}`);
-			request.send();
+			//let request = new XMLHttpRequest();
+			//request.open("POST", proxy+'https://api.dropboxapi.com/2/users/get_current_account');
+			//request.setRequestHeader('Authorization', `Bearer ${this.token}`);
+			//request.send();
 			// fetch(proxy+'https://api.dropboxapi.com/2/users/get_current_account', {
 			// 	headers: new Headers({Authorization: `Bearer ${this.token}`})
 			// })
@@ -1837,11 +1909,13 @@ class DropboxHandler {
 			// 	console.log(response);
 			// });
 		}
+		else {
+			this.createChallenge();
+		}
 
-		/* create verifier and challenge codes */
-		this.createChallenge();
 	}
 
+	/* create verifier and challenge codes */
 	async createChallenge( ){
 		let verifier = '';
 		const verifierChars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-._~';
@@ -1852,20 +1926,18 @@ class DropboxHandler {
 		console.log(verifier);
 		verifier = encodeBase64Url(verifier);
 		/* debug */
-		this.codeVerifier = verifier;
-		this.codeChallenge = encodeBase64Url(await encodeSha256(verifier));
+		this.#codeVerifier = verifier;
+		this.#codeChallenge = encodeBase64Url(await encodeSha256(verifier));
 	}
 	
 	/* step 1 */
 	getCode( ){
-		window.open(`https://www.dropbox.com/oauth2/authorize?client_id=${this.clientId}&response_type=code&code_challenge=${this.codeVerifier}&code_challenge_method=plain`, '_blank');
+		window.open(`https://www.dropbox.com/oauth2/authorize?client_id=${this.#clientId}&response_type=code&code_challenge=${this.#codeVerifier}&code_challenge_method=plain`, '_blank');
 	}
 	
 	/* step 2 */
 	async exchangeCode( code ){
-		console.log('code', code);
-		
-		let token = await fetch(proxy+'https://api.dropboxapi.com/oauth2/token', {
+		let response = await fetch(proxy+'https://api.dropboxapi.com/oauth2/token', {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/x-www-form-urlencoded'
@@ -1873,23 +1945,47 @@ class DropboxHandler {
 			body: new URLSearchParams({
 				'code': code,
 				'grant_type': 'authorization_code',
-				'code_verifier': this.codeVerifier,
-				'client_id': this.clientId
+				'code_verifier': this.#codeVerifier,
+				'client_id': this.#clientId
 			})
-		})
-		.then((response)=>{
-			if( !response.ok ){
-				throw new Error(`${response.status} ${response.statusText}`);
-			}
-			return response.text();
-		})
-		.catch((err)=>{
-			alert(`Failed to validate token: ${err}`);
 		});
-		return token;
+		if( !response.ok ){
+			alert(`Failed to exchange token: response not ok: ${response.status} ${response.statusText}`);
+			return false;
+		}
+		let json = await response.json();
+		if( !json ){
+			alert(`Failed to exchange token: json is ${json}`);
+			return false;
+		}
+
+		let token = json['access_token'];
+		if( token ){
+			alert('Failed to exchange token: dictionary key does not exist.\n\nReport this problem to the developer.');
+			return false;
+		}
+		this.#token = token;
+		this.authenticated = true;
+		store.set('auth_dropbox', token);
+		return true;
+	}
+
+	/* TODO: make this a real function */
+	async confirmAuthentication( ){
+		/* send request to dropbox to confirm good */
+		if( false ){
+			this.authenticated = false;
+			return false;
+		}
+		if( this.#token ){
+			/* TODO: refresh token */
+		}
+		if( true ){
+			this.authenticated = true;
+			return true;
+		}
 	}
 }
-var Dropbox = new DropboxHandler();
 
 
 
@@ -2944,38 +3040,48 @@ function buildGlobalSettings( ){
 	let delay = new Field(['delay'], 'Delay between items:', 'Delay (ms) between requests to avoid spamming the server.', 'inline');
 	delay.$box.css('width', '50px');
 
-	let code = new Field(false, '');
-	/* TODO: add Field placehodler {'placeholder':'Paste your Dropbox code here to allow access.'} */
-	if( store.has('auth_dropbox') ){
-		code.$box.val(store.get('auth_dropbox'));
+	/* uploaders */
+
+	let upload = new Check(['automatic_upload'], 'Upload automatically.');
+	let update = new Check(['automatic_import'], 'Add an @import to your CSS automatically.');
+	let drawerGeneric = new Drawer([upload.$main, update.$main]);
+
+	/* MyAnimeList */
+
+	let drawerMal = new Drawer();
+
+	/* Dropbox */
+
+	let $authBlurb = new Paragraph('You are not currently authenticated. To link your account, click "Authenticate" below.');
+	let $authBtn = new Button('Authenticate').on('click', ()=>{ buildDropboxAuth(popupUI, authenticated); });
+	function authenticated( ){
+		$authBlurb.text('✔ You are logged in and ready to go!');
+		$authBtn.css('display', 'none');
+	}
+	if( Dropbox.authenticated ){
+		authenticated();
 	}
 
-	let upload = new Check(false, 'Enable uploading to your file host.');
-	if( store.has('auto_dropbox') ){
-		upload.$box.prop('checked', (Boolean(store.get('auto_dropbox'))));
+	let drawerDropbox = new Drawer([
+		new Hr(),
+		$authBlurb,
+		$authBtn,
+		upload.$main,
+		update.$main
+	]);
+
+	/* Catbox */
+
+	let drawerCatbox = new Drawer();
+
+	/* the rest */
+
+	const drawers = [drawerGeneric, drawerMal, drawerDropbox, drawerCatbox];
+	function closeDrawers( ){
+		drawers.forEach(drawer=>drawer.close());
 	}
-	upload.$box.on('input', (ev)=>{
-		if( ev.target.checked ){
-			store.set('auto_dropbox', 'true');
-		}
-		else {
-			store.set('auto_dropbox', 'false');
-		}
-	});
-	let update = new Check(false, 'Enable updating your Custom CSS.', 'TODO, does nothing right now');
-	if( store.has('auto_import') ){
-		update.$box.prop('checked', (Boolean(store.get('auto_import'))));
-	}
-	update.$box.on('input', (ev)=>{
-		if( ev.target.checked ){
-			store.set('auto_import', 'true');
-		}
-		else {
-			store.set('auto_import', 'false');
-		}
-	});
-	let urlField = new Field(false, '');
-	/* TODO: add Field placehodler "The URL for your CSS will be placed here."" */
+	let $drawers = $('<div style="width:100%;">');
+	$drawers.append(drawerMal.$main, drawerDropbox.$main, drawerCatbox.$main, drawerGeneric.$main);
 
 	let $options = $('<div class="l-column o-justify-start">');
 	$options.append(
@@ -2987,33 +3093,88 @@ function buildGlobalSettings( ){
 			new Check(['checked_categories', '4'], "Dropped"),
 			new Check(['checked_categories', '6'], "Planned")
 		]).$main,
-		new Hr(),
-		new Paragraph(`To link your Dropbox account, click the button below to grant the app access. It will only ask for access to it's own folder, not your entire account. Once granted, it will give you a code.`),
-		new Button('Get code from Dropbox')
-		.on('click', ()=>{ Dropbox.getCode(); }),
-		new Paragraph('Take the code from Dropbox and enter it in this text box.'),
-		code.$raw,
-		new Paragraph('With the code entered, press this button to exchange it for a proper token. Once the field has changed, you should be good to go.'),
-		new Button('Authenticate token')
-		.on('click', ()=>{
-			Dropbox.exchangeCode(code.$box.val())
-			.then((json)=>{
-				let token = json['access_token'];
-				if( !token ){
-					console.log(json, token);
-					alert('Exchange failed.');
-					return;
+		new Radio(['uploader'], 'Automatically upload and manage your code?', {
+			'none': {
+				'name': 'No',
+				'desc': 'Manually copy and paste code that the tool generates.',
+				'func': ()=>{
+					closeDrawers();
 				}
-				code.$box.val(token);
-				store.set('auth_dropbox', token);
-			});
-		}),
-		upload.$main,
-		update.$main,
-		urlField.$raw
+			},
+			'myanimelist': {
+				'name': 'MyAnimeList',
+				'desc': 'Will attempt to upload directly to MAL\s Custom CSS box on your list. However, if you go over their limit of 65,535 characters, the tool will cancel and alert you.',
+				'func': ()=>{
+					closeDrawers();
+					drawerMal.open();
+				}
+			},
+			'dropbox': {
+				'name': 'Dropbox',
+				'desc': 'Upload to Dropbox.com and add a single import line to your MAL Custom CSS. Requires a Dropbox account.',
+				'func': ()=>{
+					closeDrawers();
+					drawerDropbox.open();
+					drawerGeneric.open();
+				}
+			},
+			'catbox': {
+				'name': 'Catbox',
+				'desc': 'Upload to Catbox.moe and add a single import line to your MAL Custom CSS. Requires a Catbox account.',
+				'func': ()=>{
+					closeDrawers();
+					drawerCatbox.open();
+					drawerGeneric.open();
+				}
+			}
+		}).$main,
+		$drawers
 	);
 
+	popupUI.$window.append($options);
+	popupUI.open();
+}
 
+function buildDropboxAuth( ui = UI, callback = ()=>{} ){
+	let popupUI = new SubsidiaryUI(ui, 'Dropbox Authentication Guide');
+	let $options = $('<div class="l-column">');
+
+	let code = new Field();
+	code.$box.attr('placeholder', 'Paste your Dropbox code here to allow access.');
+	let working = false;
+	
+	$options.append(
+		new Paragraph(`To link your Dropbox account, click the button below to grant the app access. Once granted, it will give you a code.`),
+		new Button('Get code from Dropbox')
+		.on('click', ()=>{ Dropbox.getCode(); }),
+		new Paragraph('Enter the provided code into this text box.'),
+		code.$raw,
+		new Paragraph('With the code entered, press this button to exchange it for a proper token. If successful, you will be sent back to the previous menu.'),
+		new Button('Authenticate token')
+		.on('click', async ev=>{
+			if( working ){
+				return;
+			}
+			working = true;
+			
+			let $btn = $(ev.target);
+			$btn.attr('disabled', 'disabled');
+			$btn.val('Authenticating...');
+			$btn.addClass('is-loading');
+
+			let success = await Dropbox.exchangeCode(code.$box.val());
+			$btn.removeAttr('disabled');
+			$btn.val('Authenticate token');
+			$btn.removeClass('is-loading');
+			working = false;
+			if( !success ){
+				return;
+			}
+
+			popupUI.close();
+			callback();
+		})
+	);
 
 	popupUI.$window.append($options);
 	popupUI.open();
@@ -3473,6 +3634,13 @@ function buildResults( css, tags, notes, headers, items, errors, warnings ){
 			output.$raw
 		);
 	}
+	/*
+	TODO: display CSS here if auto-managing and uploading is enabled and it was successful
+	
+	let urlField = new Field();
+	urlField.$box.attr('placeholder', 'The URL for your CSS will be placed here.');
+
+	*/
 
 	popupUI.$window.append($info);
 

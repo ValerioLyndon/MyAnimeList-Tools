@@ -1,3 +1,12 @@
+/* Some re-usable functions use in UI building blocks */
+
+function addAttrs( $ele, attrs = {} ){
+	for( let [name, value] of Object.entries(attrs) ){
+		$ele.attr(name, value);
+	}
+	return $ele;
+}
+
 /* Core class for handling popup windows and overlays, extended by Primary and Subsidiary variants
 no requirements */
 class UserInterface {
@@ -313,6 +322,37 @@ class Check {
 	}
 }
 
+class Radio {
+	constructor( settingArray, title = '', options = {} ){
+		this.$main = $(`<div class="c-radio">${title}</div>`);
+		let $options = $('<div class="c-radio__row">');
+		let value = settings.get(settingArray);
+		let htmlId = settingArray.join('');
+
+		for( let [newValue, meta] of Object.entries(options) ){
+			let $input = $(`<input type="radio" name="${htmlId}" id="${htmlId+newValue}" />`);
+			$input.on('input', ()=>{ settings.set(settingArray, newValue); });
+			let $station = $(`<label class="c-radio__station" for="${htmlId+newValue}">${meta['name']}</label>`);
+
+			if( value === newValue ){
+				$input.prop('checked', true);
+				if( 'func' in meta ){
+					meta['func']();
+				}
+			}
+			if( 'desc' in meta ){
+				$station.attr('title', meta['desc']);
+			}
+			if( 'func' in meta ){
+				$input.on('click', ()=>{ meta['func'](); });
+			}
+
+			$options.append($input, $station);
+		}
+		this.$main.append($options);
+	}
+}
+
 class Field {
 	constructor( settingArray = false, title = '', desc = false, style = 'block' ){
 		this.$main = $('<div class="c-option">');
@@ -349,9 +389,7 @@ class Textarea {
 			});
 			this.$box.val(settings.get(settingArray));
 		}
-		for( let [name,value] of Object.entries(attributes) ){
-			this.$box.attr(name,value);
-		}
+		addAttrs(this.$box, attributes);
 		
 		this.$raw.append(this.$box);
 		this.$main.append(this.$raw);
@@ -371,9 +409,7 @@ class Header {
 class Button {
 	constructor( value, attributes = {} ){
 		let $main = $(`<input class="c-button" type="button" value="${value}">`);
-		for( let [name,value] of Object.entries(attributes) ){
-			$main.attr(name,value);
-		}
+		addAttrs($main, attributes);
 		return $main;
 	}
 }
