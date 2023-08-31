@@ -239,7 +239,7 @@ class Hr {
 
 class Paragraph {
 	constructor( text ){
-		return $('<p class="c-paragraph">'+text.split('\n\n').join('</p><p class="c-paragraph">')+'</p>');
+		return $('<p class="c-paragraph">'+text.split('\n\n').join('</p><p class="c-paragraph">')+'</p>'.replaceAll('\n','<br/>'));
 	}
 }
 

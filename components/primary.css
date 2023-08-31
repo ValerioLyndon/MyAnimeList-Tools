@@ -58,7 +58,7 @@
 	display: grid;
 	grid-auto-flow: row;
 	gap: 10px;
-	place-items: start stretch;
+	place-content: start stretch;
 }
 
 .l-row {

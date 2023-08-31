@@ -1,5 +1,3 @@
-const proxy = 'https://cors-anywhere-rp3l.onrender.com/';
-
 /* Standalone Re-usable Functions and Classes */ 
 
 function isDict( unknown ){
@@ -21,7 +19,6 @@ class NodeDimensions {
 		/* return height immediately where possible */
 		const container = node.getRootNode() instanceof ShadowRoot ? node.getRootNode().host : node;
 		if( document.body.contains(container) ){
-			console.log('easily got height')
 			return node.scrollHeight;
 		}
 		/* move node into DOM so that height can be checked */
@@ -43,7 +40,6 @@ class NodeDimensions {
 		else if( parent ){
 			parent.append(node);
 		}
-		console.log('had to fuck height')
 		return height;
 	}
 }
@@ -661,9 +657,9 @@ async function request( url, result = 'html' ){
 		return false;
 	}
 	if( result === 'json' ){
-		return response.json();
+		return await response.json();
 	}
-	const text = response.text();
+	const text = await response.text();
 
 	if( result === 'html' ){
 		return createDOM(text);
@@ -713,6 +709,77 @@ function decodeBase64Url( base64Url ){
 
 
 /* File Upload Integrations */
+
+const proxy = 'https://cors-anywhere-rp3l.onrender.com/';
+
+var Catbox = new class {
+	/* API reference at https://catbox.moe/tools.php */
+	#url = proxy+'https://catbox.moe/user/api.php';
+	#userhash;
+	authenticated = false;
+	
+	constructor( ){
+		if( store.has('auth_catbox') ){
+			this.#userhash = store.get('auth_catbox');
+			this.authenticated = true;
+		}
+	}
+
+	async #post( reqtype, args ){
+		const data = new FormData();
+		data.append('reqtype', reqtype);
+		data.append('userhash', this.#userhash);
+		args.forEach(( [key, value, filename] )=>{
+			if( filename ){
+				data.append(key, value, filename);
+			}
+			else {
+				data.append(key, value);
+			}
+		});
+
+		try {
+			const response = await fetch(this.#url, { method: 'POST', body: data });
+			return await response.text();
+		}
+		catch( error ){
+			return error;
+		}
+	}
+
+	async upload( text ){
+		try {
+			const result = await this.#post('fileupload', [['fileToUpload', new Blob([text], { 'type': 'text/css' }), 'filename.css']]);
+			return result.includes('/') ? t.split('/').pop() : result;
+		}
+		catch {
+			return '';
+		}
+	}
+
+	async del( filenames ){
+		try {
+			const result = await this.#post('deletefiles', [['files', filenames]]);
+			return result.includes('success');
+		}
+		catch {
+			return false;
+		}
+	}
+
+	async authenticate( userhash = this.#userhash ){
+		this.#userhash = userhash;
+		/* test auth by uploading file */
+		const upload = await this.upload('validating auth');
+		/* fail out if file did not upload or file was not able to be deleted */
+		if( !upload || !upload.endsWith('.css') || !(await this.del(upload)) ){
+			this.#userhash = undefined;
+			return false;
+		}
+		store.set('auth_catbox', userhash);
+		this.authenticated = true;
+	}
+}
 
 var Dropbox = new class {
 	#codeVerifier;
@@ -1876,31 +1943,54 @@ function buildGlobalSettings( ){
 
 	/* MyAnimeList */
 
-	let drawerMal = new Drawer();
+	let malPercent = round(List.customCss.length / 65535 * 100);
+	let $malBlurb = malPercent >= 100 ?
+		new Paragraph(`Your CSS is over MyAnimeList's max CSS length! As long as output remains over limit, the tool will not update your CSS. To fix this, either:\nA. Switch to one of the other automatic uploaders, or\nB. Use a less detailed CSS Generator preset, or\nC. Manage and import the code yourself to circumvent MAL's limit.`)
+		: new Paragraph(`The MyAnimeList uploader sends items directly to your list style's Custom CSS box. This is convenient, but will run out of space quickly if you use the CSS Generator. If you go over the limit the tool will send you an alert and immediately stop updating your CSS.`)
+		
+	let drawerMal = new Drawer([
+		new Hr(),
+		new Paragraph(`<b>Current usage:</b> ${malPercent}% (${List.customCss.length} / 65535 characters)`),
+		$malBlurb
+	]);
 
 	/* Dropbox */
 
-	let $authBlurb = new Paragraph('You are not currently authenticated. To link your account, click "Authenticate" below.');
-	let $authBtn = new Button('Authenticate').on('click', ()=>{ buildDropboxAuth(popupUI, authenticated); });
-	function authenticated( ){
-		$authBlurb.text('✔ You are logged in and ready to go!');
-		$authBtn.css('display', 'none');
+	let $dropBlurb = new Paragraph('You are not currently authenticated. To link your account, click "Authenticate" below.');
+	let $dropBtn = new Button('Authenticate').on('click', ()=>{ buildDropboxAuth(popupUI, dropAuthenticated); });
+	function dropAuthenticated( ){
+		$dropBlurb.text('✔ You are logged in and ready to go!');
+		$dropBtn.css('display', 'none');
 	}
 	if( Dropbox.authenticated ){
-		authenticated();
+		dropAuthenticated();
 	}
 
 	let drawerDropbox = new Drawer([
 		new Hr(),
-		$authBlurb,
-		$authBtn,
+		$dropBlurb,
+		$dropBtn,
 		upload.$main,
 		update.$main
 	]);
 
 	/* Catbox */
 
-	let drawerCatbox = new Drawer();
+	let $catBlurb = new Paragraph('You are not currently authenticated. To link your account, click "Authenticate" below.');
+	let $catBtn = new Button('Authenticate').on('click', ()=>{ buildCatboxAuth(popupUI, catAuthenticated); });
+	function catAuthenticated( ){
+		$catBlurb.text('✔ You are logged in and ready to go!');
+		$catBtn.val('Modify Auth');
+	}
+	if( Catbox.authenticated ){
+		catAuthenticated();
+	}
+
+	let drawerCatbox = new Drawer([
+		new Hr(),
+		$catBlurb,
+		$catBtn
+	]);
 
 	/* the rest */
 
@@ -1964,7 +2054,7 @@ function buildGlobalSettings( ){
 }
 
 function buildDropboxAuth( ui = UI, callback = ()=>{} ){
-	let popupUI = new SubsidiaryUI(ui, 'Dropbox Authentication Guide');
+	let popupUI = new SubsidiaryUI(ui, 'Dropbox Authentication');
 	let $options = $('<div class="l-column">');
 
 	let code = new Field();
@@ -1978,7 +2068,7 @@ function buildDropboxAuth( ui = UI, callback = ()=>{} ){
 		new Paragraph('Enter the provided code into this text box.'),
 		code.$raw,
 		new Paragraph('With the code entered, press this button to exchange it for a proper token. If successful, you will be sent back to the previous menu.'),
-		new Button('Authenticate token')
+		new Button('Authenticate Token')
 		.on('click', async ev=>{
 			if( working ){
 				return;
@@ -1992,7 +2082,60 @@ function buildDropboxAuth( ui = UI, callback = ()=>{} ){
 
 			let success = await Dropbox.exchangeCode(code.$box.val());
 			$btn.removeAttr('disabled');
-			$btn.val('Authenticate token');
+			$btn.val('Authenticate Token');
+			$btn.removeClass('is-loading');
+			working = false;
+			if( !success ){
+				return;
+			}
+
+			popupUI.close();
+			callback();
+		})
+	);
+
+	popupUI.$window.append($options);
+	popupUI.open();
+}
+
+function buildCatboxAuth( ui, callback ){
+	let popupUI = new SubsidiaryUI(ui, 'Catbox Authentication');
+	let $options = $('<div class="l-column">');
+
+	let working = false;
+	
+	let field = new Field();
+	let auth = store.get('auth_catbox');
+	if( auth ){
+		field.$box.val(auth);
+	}
+
+	$options.append(
+		new Paragraph(`To link Catbox, you will need your userhash from the <a href="https://catbox.moe/user/manage.php" target="_blank">account management page</a>.`),
+		field.$raw,
+		new Paragraph('With the hash entered, press this button to validate that it works. If successful, you will be sent back to the previous menu.'),
+		new Button('Authenticate Hash')
+		.on('click', async ev=>{
+			if( working ){
+				return;
+			}
+			working = true;
+			
+			let $btn = $(ev.target);
+			$btn.attr('disabled', 'disabled');
+			$btn.val('Authenticating...');
+			$btn.addClass('is-loading');
+
+			let hash = field.$box.val();
+			if( hash.length < 1 ){
+				alert('Please input your userhash first.');
+				return;
+			}
+
+			let success = await Catbox.authenticate( hash );
+
+			$btn.removeAttr('disabled');
+			$btn.val('Authenticate Token');
 			$btn.removeClass('is-loading');
 			working = false;
 			if( !success ){
