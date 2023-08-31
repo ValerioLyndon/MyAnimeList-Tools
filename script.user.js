@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre30+f3_a0
+// @version      11.0-pre30+f4_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,8 +24,8 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre30+f3_a0';
-const verMod = '2023/Aug/30';
+const ver = '11.0-pre30+f4_a0';
+const verMod = '2023/Aug/31';
 
 class CustomStorage {
 	constructor( type = 'localStorage' ){
@@ -1311,16 +1311,23 @@ class List {
 	static isModern = ($('#list_surround').length === 0);
 	static isPreview = new URLSearchParams(window.location.search).has('preview');
 	static style = undefined;
-	static customCssEle = this.isModern ? $('#custom-css') : $('head style:first-of-type');
-	static customCss = this.customCssEle.text().trim();
-	static #headerRegex = this.isAnime ?
+	static csrf = $('meta[name="csrf_token"]').attr('content');
+
+	static #cssEle = this.isModern ? $('#custom-css') : $('head style:first-of-type');
+	static css( newCss = false ){
+		if( typeof newCss === 'string' ){
+			this.#cssEle.text(newCss);
+		}
+		return this.#cssEle.text().trim();
+	}
+
+	static cleanCss( ){
+		const cssRegex = /\/\*MYANIMELIST-TOOLS START\*\/(.|\n)*?\/\*MYANIMELIST-TOOLS END\*\//g;
+		const headerRegex = this.isAnime ?
 		   /\/\*LIST-TOOLS HEADERS ANIME START\*\/(.|\n)*?\/\*LIST-TOOLS HEADERS ANIME END\*\//g :
 		   /\/\*LIST-TOOLS HEADERS MANGA START\*\/(.|\n)*?\/\*LIST-TOOLS HEADERS MANGA END\*\//g;
-	static customCssModified = this.customCss
-	       .replaceAll(/\/\*MYANIMELIST-TOOLS START\*\/(.|\n)*?\/\*MYANIMELIST-TOOLS END\*\//g, '')
-		   .replaceAll(this.#headerRegex, '')
-		   .trim();
-	static csrf = $('meta[name="csrf_token"]').attr('content');
+		return this.css().replaceAll(cssRegex, '').replaceAll(headerRegex, '').trim();
+	}
 
 	static async determineStyle( ){
 		if( this.style ){
@@ -1494,7 +1501,7 @@ class List {
 
 			let styleCss = $(userCSSPage).find('textarea[name="cssText"]').text().trim();
 
-			if( styleCss === this.customCss ){
+			if( styleCss === this.css() ){
 				return url.split('id=')[1];
 			}
 		}
@@ -1734,7 +1741,7 @@ async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 			return false;
 		}
 
-		let css = List.customCssModified;
+		let css = List.cleanCss();
 		if( newCss.length > 0 ){
 			css += '\n\n/*MYANIMELIST-TOOLS START*/\n\n' + newCss + '\n\n/*MYANIMELIST-TOOLS END*/';
 		}
@@ -1754,7 +1761,7 @@ async function setHeaderTemplate(newTemplate, newStyle) {
 }
 
 async function updateCss( css ){
-	if( css === List.customCss ){
+	if( css === List.css() ){
 		return true;
 	}
 	if( css.length >= 65535 ){
@@ -1835,8 +1842,7 @@ async function updateCss( css ){
 	}
 
 	/* Temporarily update the page's CSS to make sure no page reload is required */
-	List.customCssEle.text(css);
-	List.customCss = css;
+	List.css(css);
 }
 
 /* wrapper for common fetch requests to remove some boilerplate */
@@ -2303,7 +2309,7 @@ class Worker {
 		}
 		toAppend += `\n\n/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} END*/`;
 
-		let css = List.customCssModified + toAppend;
+		let css = List.cleanCss() + toAppend;
 		updateCss(css);
 		store.set('last_auto_headers', Date.now());
 	}
@@ -3132,14 +3138,14 @@ function buildGlobalSettings( ){
 
 	/* MyAnimeList */
 
-	let malPercent = round(List.customCss.length / 65535 * 100);
+	let malPercent = round(List.css().length / 65535 * 100);
 	let $malBlurb = malPercent >= 100 ?
 		new Paragraph(`Your CSS is over MyAnimeList's max CSS length! As long as output remains over limit, the tool will not update your CSS. To fix this, either:\nA. Switch to one of the other automatic uploaders, or\nB. Use a less detailed CSS Generator preset, or\nC. Manage and import the code yourself to circumvent MAL's limit.`)
 		: new Paragraph(`The MyAnimeList uploader sends items directly to your list style's Custom CSS box. This is convenient, but will run out of space quickly if you use the CSS Generator. If you go over the limit the tool will send you an alert and immediately stop updating your CSS.`)
 		
 	let drawerMal = new Drawer([
 		new Hr(),
-		new Paragraph(`<b>Current usage:</b> ${malPercent}% (${List.customCss.length} / 65535 characters)`),
+		new Paragraph(`<b>Current usage:</b> ${malPercent}% (${List.css().length} / 65535 characters)`),
 		$malBlurb
 	]);
 
