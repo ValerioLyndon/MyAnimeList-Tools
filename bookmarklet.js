@@ -7,7 +7,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre30+f4_b0';
+const ver = '11.0-pre30+f5_b0';
 const verMod = '2023/Aug/31';
 
 class CustomStorage {
@@ -1514,12 +1514,11 @@ class UserSettings {
 		"delay": "3000",
 
 		/* file hosts */
-		"uploader": "none",
-		"automatic_upload": true,
+		"uploader": "myanimelist",
 		"automatic_import": true,
 
 		/* css */
-		"update_css": true,
+		"update_css": false,
 		"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
 		"match_template": "/[TYPE]/[ID]/",
 		"check_existing": false,
@@ -1677,6 +1676,7 @@ class UserSettings {
 		if( UI ){
 			UI.exit();
 			initialise();
+			UI.open();
 		}
 		else {
 			alert('Please exit and restart the tool to complete the clearing of your settings.');
@@ -1962,14 +1962,14 @@ var Catbox = new class {
 var Dropbox = new class {
 	#codeVerifier;
 	#codeChallenge;
-	#token;
+	#auth;
 	#clientId = 'odribfnp0304xy2';
 	authenticated = false;
 
 	constructor( ){
 		if( store.has('auth_dropbox') ){
-			this.#token = store.get('auth_dropbox');
-			this.confirmAuthentication();
+			this.#auth = store.get('auth_dropbox');
+			this.refreshToken();
 
 			//let request = new XMLHttpRequest();
 			//request.open("POST", proxy+'https://api.dropboxapi.com/2/users/get_current_account');
@@ -1982,10 +1982,7 @@ var Dropbox = new class {
 			// 	console.log(response);
 			// });
 		}
-		else {
-			this.createChallenge();
-		}
-
+		this.createChallenge();
 	}
 
 	/* create verifier and challenge codes */
@@ -2005,7 +2002,7 @@ var Dropbox = new class {
 	
 	/* step 1 */
 	getCode( ){
-		window.open(`https://www.dropbox.com/oauth2/authorize?client_id=${this.#clientId}&response_type=code&code_challenge=${this.#codeVerifier}&code_challenge_method=plain`, '_blank');
+		window.open(`https://www.dropbox.com/oauth2/authorize?client_id=${this.#clientId}&response_type=code&code_challenge=${this.#codeVerifier}&code_challenge_method=plain&token_access_type=offline`, '_blank');
 	}
 	
 	/* step 2 */
@@ -2031,32 +2028,90 @@ var Dropbox = new class {
 			alert(`Failed to exchange token: json is ${json}`);
 			return false;
 		}
-
-		let token = json['access_token'];
-		if( token ){
-			alert('Failed to exchange token: dictionary key does not exist.\n\nReport this problem to the developer.');
-			return false;
-		}
-		this.#token = token;
-		this.authenticated = true;
-		store.set('auth_dropbox', token);
-		return true;
+		
+		return this.#parseResponse(json);
 	}
 
 	/* TODO: make this a real function */
-	async confirmAuthentication( ){
-		/* send request to dropbox to confirm good */
-		if( false ){
+	/* confirms dropbox is still authenticated and refreshes token if necessary */
+	async refreshToken( ){
+		if( !this.#auth ){
+			Log.error('Refresh token was called when initial authorisation has yet to occur.');
 			this.authenticated = false;
 			return false;
 		}
-		if( this.#token ){
-			/* TODO: refresh token */
-		}
-		if( true ){
+
+		/* do nothing if token is still good for at least 5 minutes */
+		if( (this.#auth['expires_at'] - 5*60*1000) > Date.now() ){
 			this.authenticated = true;
 			return true;
 		}
+
+		/* get new refresh token */
+		let response = await fetch(proxy+'https://api.dropboxapi.com/oauth2/token', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded'
+			},
+			body: new URLSearchParams({
+				'refresh_token': this.#auth['refresh_token'],
+				'grant_type': 'refresh_token',
+				'client_id': this.#clientId
+			})
+		});
+		if( !response.ok ){
+			Log.error(`Failed to refresh token: response not ok: ${response.status} ${response.statusText}`);
+			this.authenticated = false;
+			return false;
+		}
+		let json = await response.json();
+		if( !json ){
+			Log.error(`Failed to refresh token: json is ${json}`);
+			this.authenticated = false;
+			return false;
+		}
+		
+		return this.#parseResponse(json);
+	}
+
+	#parseResponse( json ){
+		this.#auth = {};
+		this.#auth['access_token'] = json['access_token'];
+		this.#auth['refresh_token'] = json['refresh_token'] || this.#auth['refresh_token'];
+		this.#auth['expires_at'] = Date.now() + (json['expires_in'] * 1000);
+		this.authenticated = true;
+		store.set('auth_dropbox', this.#auth);
+		return true;
+	}
+
+	async upload( txt ){
+		this.refreshToken();
+
+		let apiArg = {
+			"autorename": false,
+			"mode": "overwrite",
+			"mute": false,
+			"path": `/css/${List.isModern ? 'modern' : 'classic'}_${List.style}.css`,
+			"strict_conflict": false
+		};
+
+		let response = await fetch(proxy+'https://content.dropboxapi.com/2/files/upload', {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${this.#auth['access_token']}`,
+				'Content-Type': 'application/octet-stream',
+				'Dropbox-API-Arg': JSON.stringify(apiArg)
+			},
+			body: new Blob([txt])
+		});
+		if( !response.ok ){
+			Log.error(`Failed to upload file: response not ok: ${response.status} ${response.statusText}`);
+			return false;
+		}
+		let json = await response.json();
+
+		console.log(json);
+		return json;
 	}
 }
 
@@ -2097,13 +2152,15 @@ var worker;
 
 /* Runtime */
 
-function initialise() {
+async function initialise() {
 	if( !UI || !UI.isAlive ){
 		UI = new PrimaryUI();
 	}
 	Log.prepare(UI);
-	List.determineStyle();
+	await List.determineStyle();
 	settings = new UserSettings();
+
+	Dropbox.upload('Hello!');
 
 	buildMainUI();
 	ListItems.load();
@@ -3115,9 +3172,7 @@ function buildGlobalSettings( ){
 
 	/* uploaders */
 
-	let upload = new Check(['automatic_upload'], 'Upload automatically.');
-	let update = new Check(['automatic_import'], 'Add an @import to your CSS automatically.');
-	let drawerGeneric = new Drawer([upload.$main, update.$main]);
+	let update = new Check(['automatic_import'], 'Add an @import to your CSS automatically.', 'Recommended! After uploading your file, it will be added to your Custom CSS as an @import line.');
 
 	/* MyAnimeList */
 
@@ -3138,7 +3193,7 @@ function buildGlobalSettings( ){
 	let $dropBtn = new Button('Authenticate').on('click', ()=>{ buildDropboxAuth(popupUI, dropAuthenticated); });
 	function dropAuthenticated( ){
 		$dropBlurb.text('✔ You are logged in and ready to go!');
-		$dropBtn.css('display', 'none');
+		$dropBtn.val('Modify Auth');
 	}
 	if( Dropbox.authenticated ){
 		dropAuthenticated();
@@ -3147,9 +3202,7 @@ function buildGlobalSettings( ){
 	let drawerDropbox = new Drawer([
 		new Hr(),
 		$dropBlurb,
-		$dropBtn,
-		upload.$main,
-		update.$main
+		$dropBtn
 	]);
 
 	/* Catbox */
@@ -3172,12 +3225,12 @@ function buildGlobalSettings( ){
 
 	/* the rest */
 
-	const drawers = [drawerGeneric, drawerMal, drawerDropbox, drawerCatbox];
+	const drawers = [drawerMal, drawerDropbox, drawerCatbox];
 	function closeDrawers( ){
 		drawers.forEach(drawer=>drawer.close());
 	}
 	let $drawers = $('<div style="width:100%;">');
-	$drawers.append(drawerMal.$main, drawerDropbox.$main, drawerCatbox.$main, drawerGeneric.$main);
+	$drawers.append(drawerMal.$main, drawerDropbox.$main, drawerCatbox.$main);
 
 	let $options = $('<div class="l-column o-justify-start">');
 	$options.append(
@@ -3190,13 +3243,6 @@ function buildGlobalSettings( ){
 			new Check(['checked_categories', '6'], "Planned")
 		]).$main,
 		new Radio(['uploader'], 'Automatically upload and manage your code?', {
-			'none': {
-				'name': 'No',
-				'desc': 'Manually copy and paste code that the tool generates.',
-				'func': ()=>{
-					closeDrawers();
-				}
-			},
 			'myanimelist': {
 				'name': 'MyAnimeList',
 				'desc': 'Will attempt to upload directly to MAL\s Custom CSS box on your list. However, if you go over their limit of 65,535 characters, the tool will cancel and alert you.',
@@ -3210,8 +3256,8 @@ function buildGlobalSettings( ){
 				'desc': 'Upload to Dropbox.com and add a single import line to your MAL Custom CSS. Requires a Dropbox account.',
 				'func': ()=>{
 					closeDrawers();
+					drawerDropbox.$main.append(update.$main);
 					drawerDropbox.open();
-					drawerGeneric.open();
 				}
 			},
 			'catbox': {
@@ -3219,8 +3265,15 @@ function buildGlobalSettings( ){
 				'desc': 'Upload to Catbox.moe and add a single import line to your MAL Custom CSS. Requires a Catbox account.',
 				'func': ()=>{
 					closeDrawers();
+					drawerCatbox.$main.append(update.$main);
 					drawerCatbox.open();
-					drawerGeneric.open();
+				}
+			},
+			'none': {
+				'name': 'No',
+				'desc': 'Manually copy and paste code that the tool generates.',
+				'func': ()=>{
+					closeDrawers();
 				}
 			}
 		}).$main,
