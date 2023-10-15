@@ -795,22 +795,14 @@ var Dropbox = new class {
 	authenticated = false;
 
 	constructor( ){
+		this.createChallenge();
 		if( store.has('auth_dropbox') ){
 			this.#auth = store.get('auth_dropbox');
-			this.refreshToken();
-
-			//let request = new XMLHttpRequest();
-			//request.open("POST", proxy+'https://api.dropboxapi.com/2/users/get_current_account');
-			//request.setRequestHeader('Authorization', `Bearer ${this.token}`);
-			//request.send();
-			// fetch(proxy+'https://api.dropboxapi.com/2/users/get_current_account', {
-			// 	headers: new Headers({Authorization: `Bearer ${this.token}`})
-			// })
-			// .then(response=>{
-			// 	console.log(response);
-			// });
+			this.refreshToken()
+			.then(result=>{
+				this.#auth = result;
+			});
 		}
-		this.createChallenge();
 	}
 
 	/* create verifier and challenge codes */
@@ -860,10 +852,10 @@ var Dropbox = new class {
 		return this.#parseResponse(json);
 	}
 
-	/* TODO: make this a real function */
 	/* confirms dropbox is still authenticated and refreshes token if necessary */
 	async refreshToken( ){
-		if( !this.#auth ){
+		console.log(this.#auth);
+		if( !this.#auth || !('refresh_token' in this.#auth) ){
 			Log.error('Refresh token was called when initial authorisation has yet to occur.');
 			this.authenticated = false;
 			return false;
@@ -872,7 +864,7 @@ var Dropbox = new class {
 		/* do nothing if token is still good for at least 5 minutes */
 		if( (this.#auth['expires_at'] - 5*60*1000) > Date.now() ){
 			this.authenticated = true;
-			return true;
+			return this.#auth;
 		}
 
 		/* get new refresh token */
@@ -913,7 +905,9 @@ var Dropbox = new class {
 	}
 
 	async upload( txt ){
-		this.refreshToken();
+		if( !this.refreshToken() ){
+			return false;
+		}
 
 		let apiArg = {
 			"autorename": false,
@@ -961,7 +955,7 @@ function find( str, startTxt, endTxt ){
 }
 
 function encodeForCss( str ){
-	return str.replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").trim()
+	return str.replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").trim();
 }
 
 /* Parse any and all numbers from a string into an int */
@@ -987,8 +981,6 @@ async function initialise() {
 	Log.prepare(UI);
 	await List.determineStyle();
 	settings = new UserSettings();
-
-	Dropbox.upload('Hello!');
 
 	buildMainUI();
 	ListItems.load();
@@ -1065,8 +1057,10 @@ class ListItems {
 }
 	
 class Worker {
-	/* CSS vars */
-	css = '';
+	allCss = '';
+	
+	/* CSS generation vars */
+	scrapedCss = '';
 	$preview = false;
 
 	/* image validation vars */
@@ -1101,9 +1095,9 @@ class Worker {
 		if( !this.doCss ){
 			return;
 		}
-		this.css += line + '\n';
+		this.scrapedCss += line + '\n';
 		if( this.$preview ){
-			this.$preview.val(this.css);
+			this.$preview.val(this.scrapedCss);
 			this.$preview.scrollTop(NodeDimensions.height(this.$preview));
 		}
 	}
@@ -1394,8 +1388,8 @@ class Worker {
 			UIState.setIdle();
 		}
 
-		if( this.css.length > 0 ){
-			store.set(`last_${List.type}_run`, this.css);
+		if( this.scrapedCss.length > 0 ){
+			store.set(`last_${List.type}_run`, this.scrapedCss);
 		}
 
 		if( store.has('auth_dropbox') && settings.get('auto_dropbox') === 'true' ){
