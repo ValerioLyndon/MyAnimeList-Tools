@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre30+f5_a0
+// @version      11.0-pre30+f7_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,7 +24,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre30+f5_a0';
+const ver = '11.0-pre30+f7_a0';
 const verMod = '2023/Aug/31';
 
 class CustomStorage {
@@ -1990,6 +1990,7 @@ var Dropbox = new class {
 			this.refreshToken()
 			.then(result=>{
 				this.#auth = result;
+				Log.generic('Authenticated with Dropbox.\n'+JSON.stringify(this.#auth), false)
 			});
 		}
 	}
@@ -2002,7 +2003,6 @@ var Dropbox = new class {
 			let random = round((verifierChars.length-1) * Math.random());
 			verifier += verifierChars[random];
 		}
-		console.log(verifier);
 		verifier = encodeBase64Url(verifier);
 		/* debug */
 		this.#codeVerifier = verifier;
@@ -2051,10 +2051,10 @@ var Dropbox = new class {
 		}
 
 		/* do nothing if token is still good for at least 5 minutes */
-		//if( (this.#auth['expires_at'] - 5*60*1000) > Date.now() ){
-		//	this.authenticated = true;
-		//	return this.#auth;
-		//}
+		if( (this.#auth['expires_at'] - 5*60*1000) > Date.now() ){
+			this.authenticated = true;
+			return this.#auth;
+		}
 
 		/* get new refresh token */
 		let response = await fetch(proxy+'https://api.dropboxapi.com/oauth2/token', {
@@ -2086,7 +2086,7 @@ var Dropbox = new class {
 	#parseResponse( json ){
 		this.#auth = {};
 		this.#auth['access_token'] = json['access_token'];
-		this.#auth['refresh_token'] = json['refresh_token'] || this.#auth['refresh_token'];
+		this.#auth['refresh_token'] = 'refresh_token' in json ? json['refresh_token'] : this.#auth['refresh_token'];
 		this.#auth['expires_at'] = Date.now() + (json['expires_in'] * 1000);
 		this.authenticated = true;
 		store.set('auth_dropbox', this.#auth);
@@ -2121,7 +2121,7 @@ var Dropbox = new class {
 		}
 		let json = await response.json();
 
-		console.log(json);
+		Log.generic(JSON.stringify(json));
 		return json;
 	}
 }
@@ -2199,6 +2199,7 @@ class ListItems {
 	}
 
 	static load( ){
+		console.log('load', this.#offset);
 		if( this.#loaded ){
 			this.#done();
 			return true;
@@ -2238,6 +2239,7 @@ class ListItems {
 	}
 
 	static #done( ){
+		console.log('done', this.#offset, this.#callbacks);
 		UIState.setIdle();
 		while( this.#callbacks.length > 0 ){
 			this.#callbacks.pop()();
@@ -3894,8 +3896,8 @@ if( List.isOwner ){
 }
 
 /* Handle UI-less automatic runs of the tool. */
-function automation( ){
-	initialise();
+async function automation( ){
+	await initialise();
 
 	const doHeaders = settings.get(['update_headers']) && settings.get(['auto_headers']);
 
