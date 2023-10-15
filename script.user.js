@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre30+f7_a0
+// @version      11.0-pre30+f8_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,7 +24,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre30+f7_a0';
+const ver = '11.0-pre30+f8_a0';
 const verMod = '2023/Aug/31';
 
 class CustomStorage {
@@ -2187,6 +2187,7 @@ class ListItems {
 	static #loaded = false;
 	static #callbacks = [];
 
+	/* functions are given to afterLoad to be executed as soon as possible after loading */
 	static afterLoad( func ){
 		if( this.#loaded ){
 			func();
@@ -2204,9 +2205,6 @@ class ListItems {
 			this.#done();
 			return true;
 		}
-		if( this.#working ){
-			return true;
-		}
 		this.#working = true;
 
 		let url = this.#url + this.#offset;
@@ -2222,7 +2220,6 @@ class ListItems {
 			}
 			else {
 				this.#done();
-				this.#loaded = true;
 			}
 		}).fail(()=>{
 			this.#failures++;
@@ -2239,6 +2236,8 @@ class ListItems {
 	}
 
 	static #done( ){
+		this.#loaded = true;
+		this.#working = false;
 		console.log('done', this.#offset, this.#callbacks);
 		UIState.setIdle();
 		while( this.#callbacks.length > 0 ){
