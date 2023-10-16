@@ -778,7 +778,7 @@ var Dropbox = new class {
 	authenticated = false;
 
 	constructor( ){
-		this.createCodes();
+		this.setup();
 		if( store.has('auth_dropbox') ){
 			this.#auth = store.get('auth_dropbox');
 			this.refreshToken()
@@ -789,12 +789,7 @@ var Dropbox = new class {
 		}
 	}
 
-	base64URLEncode(buffer) {
-		let base64 = btoa(String.fromCharCode.apply(null, buffer));
-		return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-	}
-
-	async createCodes( ){
+	async setup( ){
 		/* create verifier */
 		const codeVerifier = new Uint8Array(32);
 		window.crypto.getRandomValues(codeVerifier);
@@ -805,6 +800,11 @@ var Dropbox = new class {
 		const data = encoder.encode(verifier);
 		const hashBuffer = await crypto.subtle.digest('SHA-256', data);
 		this.#codeChallenge = this.base64URLEncode(new Uint8Array(hashBuffer));
+	}
+
+	base64URLEncode(buffer) {
+		let base64 = btoa(String.fromCharCode.apply(null, buffer));
+		return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 	}
 	
 	/* step 1 */
