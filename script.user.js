@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre30+f13_a0
+// @version      11.0-pre31_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,8 +24,8 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre30+f13_a0';
-const verMod = '2023/Aug/31';
+const ver = '11.0-pre31_a0';
+const verMod = '2023/Oct/15';
 
 class CustomStorage {
 	constructor( type = 'localStorage' ){
@@ -1624,7 +1624,7 @@ class UserSettings {
 	font: bold 2em/38px 'Helvetica neue', Helvetica, "lucida grande", tahoma, verdana, arial, sans-serif;
 	text-transform: uppercase;
 }`
-	}
+	};
 	
 	constructor( ){
 		this.updateOlderFormats();
@@ -1877,7 +1877,7 @@ var MyAnimeList = new class {
 
 	/* Surrounds any CSS to be inserted with text that will be seeked out later and replaced */
 	formatInsert( str ){
-		return `/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} START*/\n${str}\n/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} END*/`
+		return `/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} START*/\n${str}\n/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} END*/`;
 	}
 
 	async import( url ){
@@ -1891,7 +1891,7 @@ var MyAnimeList = new class {
 	async append( str ){
 		return await this.#updateCss(List.cleanCss() + '\n\n' + this.formatInsert(str));
 	}
-}
+};
 
 var Catbox = new class {
 	/* API reference at https://catbox.moe/tools.php */
@@ -1963,7 +1963,7 @@ var Catbox = new class {
 		store.set('auth_catbox', userhash);
 		this.authenticated = true;
 	}
-}
+};
 
 var Dropbox = new class {
 	#codeVerifier;
@@ -2201,7 +2201,7 @@ var Dropbox = new class {
 
 		return json['url'];
 	}
-}
+};
 
 
 
@@ -3309,7 +3309,7 @@ function buildGlobalSettings( ){
 	let malPercent = round(List.css().length / 65535 * 100);
 	let $malBlurb = malPercent >= 100 ?
 		new Paragraph(`Your CSS is over MyAnimeList's max CSS length! As long as output remains over limit, the tool will not update your CSS. To fix this, either:\nA. Switch to one of the other automatic uploaders, or\nB. Use a less detailed CSS Generator preset, or\nC. Manage and import the code yourself to circumvent MAL's limit.`)
-		: new Paragraph(`The MyAnimeList uploader sends items directly to your list style's Custom CSS box. This is convenient, but will run out of space quickly if you use the CSS Generator. If you go over the limit the tool will send you an alert and immediately stop updating your CSS.`)
+		: new Paragraph(`The MyAnimeList uploader sends items directly to your list style's Custom CSS box. This is convenient, but will run out of space quickly if you use the CSS Generator. If you go over the limit the tool will send you an alert and immediately stop updating your CSS.`);
 		
 	let drawerMal = new Drawer([
 		new Hr(),
