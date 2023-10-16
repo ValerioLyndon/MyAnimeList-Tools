@@ -58,7 +58,7 @@
 	display: grid;
 	grid-auto-flow: row;
 	gap: 10px;
-	place-items: start stretch;
+	place-content: start stretch;
 }
 
 .l-row {
@@ -242,21 +242,28 @@
 }
 .c-radio__row {
 	display: flex;
-	border-radius: 6px;
-	overflow: hidden;
 }
 .c-radio__station {
-	padding: 3px 6px;
+	padding: 1px 4px;
 	background: var(--group-bg);
+	border: 2px solid transparent;
 	cursor: pointer;
 	font-weight: normal;
+	transition: all 0.08s ease;
+}
+.c-radio__station:first-of-type {
+	border-radius: 6px 0 0 6px;
+}
+.c-radio__station:last-of-type {
+	border-radius: 0 6px 6px 0;
 }
 .c-radio__station ~ .c-radio__station {
 	margin-left: 2px;
 }
+.c-radio__station:hover,
 :checked + .c-radio__station {
 	background: var(--btn-bg);
-	filter: invert(1);
+	border-color: var(--btn-brdr);
 }
 
 .c-component {
@@ -364,10 +371,14 @@
 	transform: translateX(0px);
 }
 
-/* UIStates */
+/* Actions */
 
 .is-interactable {
 	cursor: pointer;
+}
+
+.is-loading {
+	cursor: progress;
 }
 
 /* Overrides */

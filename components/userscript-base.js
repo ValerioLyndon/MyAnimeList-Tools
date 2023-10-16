@@ -62,8 +62,8 @@ if( List.isOwner ){
 }
 
 /* Handle UI-less automatic runs of the tool. */
-function automation( ){
-	initialise();
+async function automation( ){
+	await initialise();
 
 	const doHeaders = settings.get(['update_headers']) && settings.get(['auto_headers']);
 

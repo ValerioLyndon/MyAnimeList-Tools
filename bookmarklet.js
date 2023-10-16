@@ -7,8 +7,8 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre30_b0';
-const verMod = '2023/Aug/29';
+const ver = '11.0-pre31_b0';
+const verMod = '2023/Oct/15';
 
 class CustomStorage {
 	constructor( type = 'localStorage' ){
@@ -81,6 +81,15 @@ class CustomStorage {
 }
 
 var store = new CustomStorage('localStorage');
+
+/* Some re-usable functions use in UI building blocks */
+
+function addAttrs( $ele, attrs = {} ){
+	for( let [name, value] of Object.entries(attrs) ){
+		$ele.attr(name, value);
+	}
+	return $ele;
+}
 
 /* Core class for handling popup windows and overlays, extended by Primary and Subsidiary variants
 no requirements */
@@ -166,7 +175,7 @@ class UserInterface {
 	display: grid;
 	grid-auto-flow: row;
 	gap: 10px;
-	place-items: start stretch;
+	place-content: start stretch;
 }
 
 .l-row {
@@ -350,21 +359,28 @@ class UserInterface {
 }
 .c-radio__row {
 	display: flex;
-	border-radius: 6px;
-	overflow: hidden;
 }
 .c-radio__station {
-	padding: 3px 6px;
+	padding: 1px 4px;
 	background: var(--group-bg);
+	border: 2px solid transparent;
 	cursor: pointer;
 	font-weight: normal;
+	transition: all 0.08s ease;
+}
+.c-radio__station:first-of-type {
+	border-radius: 6px 0 0 6px;
+}
+.c-radio__station:last-of-type {
+	border-radius: 0 6px 6px 0;
 }
 .c-radio__station ~ .c-radio__station {
 	margin-left: 2px;
 }
+.c-radio__station:hover,
 :checked + .c-radio__station {
 	background: var(--btn-bg);
-	filter: invert(1);
+	border-color: var(--btn-brdr);
 }
 
 .c-component {
@@ -472,10 +488,14 @@ class UserInterface {
 	transform: translateX(0px);
 }
 
-/* UIStates */
+/* Actions */
 
 .is-interactable {
 	cursor: pointer;
+}
+
+.is-loading {
+	cursor: progress;
 }
 
 /* Overrides */
@@ -764,7 +784,7 @@ class Hr {
 
 class Paragraph {
 	constructor( text ){
-		return $('<p class="c-paragraph">'+text.split('\n\n').join('</p><p class="c-paragraph">')+'</p>');
+		return $('<p class="c-paragraph">'+text.split('\n\n').join('</p><p class="c-paragraph">')+'</p>'.replaceAll('\n','<br/>'));
 	}
 }
 
@@ -847,6 +867,37 @@ class Check {
 	}
 }
 
+class Radio {
+	constructor( settingArray, title = '', options = {} ){
+		this.$main = $(`<div class="c-radio">${title}</div>`);
+		let $options = $('<div class="c-radio__row">');
+		let value = settings.get(settingArray);
+		let htmlId = settingArray.join('');
+
+		for( let [newValue, meta] of Object.entries(options) ){
+			let $input = $(`<input type="radio" name="${htmlId}" id="${htmlId+newValue}" />`);
+			$input.on('input', ()=>{ settings.set(settingArray, newValue); });
+			let $station = $(`<label class="c-radio__station" for="${htmlId+newValue}">${meta['name']}</label>`);
+
+			if( value === newValue ){
+				$input.prop('checked', true);
+				if( 'func' in meta ){
+					meta['func']();
+				}
+			}
+			if( 'desc' in meta ){
+				$station.attr('title', meta['desc']);
+			}
+			if( 'func' in meta ){
+				$input.on('click', ()=>{ meta['func'](); });
+			}
+
+			$options.append($input, $station);
+		}
+		this.$main.append($options);
+	}
+}
+
 class Field {
 	constructor( settingArray = false, title = '', desc = false, style = 'block' ){
 		this.$main = $('<div class="c-option">');
@@ -883,9 +934,7 @@ class Textarea {
 			});
 			this.$box.val(settings.get(settingArray));
 		}
-		for( let [name,value] of Object.entries(attributes) ){
-			this.$box.attr(name,value);
-		}
+		addAttrs(this.$box, attributes);
 		
 		this.$raw.append(this.$box);
 		this.$main.append(this.$raw);
@@ -905,9 +954,7 @@ class Header {
 class Button {
 	constructor( value, attributes = {} ){
 		let $main = $(`<input class="c-button" type="button" value="${value}">`);
-		for( let [name,value] of Object.entries(attributes) ){
-			$main.attr(name,value);
-		}
+		addAttrs($main, attributes);
 		return $main;
 	}
 }
@@ -1141,14 +1188,30 @@ class NodeDimensions {
 	static $dummy = $('<div style="position: fixed; left: -9999px; display: none; width: 480px;">');
 	static height( node ){
 		node = node instanceof $ ? node[0] : node;
-		if( node.parentElement ){
+		/* return height immediately where possible */
+		const container = node.getRootNode() instanceof ShadowRoot ? node.getRootNode().host : node;
+		if( document.body.contains(container) ){
 			return node.scrollHeight;
 		}
+		/* move node into DOM so that height can be checked */
+		let parent = node.parentElement;
+		let previous = node.previousElementSibling;
+		let next = node.nextElementSibling;
 		UI.$window.append(this.$dummy);
 		this.$dummy.css('display', 'block');
 		this.$dummy.append(node);
 		let height = node.scrollHeight;
 		this.$dummy.css('display', 'none');
+		/* return node to previous position */
+		if( previous ){
+			previous.insertAdjacentElement('afterend', node); 
+		}
+		else if( next ){
+			next.insertAdjacentElement('beforebegin', node); 
+		}
+		else if( parent ){
+			parent.append(node);
+		}
 		return height;
 	}
 }
@@ -1231,16 +1294,23 @@ class List {
 	static isModern = ($('#list_surround').length === 0);
 	static isPreview = new URLSearchParams(window.location.search).has('preview');
 	static style = undefined;
-	static customCssEle = this.isModern ? $('#custom-css') : $('head style:first-of-type');
-	static customCss = this.customCssEle.text().trim();
-	static #headerRegex = this.isAnime ?
+	static csrf = $('meta[name="csrf_token"]').attr('content');
+
+	static #cssEle = this.isModern ? $('#custom-css') : $('head style:first-of-type');
+	static css( newCss = false ){
+		if( typeof newCss === 'string' ){
+			this.#cssEle.text(newCss);
+		}
+		return this.#cssEle.text().trim();
+	}
+
+	static cleanCss( ){
+		const cssRegex = /\/\*MYANIMELIST-TOOLS START\*\/(.|\n)*?\/\*MYANIMELIST-TOOLS END\*\//g;
+		const headerRegex = this.isAnime ?
 		   /\/\*LIST-TOOLS HEADERS ANIME START\*\/(.|\n)*?\/\*LIST-TOOLS HEADERS ANIME END\*\//g :
 		   /\/\*LIST-TOOLS HEADERS MANGA START\*\/(.|\n)*?\/\*LIST-TOOLS HEADERS MANGA END\*\//g;
-	static customCssModified = this.customCss
-	       .replaceAll(/\/\*MYANIMELIST-TOOLS START\*\/(.|\n)*?\/\*MYANIMELIST-TOOLS END\*\//g, '')
-		   .replaceAll(this.#headerRegex, '')
-		   .trim();
-	static csrf = $('meta[name="csrf_token"]').attr('content');
+		return this.css().replaceAll(cssRegex, '').replaceAll(headerRegex, '').trim();
+	}
 
 	static async determineStyle( ){
 		if( this.style ){
@@ -1414,7 +1484,7 @@ class List {
 
 			let styleCss = $(userCSSPage).find('textarea[name="cssText"]').text().trim();
 
-			if( styleCss === this.customCss ){
+			if( styleCss === this.css() ){
 				return url.split('id=')[1];
 			}
 		}
@@ -1443,8 +1513,12 @@ class UserSettings {
 		},
 		"delay": "3000",
 
+		/* file hosts */
+		"uploader": "myanimelist",
+		"automatic_import": true,
+
 		/* css */
-		"update_css": true,
+		"update_css": false,
 		"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
 		"match_template": "/[TYPE]/[ID]/",
 		"check_existing": false,
@@ -1533,7 +1607,7 @@ class UserSettings {
 	font: bold 2em/38px 'Helvetica neue', Helvetica, "lucida grande", tahoma, verdana, arial, sans-serif;
 	text-transform: uppercase;
 }`
-	}
+	};
 	
 	constructor( ){
 		this.updateOlderFormats();
@@ -1602,6 +1676,7 @@ class UserSettings {
 		if( UI ){
 			UI.exit();
 			initialise();
+			UI.open();
 		}
 		else {
 			alert('Please exit and restart the tool to complete the clearing of your settings.');
@@ -1649,11 +1724,11 @@ async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 			return false;
 		}
 
-		let css = List.customCssModified;
+		let css = List.cleanCss();
 		if( newCss.length > 0 ){
 			css += '\n\n/*MYANIMELIST-TOOLS START*/\n\n' + newCss + '\n\n/*MYANIMELIST-TOOLS END*/';
 		}
-		updateCss(css);
+		MyAnimeList.append(css);
 	}
 	alert('Import succeeded.');
 	return true;
@@ -1668,92 +1743,6 @@ async function setHeaderTemplate(newTemplate, newStyle) {
 	return true;
 }
 
-async function updateCss( css ){
-	if( css === List.customCss ){
-		return true;
-	}
-	if( css.length >= 65535 ){
-		alert('Your MAL Custom CSS may be longer than the max allowed length. If your CSS has been cut off at the end, you will need to resolve this issue.');
-	}
-
-	/* Send new CSS to MAL */
-	if( List.isModern ){
-		let styleUrl = `https://myanimelist.net/ownlist/style/theme/${List.style}`;
-
-		let stylePage = await request(styleUrl);
-		let bg_attach = $(stylePage).find('#style_edit_theme_background_image_attachment').find('[selected]').val() || '';
-		let bg_vert = $(stylePage).find('#style_edit_theme_background_image_vertical_position').find('[selected]').val() || '';
-		let bg_hori = $(stylePage).find('#style_edit_theme_background_image_horizontal_position').find('[selected]').val() || '';
-		let bg_repeat = $(stylePage).find('#style_edit_theme_background_image_repeat').find('[selected]').val() || '';
-		
-		let formData = new FormData();
-		formData.append("style_edit_theme[show_cover_image]", "1");
-		formData.append("style_edit_theme[cover_image]", new File([], ""));
-		formData.append("style_edit_theme[show_background_image]", "1");
-		formData.append("style_edit_theme[background_image]", new File([], ""));
-		formData.append("style_edit_theme[background_image_attachment]", bg_attach);
-		formData.append("style_edit_theme[background_image_vertical_position]", bg_vert);
-		formData.append("style_edit_theme[background_image_horizontal_position]", bg_hori);
-		formData.append("style_edit_theme[background_image_repeat]", bg_repeat);
-		formData.append("style_edit_theme[css]", css);
-		formData.append("style_edit_theme[save]", "");
-		formData.append("csrf_token", List.csrf);
-		
-		let post = await fetch(styleUrl, {
-			method: "POST",
-			body: formData
-		})
-		.then(response => {
-			if( !response.ok) {
-				throw new Error(`Failed to send modern CSS update request.`);
-			}
-			return true;
-		})
-		.catch(error => {
-			Log.error(error);
-			return false;
-		});
-		if( !post ){
-			return false;
-		}
-	}
-	else {
-		let styleUrl = `https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv&id=${List.style}`;
-		
-		let headerData = new Headers();
-		headerData.append('Content-Type', 'application/x-www-form-urlencoded');
-		headerData.append('Referer', styleUrl);
-
-		let formData = new URLSearchParams();
-		formData.append('cssText', css);
-		formData.append('subForm', 'Update CSS');
-		formData.append('csrf_token', List.csrf);
-		
-		let post = await fetch(styleUrl, {
-			method: "POST",
-			headers: headerData,
-			body: formData
-		})
-		.then(response => {
-			if( !response.ok ){
-				throw new Error(`Failed to send classic CSS update request.`);
-			}
-			return true;
-		})
-		.catch(error => {
-			Log.error(error);
-			return false;
-		});
-		if( !post ){
-			return false;
-		}
-	}
-
-	/* Temporarily update the page's CSS to make sure no page reload is required */
-	List.customCssEle.text(css);
-	List.customCss = css;
-}
-
 /* wrapper for common fetch requests to remove some boilerplate */
 async function request( url, result = 'html' ){
 	const response = await fetch(url);
@@ -1761,9 +1750,9 @@ async function request( url, result = 'html' ){
 		return false;
 	}
 	if( result === 'json' ){
-		return response.json();
+		return await response.json();
 	}
-	const text = response.text();
+	const text = await response.text();
 
 	if( result === 'html' ){
 		return createDOM(text);
@@ -1793,6 +1782,414 @@ function sleep( ms ){
 	return new Promise(resolve => { setTimeout(resolve, ms); });
 }
 
+
+
+/* File Upload Integrations */
+
+const proxy = 'https://cors-anywhere-rp3l.onrender.com/';
+
+var MyAnimeList = new class {
+	async #updateCss( css ){
+		if( css === List.css() ){
+			return true;
+		}
+		if( css.length >= 65535 ){
+			Log.warn('Your MAL Custom CSS was not updated as it would be over the max allowed length. You need to switch to a different uploader or reduce the components you are using.');
+			return false;
+		}
+
+		/* Send new CSS to MAL */
+		if( List.isModern ){
+			let styleUrl = `https://myanimelist.net/ownlist/style/theme/${List.style}`;
+
+			let stylePage = await request(styleUrl);
+			let bg_attach = $(stylePage).find('#style_edit_theme_background_image_attachment').find('[selected]').val() || '';
+			let bg_vert = $(stylePage).find('#style_edit_theme_background_image_vertical_position').find('[selected]').val() || '';
+			let bg_hori = $(stylePage).find('#style_edit_theme_background_image_horizontal_position').find('[selected]').val() || '';
+			let bg_repeat = $(stylePage).find('#style_edit_theme_background_image_repeat').find('[selected]').val() || '';
+			
+			let formData = new FormData();
+			formData.append("style_edit_theme[show_cover_image]", "1");
+			formData.append("style_edit_theme[cover_image]", new File([], ""));
+			formData.append("style_edit_theme[show_background_image]", "1");
+			formData.append("style_edit_theme[background_image]", new File([], ""));
+			formData.append("style_edit_theme[background_image_attachment]", bg_attach);
+			formData.append("style_edit_theme[background_image_vertical_position]", bg_vert);
+			formData.append("style_edit_theme[background_image_horizontal_position]", bg_hori);
+			formData.append("style_edit_theme[background_image_repeat]", bg_repeat);
+			formData.append("style_edit_theme[css]", css);
+			formData.append("style_edit_theme[save]", "");
+			formData.append("csrf_token", List.csrf);
+			
+			let response = await fetch(styleUrl, {
+				method: "POST",
+				body: formData
+			});
+			if( !response.ok ) {
+				Log.error(`Failed to send modern CSS update request.`);
+				return false;
+			}
+		}
+		else {
+			let styleUrl = `https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv&id=${List.style}`;
+			
+			let headerData = new Headers();
+			headerData.append('Content-Type', 'application/x-www-form-urlencoded');
+			headerData.append('Referer', styleUrl);
+
+			let formData = new URLSearchParams();
+			formData.append('cssText', css);
+			formData.append('subForm', 'Update CSS');
+			formData.append('csrf_token', List.csrf);
+			
+			let response = await fetch(styleUrl, {
+				method: "POST",
+				headers: headerData,
+				body: formData
+			});
+			if( !response.ok ){
+				Log.error(`Failed to send classic CSS update request.`);
+				return false;
+			};
+		}
+
+		/* Temporarily update the page's CSS to make sure no page reload is required */
+		List.css(css);
+		return true;
+	}
+
+	/* Surrounds any CSS to be inserted with text that will be seeked out later and replaced */
+	formatInsert( str ){
+		return `/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} START*/\n${str}\n/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} END*/`;
+	}
+
+	async import( url ){
+		return await this.prepend(`@\import "${url}";`);
+	}
+
+	async prepend( str ){
+		return await this.#updateCss(this.formatInsert(str) + '\n\n' + List.cleanCss());
+	}
+
+	async append( str ){
+		return await this.#updateCss(List.cleanCss() + '\n\n' + this.formatInsert(str));
+	}
+};
+
+var Catbox = new class {
+	/* API reference at https://catbox.moe/tools.php */
+	#url = proxy+'https://catbox.moe/user/api.php';
+	#userhash;
+	authenticated = false;
+	
+	constructor( ){
+		if( store.has('auth_catbox') ){
+			this.#userhash = store.get('auth_catbox');
+			this.authenticated = true;
+		}
+	}
+
+	async #post( reqtype, args ){
+		const data = new FormData();
+		data.append('reqtype', reqtype);
+		data.append('userhash', this.#userhash);
+		args.forEach(( [key, value, filename] )=>{
+			if( filename ){
+				data.append(key, value, filename);
+			}
+			else {
+				data.append(key, value);
+			}
+		});
+
+		try {
+			const response = await fetch(this.#url, { method: 'POST', body: data });
+			return await response.text();
+		}
+		catch( error ){
+			Log.error(`Failed to perform "${reqtype}" Catbox operation: ${error}`);
+			return false;
+		}
+	}
+
+	async upload( text ){
+		try {
+			const result = await this.#post('fileupload', [['fileToUpload', new Blob([text], { 'type': 'text/css' }), 'filename.css']]);
+			return result;
+		}
+		catch {
+			return '';
+		}
+	}
+
+	/* accepts a space-separated list of filenames to delete */
+	async del( filenames ){
+		filenames = filenames.replaceAll('https://files.catbox.moe/','');
+		try {
+			const result = await this.#post('deletefiles', [['files', filenames]]);
+			return result.includes('success');
+		}
+		catch {
+			return false;
+		}
+	}
+
+	async authenticate( userhash = this.#userhash ){
+		this.#userhash = userhash;
+		/* test auth by uploading file */
+		const upload = await this.upload('validating auth');
+		/* fail out if file did not upload or file was not able to be deleted */
+		if( !upload || !upload.endsWith('.css') || !(await this.del(upload)) ){
+			this.#userhash = undefined;
+			return false;
+		}
+		store.set('auth_catbox', userhash);
+		this.authenticated = true;
+	}
+};
+
+var Dropbox = new class {
+	#codeVerifier;
+	#codeChallenge;
+	#auth;
+	#clientId = 'odribfnp0304xy2';
+	authenticated = false;
+
+	constructor( ){
+		this.setup();
+		if( store.has('auth_dropbox') ){
+			this.#auth = store.get('auth_dropbox');
+			this.refreshToken()
+			.then(result=>{
+				this.#auth = result;
+				if( !this.#auth ){
+					Log.generic('Your Dropbox authorisation has expired or failed. Please repeat the authorisation process.');
+				}
+			});
+		}
+	}
+
+	async setup( ){
+		/* create verifier */
+		const codeVerifier = new Uint8Array(32);
+		window.crypto.getRandomValues(codeVerifier);
+		this.#codeVerifier = this.base64URLEncode(codeVerifier);
+
+		/* create challenge */
+		const encoder = new TextEncoder();
+		const data = encoder.encode(this.#codeVerifier);
+		const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+		this.#codeChallenge = this.base64URLEncode(new Uint8Array(hashBuffer));
+	}
+
+	base64URLEncode(buffer) {
+		let base64 = btoa(String.fromCharCode.apply(null, buffer));
+		return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+	}
+	
+	/* step 1 */
+	getCode( ){
+		window.open(`https://www.dropbox.com/oauth2/authorize?client_id=${this.#clientId}&response_type=code&code_challenge=${this.#codeChallenge}&code_challenge_method=S256&token_access_type=offline`, '_blank');
+	}
+	
+	/* step 2 */
+	async exchangeCode( code ){
+		let response = await fetch(proxy+'https://api.dropboxapi.com/oauth2/token', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded'
+			},
+			body: new URLSearchParams({
+				'code': code,
+				'grant_type': 'authorization_code',
+				'code_verifier': this.#codeVerifier,
+				'client_id': this.#clientId
+			})
+		});
+		if( !response.ok ){
+			alert(`Failed to exchange token: response not ok: ${response.status} ${response.statusText}`);
+			return false;
+		}
+		let json = await response.json();
+		if( !json ){
+			alert(`Failed to exchange token: json is ${json}`);
+			return false;
+		}
+		
+		return this.#parseResponse(json);
+	}
+
+	/* confirms dropbox is still authenticated and refreshes token if necessary */
+	async refreshToken( ){
+		if( !this.#auth || !('refresh_token' in this.#auth) ){
+			Log.error('Refresh token was called when initial authorisation has yet to occur.');
+			this.authenticated = false;
+			return false;
+		}
+
+		/* do nothing if token is still good for at least 5 minutes */
+		if( (this.#auth['expires_at'] - 5*60*1000) > Date.now() ){
+			this.authenticated = true;
+			return this.#auth;
+		}
+
+		/* get new refresh token */
+		let response = await fetch(proxy+'https://api.dropboxapi.com/oauth2/token', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded'
+			},
+			body: new URLSearchParams({
+				'refresh_token': this.#auth['refresh_token'],
+				'grant_type': 'refresh_token',
+				'client_id': this.#clientId
+			})
+		});
+		if( !response.ok ){
+			Log.error(`Failed to refresh token: response not ok: ${response.status} ${response.statusText}`);
+			this.authenticated = false;
+			return false;
+		}
+		let json = await response.json();
+		if( !json ){
+			Log.error(`Failed to refresh token: json is ${json}`);
+			this.authenticated = false;
+			return false;
+		}
+		
+		return this.#parseResponse(json);
+	}
+
+	#parseResponse( json ){
+		this.#auth = {};
+		this.#auth['access_token'] = json['access_token'];
+		this.#auth['refresh_token'] = 'refresh_token' in json ? json['refresh_token'] : this.#auth['refresh_token'];
+		this.#auth['expires_at'] = Date.now() + (json['expires_in'] * 1000);
+		this.authenticated = true;
+		store.set('auth_dropbox', this.#auth);
+		return true;
+	}
+
+	/* upload file and get a share link */
+	async upload( txt ){
+		if( !this.refreshToken() ){
+			return false;
+		}
+
+		let apiArg = {
+			"autorename": false,
+			"mode": "overwrite",
+			"mute": false,
+			"path": `/css/${List.isModern ? 'modern' : 'classic'}_${List.style}.css`,
+			"strict_conflict": false
+		};
+
+		let response = await fetch(proxy+'https://content.dropboxapi.com/2/files/upload', {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${this.#auth['access_token']}`,
+				'Content-Type': 'application/octet-stream',
+				'Dropbox-API-Arg': JSON.stringify(apiArg)
+			},
+			body: new Blob([txt])
+		});
+		if( !response.ok ){
+			Log.error(`Failed to upload Dropbox file: response not ok: ${response.status} ${response.statusText}`);
+			return false;
+		}
+		const json = await response.json();
+		if( 'error' in json ){
+			Log.error(`Failed to upload Dropbox file: response contained an error: ${json['error_summary']}`);
+			return false;
+		}
+		if( !('path_lower' in json) ){
+			Log.error('Failed to upload Dropbox file: response did not contain necessary information.');
+			return false;
+		}
+
+		let url = false;
+		let share = this.#getShare(json['path_lower']);
+		if( share ){
+			return share;
+		}
+		else {
+			return this.#share(json['path_lower']);
+		}
+	}
+
+	async #getShare( path ){
+		let args  = {"path": path};
+
+		let response = await fetch(proxy+'https://api.dropboxapi.com/2/sharing/list_shared_links', {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${this.#auth['access_token']}`,
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(args)
+		});
+		if( !response.ok ){
+			Log.error(`Failed to get Dropbox link: response not ok: ${response.status} ${response.statusText}`);
+			return false;
+		}
+		let json = await response.json();
+		if( 'error' in json ){
+			Log.error(`Failed to get Dropbox link: response contained an error: ${json['error_summary']}`);
+			return false;
+		}
+		if( !('links' in json) ){
+			Log.error('Failed to get Dropbox link: response did not contain necessary information.');
+			return false;
+		}
+
+		for( let link of json['links'] ){
+			if( link['path_lower'] === path ){
+				return link['url'];
+			}
+		}
+		return false;
+	}
+
+	async #share( path ){
+		let args  = {
+			"path": path,
+			"settings": {
+				"access": "viewer",
+				"allow_download": true,
+				"audience": "public"
+			}
+		};
+
+		let response = await fetch(proxy+'https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${this.#auth['access_token']}`,
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(args)
+		});
+		if( !response.ok ){
+			Log.error(`Failed to create Dropbox link: response not ok: ${response.status} ${response.statusText}`);
+			return false;
+		}
+		let json = await response.json();
+		if( 'error' in json ){
+			Log.error(`Failed to create Dropbox link: response contained an error: ${json['error_summary']}`);
+			return false;
+		}
+		if( !('url' in json) ){
+			Log.error('Failed to create Dropbox link: response did not contain necessary information.');
+			return false;
+		}
+
+		return json['url'];
+	}
+};
+
+
+
+/* Main Program */
+
 function find( str, startTxt, endTxt ){
 	let startIndex = str.indexOf(startTxt);
 	if( startIndex < 0 ){
@@ -1807,7 +2204,7 @@ function find( str, startTxt, endTxt ){
 }
 
 function encodeForCss( str ){
-	return str.replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").trim()
+	return str.replace(/\r\n/g, " ").replace(/\n/g, "\\a ").replace(/\"/g, "\\\"").trim();
 }
 
 /* Parse any and all numbers from a string into an int */
@@ -1826,12 +2223,12 @@ var worker;
 
 /* Runtime */
 
-function initialise() {
+async function initialise() {
 	if( !UI || !UI.isAlive ){
 		UI = new PrimaryUI();
 	}
 	Log.prepare(UI);
-	List.determineStyle();
+	await List.determineStyle();
 	settings = new UserSettings();
 
 	buildMainUI();
@@ -1850,6 +2247,7 @@ class ListItems {
 	static #loaded = false;
 	static #callbacks = [];
 
+	/* functions are given to afterLoad to be executed as soon as possible after loading */
 	static afterLoad( func ){
 		if( this.#loaded ){
 			func();
@@ -1864,9 +2262,6 @@ class ListItems {
 	static load( ){
 		if( this.#loaded ){
 			this.#done();
-			return true;
-		}
-		if( this.#working ){
 			return true;
 		}
 		this.#working = true;
@@ -1884,7 +2279,6 @@ class ListItems {
 			}
 			else {
 				this.#done();
-				this.#loaded = true;
 			}
 		}).fail(()=>{
 			this.#failures++;
@@ -1901,6 +2295,9 @@ class ListItems {
 	}
 
 	static #done( ){
+		this.#loaded = true;
+		this.#working = false;
+		console.log('done', this.#offset, this.#callbacks);
 		UIState.setIdle();
 		while( this.#callbacks.length > 0 ){
 			this.#callbacks.pop()();
@@ -1909,8 +2306,11 @@ class ListItems {
 }
 	
 class Worker {
-	/* CSS vars */
-	css = '';
+	/* header generation vars */
+	headerCss = '';
+	
+	/* CSS generation vars */
+	scrapedCss = '';
 	$preview = false;
 
 	/* image validation vars */
@@ -1945,9 +2345,9 @@ class Worker {
 		if( !this.doCss ){
 			return;
 		}
-		this.css += line + '\n';
+		this.scrapedCss += line + '\n';
 		if( this.$preview ){
-			this.$preview.val(this.css);
+			this.$preview.val(this.scrapedCss);
 			this.$preview.scrollTop(NodeDimensions.height(this.$preview));
 		}
 	}
@@ -1969,6 +2369,9 @@ class Worker {
 		}
 
 		Status.update('Updating category headers...', 'working', -1);
+
+		this.headerCss += settings.get(['header_style']);
+
 		/* fetch data and setup counts */
 
 		const names = List.type === 'anime' ? {
@@ -2005,24 +2408,19 @@ class Worker {
 
 		const template = settings.get(['header_template']);
 
-		let toAppend = `\n\n/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} START*/\n\n` + settings.get(['header_style']);
-
 		let position = 2;
 		for( const [id, count] of Object.entries(countsPer) ){
 			if( count === 0 ){
 				continue;
 			}
-			toAppend += '\n' + template
+			this.headerCss += '\n' + template
 				.replaceAll('[INDEX]', position)
 				.replaceAll('[NAME]', names[id])
 				.replaceAll('[TYPE]', List.type);
 
 			position += count;
 		}
-		toAppend += `\n\n/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} END*/`;
 
-		let css = List.customCssModified + toAppend;
-		updateCss(css);
 		store.set('last_auto_headers', Date.now());
 	}
 
@@ -2224,11 +2622,87 @@ class Worker {
 		}, settings.get(['delay']));
 	}
 
-	#finish( ){
+	async #finish( ){
+		let resultArgs = {
+			'didCss': this.doCss,
+			'didTags': this.doTags,
+			'didNotes': this.doNotes,
+			'didHeaders': this.doHeaders,
+			'itemCount': this.data.length,
+			'errorCount': this.errors,
+			'warningCount': this.warnings
+		};
+
+		if( this.scrapedCss.length > 0 ){
+			store.set(`last_${List.type}_run`, this.scrapedCss);
+		}
+		const allCss = this.scrapedCss + '\n\n' + this.headerCss;
+
+		const uploader = settings.get(['uploader']);
+		const auto = settings.get(['automatic_import']);
+
+		Status.update('Updating CSS...');
+		Status.estimate(1, 120000);
+		if( uploader === 'none' ){
+			resultArgs['displayCss'] = true;
+		}
+		else if( uploader === 'dropbox' ){
+			let url = await Dropbox.upload(allCss);
+			if( url ){
+				url = url.replace('www.dropbox','dl.dropboxusercontent').replace('?dl=0','').replace('&dl=0','');
+				resultArgs['url'] = url;
+				resultArgs['didUpload'] = 'Dropbox';
+				if( MyAnimeList.import(url) ){
+					resultArgs['didUpdate'] = true;
+				}
+				else {
+					resultArgs['displayUrl'] = true;
+				}
+			}
+			else {
+				resultArgs['displayCss'] = true;
+			}
+		}
+		else if( uploader === 'catbox' ){
+			let url = await Catbox.upload(allCss);
+			console.log(url);
+			if( url ){
+				/* delete previous upload to avoid cluttering up Catbox */
+				const previous = store.get('url_catbox');
+				if( previous && previous !== url ){
+					if( await Catbox.del(previous) ){
+						store.remove('url_catbox');
+					}
+				}
+
+				store.set('url_catbox', url);
+				resultArgs['url'] = url;
+				resultArgs['didUpload'] = 'Catbox';
+				if( MyAnimeList.import(url) ){
+					resultArgs['didUpdate'] = true;
+				}
+				else {
+					resultArgs['displayUrl'] = true;
+				}
+			}
+			else {
+				resultArgs['displayCss'] = true;
+			}
+		}
+		else if( uploader === 'myanimelist' ){
+			if( MyAnimeList.append(allCss) ){
+				resultArgs['didUpdate'] = true;
+			}
+			else {
+				resultArgs['displayCss'] = true;
+			}
+		}
+
+
 		UIState.isWorking = false;
 
 		const results = ()=>{
-			buildResults( this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
+			buildResults( resultArgs, this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
 		};
 		if( !this.silent ){
 			results();
@@ -2236,10 +2710,6 @@ class Worker {
 		}
 		else {
 			UIState.setIdle();
-		}
-
-		if( this.css.length > 0 ){
-			store.set(`last_${List.type}_run`, this.css);
 		}
 	}
 
@@ -2813,6 +3283,68 @@ function buildGlobalSettings( ){
 	let delay = new Field(['delay'], 'Delay between items:', 'Delay (ms) between requests to avoid spamming the server.', 'inline');
 	delay.$box.css('width', '50px');
 
+	/* uploaders */
+
+	let update = new Check(['automatic_import'], 'Add to your CSS automatically.', 'Recommended! After uploading your file, it will be added to your Custom CSS as an @import line.');
+
+	/* MyAnimeList */
+
+	let malPercent = round(List.css().length / 65535 * 100);
+	let $malBlurb = malPercent >= 100 ?
+		new Paragraph(`Your CSS is over MyAnimeList's max CSS length! As long as output remains over limit, the tool will not update your CSS. To fix this, either:\nA. Switch to one of the other automatic uploaders, or\nB. Use a less detailed CSS Generator preset, or\nC. Manage and import the code yourself to circumvent MAL's limit.`)
+		: new Paragraph(`The MyAnimeList uploader sends items directly to your list style's Custom CSS box. This is convenient, but will run out of space quickly if you use the CSS Generator. If you go over the limit the tool will send you an alert and immediately stop updating your CSS.`);
+		
+	let drawerMal = new Drawer([
+		new Hr(),
+		new Paragraph(`<b>Current usage:</b> ${malPercent}% (${List.css().length} / 65535 characters)`),
+		$malBlurb
+	]);
+
+	/* Dropbox */
+
+	let $dropBlurb = new Paragraph('You are not currently authenticated. To link your account, click "Authenticate" below.');
+	let $dropBtn = new Button('Authenticate').on('click', ()=>{ buildDropboxAuth(popupUI, dropAuthenticated); });
+	function dropAuthenticated( ){
+		$dropBlurb.text('✔ You are logged in and ready to go!');
+		$dropBtn.val('Modify Auth');
+	}
+	if( Dropbox.authenticated ){
+		dropAuthenticated();
+	}
+
+	let drawerDropbox = new Drawer([
+		new Hr(),
+		$dropBlurb,
+		$dropBtn
+	]);
+
+	/* Catbox */
+
+	let $catBlurb = new Paragraph('You are not currently authenticated. To link your account, click "Authenticate" below.');
+	let $catBtn = new Button('Authenticate').on('click', ()=>{ buildCatboxAuth(popupUI, catAuthenticated); });
+	function catAuthenticated( ){
+		$catBlurb.text('✔ You are logged in and ready to go!');
+		$catBtn.val('Modify Auth');
+	}
+	if( Catbox.authenticated ){
+		catAuthenticated();
+	}
+
+	let drawerCatbox = new Drawer([
+		new Hr(),
+		$catBlurb,
+		$catBtn
+	]);
+
+	/* the rest */
+
+	const drawers = [drawerMal, drawerDropbox, drawerCatbox];
+	function closeDrawers( ){
+		drawers.forEach(drawer=>drawer.close());
+	}
+	let $drawers = $('<div style="width:100%;">');
+	$drawers.append(drawerMal.$main, drawerDropbox.$main, drawerCatbox.$main);
+
 	let $options = $('<div class="l-column o-justify-start">');
 	$options.append(
 		delay.$main,
@@ -2822,7 +3354,141 @@ function buildGlobalSettings( ){
 			new Check(['checked_categories', '3'], "On Hold"),
 			new Check(['checked_categories', '4'], "Dropped"),
 			new Check(['checked_categories', '6'], "Planned")
-		]).$main
+		]).$main,
+		new Radio(['uploader'], 'Automatically upload and manage your code?', {
+			'myanimelist': {
+				'name': 'MyAnimeList',
+				'desc': 'Will attempt to upload directly to MAL\s Custom CSS box on your list. However, if you go over their limit of 65,535 characters, the tool will cancel and alert you.',
+				'func': ()=>{
+					closeDrawers();
+					drawerMal.open();
+				}
+			},
+			'dropbox': {
+				'name': 'Dropbox',
+				'desc': 'Upload to Dropbox.com and add a single import line to your MAL Custom CSS. Requires a Dropbox account.',
+				'func': ()=>{
+					closeDrawers();
+					drawerDropbox.$main.append(update.$main);
+					drawerDropbox.open();
+				}
+			},
+			'catbox': {
+				'name': 'Catbox',
+				'desc': 'Upload to Catbox.moe and add a single import line to your MAL Custom CSS. Requires a Catbox account.',
+				'func': ()=>{
+					closeDrawers();
+					drawerCatbox.$main.append(update.$main);
+					drawerCatbox.open();
+				}
+			},
+			'none': {
+				'name': 'No',
+				'desc': 'Manually copy and paste code that the tool generates.',
+				'func': ()=>{
+					closeDrawers();
+				}
+			}
+		}).$main,
+		$drawers
+	);
+
+	popupUI.$window.append($options);
+	popupUI.open();
+}
+
+function buildDropboxAuth( ui = UI, callback = ()=>{} ){
+	let popupUI = new SubsidiaryUI(ui, 'Dropbox Authentication');
+	let $options = $('<div class="l-column">');
+
+	let code = new Field();
+	code.$box.attr('placeholder', 'Paste your Dropbox code here to allow access.');
+	let working = false;
+	
+	$options.append(
+		new Paragraph(`To link your Dropbox account, click the button below to grant the app access. Once granted, it will give you a code.`),
+		new Button('Get code from Dropbox')
+		.on('click', ()=>{ Dropbox.getCode(); }),
+		new Paragraph('Enter the provided code into this text box.'),
+		code.$raw,
+		new Paragraph('With the code entered, press this button to exchange it for a proper token. If successful, you will be sent back to the previous menu.'),
+		new Button('Authenticate Token')
+		.on('click', async ev=>{
+			if( working ){
+				return;
+			}
+			working = true;
+			
+			let $btn = $(ev.target);
+			$btn.attr('disabled', 'disabled');
+			$btn.val('Authenticating...');
+			$btn.addClass('is-loading');
+
+			let success = await Dropbox.exchangeCode(code.$box.val());
+			$btn.removeAttr('disabled');
+			$btn.val('Authenticate Token');
+			$btn.removeClass('is-loading');
+			working = false;
+			if( !success ){
+				return;
+			}
+
+			popupUI.close();
+			callback();
+		})
+	);
+
+	popupUI.$window.append($options);
+	popupUI.open();
+}
+
+function buildCatboxAuth( ui, callback ){
+	let popupUI = new SubsidiaryUI(ui, 'Catbox Authentication');
+	let $options = $('<div class="l-column">');
+
+	let working = false;
+	
+	let field = new Field();
+	let auth = store.get('auth_catbox');
+	if( auth ){
+		field.$box.val(auth);
+	}
+
+	$options.append(
+		new Paragraph(`To link Catbox, you will need your userhash from the <a href="https://catbox.moe/user/manage.php" target="_blank">account management page</a>.`),
+		field.$raw,
+		new Paragraph('With the hash entered, press this button to validate that it works. If successful, you will be sent back to the previous menu.'),
+		new Button('Authenticate Hash')
+		.on('click', async ev=>{
+			if( working ){
+				return;
+			}
+			working = true;
+			
+			let $btn = $(ev.target);
+			$btn.attr('disabled', 'disabled');
+			$btn.val('Authenticating...');
+			$btn.addClass('is-loading');
+
+			let hash = field.$box.val();
+			if( hash.length < 1 ){
+				alert('Please input your userhash first.');
+				return;
+			}
+
+			let success = await Catbox.authenticate( hash );
+
+			$btn.removeAttr('disabled');
+			$btn.val('Authenticate Token');
+			$btn.removeClass('is-loading');
+			working = false;
+			if( !success ){
+				return;
+			}
+
+			popupUI.close();
+			callback();
+		})
 	);
 
 	popupUI.$window.append($options);
@@ -3220,7 +3886,7 @@ function buildHeaderExport( ){
 	popupUI.open();
 }
 
-function buildResults( css, tags, notes, headers, items, errors, warnings ){
+function buildResults( args ){
 	let popupUI = new SubsidiaryUI(UI, 'Job\'s Done!');
 	popupUI.nav.$right.append(
 		new Button('Exit')
@@ -3232,57 +3898,101 @@ function buildResults( css, tags, notes, headers, items, errors, warnings ){
 
 	let $info = $('<div class="l-column">');
 
-	const errorPercent = errors / items * 100;
-	const errorText = `\n\nOut of ${this.iteration} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors.`;
+	const errorPercent = args['errorCount'] / args['itemCount'] * 100;
+	const errorText = `\n\nOut of ${args['itemCount']} processed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors.`;
 	let scraperText = '';
-	if( errors < 1 && warnings > 0 ){
-		scraperText = `Scraping jobs encountered ${warnings} warning(s).\n\nIt is likely that all updates were successful. However, if you notice missing images, try running the tool again.`;
+	if( args['errorCount'] < 1 && args['warningCount'] > 0 ){
+		scraperText = `Scraping jobs encountered ${args['warningCount']} warning(s).\n\nIt is likely that all updates were successful. However, if you notice missing images, try running the tool again.`;
 	}
-	else if( errors > 0 && warnings < 1 ){
-		scraperText = `Scraping jobs encountered ${errors} error(s).${errorText}`;
+	else if( args['errorCount'] > 0 && args['warningCount'] < 1 ){
+		scraperText = `Scraping jobs encountered ${args['errorCount']} error(s).${errorText}`;
 	}
-	else if( errors > 0 && warnings > 0 ){
-		scraperText = `Scraping jobs encountered ${errors} error(s) and ${warnings} warning(s).${errorText}`;
+	else if( args['errorCount'] > 0 && args['warningCount'] > 0 ){
+		scraperText = `Scraping jobs encountered ${args['errorCount']} error(s) and ${args['warningCount']} warning(s).${errorText}`;
 	}
 
 	let tasks = [];
-	if( headers ){
-		tasks.push('Category headers updated.');
-	}
-	if( css ){
+	if( args['didCss'] ){
 		tasks.push('CSS generated.');
 	}
-	if( tags ){
+	if( args['didTags'] ){
 		tasks.push('Tags updated.');
 	}
-	if( notes ){
+	if( args['didNotes'] ){
 		tasks.push('Notes updated.');
 	}
-	$info.append(new Bullets(tasks));
-	if( scraperText && (css || tags || notes) ){
+	if( args['didHeaders'] ){
+		tasks.push('Category headers updated.');
+	}
+	if( args['didUpload'] ){
+		tasks.push(`Uploaded to your ${args['didUpload']} account.`);
+	}
+	if( args['didUpdate'] ){
+		tasks.push(`Updated your MyAnimeList "Custom CSS" box.`);
+	}
+	$info.append(new Paragraph('Tasks that were completed:'), new Bullets(tasks));
+	if( scraperText && (args['didCss'] || args['didTags'] || args['didNotes']) ){
 		$info.append(scraperText);
 	}
-	if( tags || notes ){
+	if( args['didTags'] || args['didNotes'] ){
 		$info.append(new Paragraph('Changes to tags or notes require a page refresh to display.'));
 	}
 
-	if( css ){
-		let cssRow = new SplitRow();
-		cssRow.$left.append(new Header('CSS Output').$main);
-		cssRow.$right.append(
+	if( args['displayCss'] ){
+		let scrapedCssRow = new SplitRow();
+		scrapedCssRow.$left.append(new Header('CSS Generator Output').$main);
+		scrapedCssRow.$right.append(
 			new Button('Copy to Clipboard')
 			.on('click', ()=>{
-				output.$box.trigger('select');
-				navigator.clipboard.writeText(output.$box.val());
+				scrapedOutput.$box.trigger('select');
+				navigator.clipboard.writeText(scrapedOutput.$box.val());
 			})
 		);
-		let output = new Textarea(false, '', {'readonly':'readonly'}, 20);
-		output.$box.val(worker.css);
+		let scrapedOutput = new Textarea(false, '', {'readonly':'readonly'}, 20);
+		scrapedOutput.$box.val(worker.scrapedCss);
+
+		let headerCssRow = new SplitRow();
+		headerCssRow.$left.append(new Header('Category Headers Output').$main);
+		headerCssRow.$right.append(
+			new Button('Copy to Clipboard')
+			.on('click', ()=>{
+				headerOutput.$box.trigger('select');
+				navigator.clipboard.writeText(headerOutput.$box.val());
+			})
+		);
+		let headerOutput = new Textarea(false, '', {'readonly':'readonly'}, 20);
+		headerOutput.$box.val(worker.headerCss);
+
 		$info.append(
-			cssRow.$main,
-			output.$raw
+			scrapedCssRow.$main,
+			scrapedOutput.$raw,
+			headerCssRow.$main,
+			headerOutput.$raw
 		);
 	}
+
+	if( args['didUpload'] && args['displayUrl'] ){
+		let urlField = new Field(false);
+		urlField.$box.val(args['url']);
+		let $copyBtn = new Button('Copy to Clipboard')
+		.on('click', ()=>{
+			urlField.$box.trigger('select');
+			navigator.clipboard.writeText(urlField.$box.val());
+		});
+
+		$info.append(
+			new Header('Uploaded File URL', 'For importing in your CSS.').$main,
+			urlField.$main,
+			$copyBtn
+		);
+	}
+	/*
+	TODO: display CSS here if auto-managing and uploading is enabled and it was successful
+	
+	let urlField = new Field();
+	urlField.$box.attr('placeholder', 'The URL for your CSS will be placed here.');
+
+	*/
 
 	popupUI.$window.append($info);
 
