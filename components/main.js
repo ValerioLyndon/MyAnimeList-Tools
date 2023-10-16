@@ -735,21 +735,24 @@ var Catbox = new class {
 			return await response.text();
 		}
 		catch( error ){
-			return error;
+			Log.error(`Failed to perform "${reqtype}" Catbox operation: ${error}`);
+			return false;
 		}
 	}
 
 	async upload( text ){
 		try {
 			const result = await this.#post('fileupload', [['fileToUpload', new Blob([text], { 'type': 'text/css' }), 'filename.css']]);
-			return result.includes('/') ? t.split('/').pop() : result;
+			return result;
 		}
 		catch {
 			return '';
 		}
 	}
 
+	/* accepts a space-separated list of filenames to delete */
 	async del( filenames ){
+		filenames = filenames.replaceAll('https://files.catbox.moe/','');
 		try {
 			const result = await this.#post('deletefiles', [['files', filenames]]);
 			return result.includes('success');
@@ -1471,36 +1474,55 @@ class Worker {
 		if( uploader === 'none' ){
 			resultArgs['displayCss'] = true;
 		}
-		if( uploader === 'dropbox' ){
+		else if( uploader === 'dropbox' ){
 			let url = await Dropbox.upload(allCss);
-			if( !url ){
-				resultArgs['displayCss'] = true;
-			}
-			else {
+			if( url ){
 				url = url.replace('www.dropbox','dl.dropboxusercontent').replace('?dl=0','').replace('&dl=0','');
 				resultArgs['url'] = url;
 				resultArgs['didUpload'] = 'Dropbox';
 				if( MyAnimeList.import(url) ){
 					resultArgs['didUpdate'] = true;
 				}
-			}
-		}
-		if( uploader === 'catbox' ){
-			let url = await Catbox.upload(allCss);
-			if( !url ){
-				resultArgs['displayCss'] = true;
+				else {
+					resultArgs['displayUrl'] = true;
+				}
 			}
 			else {
+				resultArgs['displayCss'] = true;
+			}
+		}
+		else if( uploader === 'catbox' ){
+			let url = await Catbox.upload(allCss);
+			console.log(url);
+			if( url ){
+				/* delete previous upload to avoid cluttering up Catbox */
+				const previous = store.get('url_catbox');
+				if( previous && previous !== url ){
+					if( await Catbox.del(previous) ){
+						store.remove('url_catbox');
+					}
+				}
+
+				store.set('url_catbox', url);
 				resultArgs['url'] = url;
 				resultArgs['didUpload'] = 'Catbox';
 				if( MyAnimeList.import(url) ){
 					resultArgs['didUpdate'] = true;
 				}
+				else {
+					resultArgs['displayUrl'] = true;
+				}
+			}
+			else {
+				resultArgs['displayCss'] = true;
 			}
 		}
-		if( uploader === 'myanimelist' ){
+		else if( uploader === 'myanimelist' ){
 			if( MyAnimeList.append(allCss) ){
 				resultArgs['didUpdate'] = true;
+			}
+			else {
+				resultArgs['displayCss'] = true;
 			}
 		}
 
