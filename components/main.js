@@ -695,23 +695,6 @@ function sleep( ms ){
 	return new Promise(resolve => { setTimeout(resolve, ms); });
 }
 
-async function encodeSha256( string ){
-	const encoder = new TextEncoder().encode(string);
-	const hashBuffer = await crypto.subtle.digest('SHA-256', encoder);
-	const hashArray = Array.from(new Uint8Array(hashBuffer));
-	return hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
-function encodeBase64Url( string ){
-	return btoa(string).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-}
-
-function decodeBase64Url( base64Url ){
-	let padding = '='.repeat((4 - base64Url.length % 4) % 4);
-	let base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/');
-	return atob(base64);
-}
-
 
 
 /* File Upload Integrations */
@@ -795,7 +778,7 @@ var Dropbox = new class {
 	authenticated = false;
 
 	constructor( ){
-		this.createChallenge();
+		this.createCodes();
 		if( store.has('auth_dropbox') ){
 			this.#auth = store.get('auth_dropbox');
 			this.refreshToken()
@@ -806,23 +789,27 @@ var Dropbox = new class {
 		}
 	}
 
-	/* create verifier and challenge codes */
-	async createChallenge( ){
-		let verifier = '';
-		const verifierChars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-._~';
-		for( let i = 0; i < 64; i++ ){
-			let random = round((verifierChars.length-1) * Math.random());
-			verifier += verifierChars[random];
-		}
-		verifier = encodeBase64Url(verifier);
-		/* debug */
-		this.#codeVerifier = verifier;
-		this.#codeChallenge = encodeBase64Url(await encodeSha256(verifier));
+	base64URLEncode(buffer) {
+		let base64 = btoa(String.fromCharCode.apply(null, buffer));
+		return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+	}
+
+	async createCodes( ){
+		/* create verifier */
+		const codeVerifier = new Uint8Array(32);
+		window.crypto.getRandomValues(codeVerifier);
+		this.#codeVerifier = this.base64URLEncode(codeVerifier);
+
+		/* create challenge */
+		const encoder = new TextEncoder();
+		const data = encoder.encode(verifier);
+		const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+		this.#codeChallenge = this.base64URLEncode(new Uint8Array(hashBuffer));
 	}
 	
 	/* step 1 */
 	getCode( ){
-		window.open(`https://www.dropbox.com/oauth2/authorize?client_id=${this.#clientId}&response_type=code&code_challenge=${this.#codeVerifier}&code_challenge_method=plain&token_access_type=offline`, '_blank');
+		window.open(`https://www.dropbox.com/oauth2/authorize?client_id=${this.#clientId}&response_type=code&code_challenge=${this.#codeChallenge}&code_challenge_method=S256&token_access_type=offline`, '_blank');
 	}
 	
 	/* step 2 */
@@ -1995,7 +1982,7 @@ function buildGlobalSettings( ){
 
 	/* uploaders */
 
-	let update = new Check(['automatic_import'], 'Add an @import to your CSS automatically.', 'Recommended! After uploading your file, it will be added to your Custom CSS as an @import line.');
+	let update = new Check(['automatic_import'], 'Add to your CSS automatically.', 'Recommended! After uploading your file, it will be added to your Custom CSS as an @import line.');
 
 	/* MyAnimeList */
 
