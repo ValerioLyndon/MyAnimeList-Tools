@@ -65,27 +65,42 @@ if( List.isOwner ){
 async function automation( ){
 	await initialise();
 
-	const doHeaders = settings.get(['update_headers']) && settings.get(['auto_headers']);
-
-	if( !doHeaders || !List.isModern ){
-		return;
-	}
-
-	const msBetweenRuns = 60 * 1000;
-
-	const timeSinceLastRun = Date.now() - store.get('last_auto_headers', 0);
-
-	if( timeSinceLastRun < msBetweenRuns ){
-		const timeUntilNextRun = round((msBetweenRuns - timeSinceLastRun) / 1000);
-		Log.generic(`Skipped automatic category headers update as the last run happened not long ago. Please start the tool manually or wait until the delay has reset in ${timeUntilNextRun} seconds.`);
+	if( !settings.get(['allow_auto']) ){
 		return;
 	}
 	if( List.isPreview ) {
-		Log.generic('Skipped automatic category headers update as the tool does not run on preview windows for safety of your CSS.');
+		Log.generic('Skipped automatic update as the tool does not run on preview windows for safety of your CSS.');
 		return;
 	}
+
+	let doCss = settings.get(['update_css']) && settings.get(['auto_css']);
+	let doTags = settings.get(['update_tags']) && settings.get(['auto_tags']);
+	let doNotes = settings.get(['update_notes']) && settings.get(['auto_notes']);
+	let doHeaders = List.isModern && settings.get(['update_headers']) && settings.get(['auto_headers']);
+
+	/* prevent spamming automatic runs */
+	const msBetweenScraperRuns = 60 * 60 * 1000;
+	const timeSinceLastScraperRun = Date.now() - store.get('last_auto_scraper', 0);
+	const msBetweenHeaderRuns = 5 * 60 * 1000;
+	const timeSinceLastHeaderRun = Date.now() - store.get('last_auto_headers', 0);
+
+	if( timeSinceLastScraperRun < msBetweenScraperRuns ){
+		const timeUntilNextRun = round((msBetweenScraperRuns - timeSinceLastScraperRun) / 1000);
+		Log.generic(`Skipped automatic CSS, Tags, or Notes update as the last run happened too recently. Please start the tool manually or wait until the delay has reset in ${timeUntilNextRun} seconds.`);
+		doCss = false;
+		doTags = false;
+		doNotes = false;
+	}
+	if( timeSinceLastHeaderRun < msBetweenHeaderRuns ){
+		const timeUntilNextRun = round((msBetweenHeaderRuns - timeSinceLastHeaderRun) / 1000);
+		Log.generic(`Skipped automatic category headers update as the last run happened too recently. Please start the tool manually or wait until the delay has reset in ${timeUntilNextRun} seconds.`);
+		doHeaders = false;
+	}
 	
-	worker = new Worker(true);
-	worker.start(false, false, false, doHeaders);
-	Log.generic('Performed automatic category header update.');
+	if( doCss || doTags || doNotes || doHeaders ){
+		worker = new Worker(true);
+		worker.start(doCss, doTags, doNotes, doHeaders);
+		Log.generic('Performing automatic update.');
+	}
+	
 }

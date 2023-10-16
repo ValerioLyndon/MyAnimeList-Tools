@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre31_a0
+// @version      11.0-pre32_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,7 +24,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre31_a0';
+const ver = '11.0-pre32_a0';
 const verMod = '2023/Oct/15';
 
 class CustomStorage {
@@ -1529,6 +1529,7 @@ class UserSettings {
 			"6": false
 		},
 		"delay": "3000",
+		"allow_auto": true,
 
 		/* file hosts */
 		"uploader": "myanimelist",
@@ -1536,6 +1537,7 @@ class UserSettings {
 
 		/* css */
 		"update_css": false,
+		"auto_css": false,
 		"css_template": "/* [TITLE] *[DEL]/ .data.image a[href^=\"/[TYPE]/[ID]/\"]::before { background-image: url([IMGURL]); }",
 		"match_template": "/[TYPE]/[ID]/",
 		"check_existing": false,
@@ -1543,6 +1545,7 @@ class UserSettings {
 
 		/* tags */
 		"update_tags": false,
+		"auto_tags": false,
 		"checked_tags": {
 			"english_title": false,
 			"french_title": false,
@@ -1572,6 +1575,7 @@ class UserSettings {
 
 		/* notes */
 		"update_notes": false,
+		"auto_notes": false,
 		"checked_notes": {
 			"synopsis": false,
 			"english_title": false,
@@ -2437,8 +2441,6 @@ class Worker {
 
 			position += count;
 		}
-
-		store.set('last_auto_headers', Date.now());
 	}
 
 	async start( doCss = settings.get(['update_css']), doTags = settings.get(['update_tags']), doNotes = settings.get(['update_notes']), doHeaders = settings.get(['update_headers']) ){
@@ -2640,6 +2642,13 @@ class Worker {
 	}
 
 	async #finish( ){
+		if( this.doCss || this.doTags || this.doNotes ){
+			store.set('last_auto_scraper', Date.now());
+		}
+		if( this.doHeaders ){
+			store.set('last_auto_headers', Date.now());
+		}
+
 		let resultArgs = {
 			'didCss': this.doCss,
 			'didTags': this.doTags,
@@ -2721,7 +2730,7 @@ class Worker {
 		const results = ()=>{
 			buildResults( resultArgs, this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
 		};
-		if( !this.silent ){
+		if( !this.silent || UI.open ){
 			results();
 			UIState.setDone(results);
 		}
@@ -3372,6 +3381,12 @@ function buildGlobalSettings( ){
 			new Check(['checked_categories', '4'], "Dropped"),
 			new Check(['checked_categories', '6'], "Planned")
 		]).$main,
+		new CheckGroup(['allow_auto'], 'Automatically Run Upon Page Load', 'Enabling any of these options will allow them to begin updating as soon as you load your list. They will not run if you have the component disabled.', [
+			new Check(['auto_css'], "CSS Generator"),
+			new Check(['auto_tags'], "Tags Updater"),
+			new Check(['auto_notes'], "Notes Updater"),
+			new Check(['auto_headers'], "Category Headers")
+		]).$main,
 		new Radio(['uploader'], 'Automatically upload and manage your code?', {
 			'myanimelist': {
 				'name': 'MyAnimeList',
@@ -3795,7 +3810,6 @@ function buildHeaderSettings( ){
 	let $options = $('<div class="l-column">');
 	$options.append(
 		new Paragraph('These headers will only be applied to modern lists. Classic lists disable this tool as they already have headers by default. For help understanding and creating templates, see the <a href="https://myanimelist.net/forum/?topicid=1905478" target="_blank">thread</a>.'),
-		new Check(['auto_headers'], 'Automatically Update Headers', 'Every time you load your anime or manga list, this script will run and update your CSS with new header locations.').$main,
 		new Textarea(['header_template'], 'Template for Each Header', {'title':'CSS Template used for each header. Replacements are:\n[INDEX], [NAME], [TYPE]'}, 15).$main,
 		new Textarea(['header_style'], 'Styling for All Headers', {'title':'CSS Styling applied once to your Custom CSS.'}, 15).$main
 	);
@@ -4053,27 +4067,42 @@ if( List.isOwner ){
 async function automation( ){
 	await initialise();
 
-	const doHeaders = settings.get(['update_headers']) && settings.get(['auto_headers']);
-
-	if( !doHeaders || !List.isModern ){
-		return;
-	}
-
-	const msBetweenRuns = 60 * 1000;
-
-	const timeSinceLastRun = Date.now() - store.get('last_auto_headers', 0);
-
-	if( timeSinceLastRun < msBetweenRuns ){
-		const timeUntilNextRun = round((msBetweenRuns - timeSinceLastRun) / 1000);
-		Log.generic(`Skipped automatic category headers update as the last run happened not long ago. Please start the tool manually or wait until the delay has reset in ${timeUntilNextRun} seconds.`);
+	if( !settings.get(['allow_auto']) ){
 		return;
 	}
 	if( List.isPreview ) {
-		Log.generic('Skipped automatic category headers update as the tool does not run on preview windows for safety of your CSS.');
+		Log.generic('Skipped automatic update as the tool does not run on preview windows for safety of your CSS.');
 		return;
 	}
+
+	let doCss = settings.get(['update_css']) && settings.get(['auto_css']);
+	let doTags = settings.get(['update_tags']) && settings.get(['auto_tags']);
+	let doNotes = settings.get(['update_notes']) && settings.get(['auto_notes']);
+	let doHeaders = List.isModern && settings.get(['update_headers']) && settings.get(['auto_headers']);
+
+	/* prevent spamming automatic runs */
+	const msBetweenScraperRuns = 60 * 60 * 1000;
+	const timeSinceLastScraperRun = Date.now() - store.get('last_auto_scraper', 0);
+	const msBetweenHeaderRuns = 5 * 60 * 1000;
+	const timeSinceLastHeaderRun = Date.now() - store.get('last_auto_headers', 0);
+
+	if( timeSinceLastScraperRun < msBetweenScraperRuns ){
+		const timeUntilNextRun = round((msBetweenScraperRuns - timeSinceLastScraperRun) / 1000);
+		Log.generic(`Skipped automatic CSS, Tags, or Notes update as the last run happened not long ago. Please start the tool manually or wait until the delay has reset in ${timeUntilNextRun} seconds.`);
+		doCss = false;
+		doTags = false;
+		doNotes = false;
+	}
+	if( timeSinceLastHeaderRun < msBetweenHeaderRuns ){
+		const timeUntilNextRun = round((msBetweenHeaderRuns - timeSinceLastHeaderRun) / 1000);
+		Log.generic(`Skipped automatic category headers update as the last run happened not long ago. Please start the tool manually or wait until the delay has reset in ${timeUntilNextRun} seconds.`);
+		doHeaders = false;
+	}
 	
-	worker = new Worker(true);
-	worker.start(false, false, false, doHeaders);
-	Log.generic('Performed automatic category header update.');
+	if( doCss || doTags || doNotes || doHeaders ){
+		worker = new Worker(true);
+		worker.start(doCss, doTags, doNotes, doHeaders);
+		Log.generic('Performing automatic update.');
+	}
+	
 }
