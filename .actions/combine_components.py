@@ -1,5 +1,6 @@
 import os
 import re
+from datetime import datetime
 
 # FUNCTIONS
 
@@ -23,6 +24,8 @@ with open(path('components/variables'), 'r') as file:
 		split = var.split('=');
 		name = split.pop(0).lstrip()
 		value = '='.join(split).rstrip('\n\r')
+		if name == 'ver_date':
+			value = datetime.now().strftime("%Y/%b/%d")
 		textReplacements.append([name, value])
 
 fileReplacements = [
