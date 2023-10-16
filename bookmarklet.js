@@ -7,7 +7,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre30+f10_b0';
+const ver = '11.0-pre30+f11_b0';
 const verMod = '2023/Aug/31';
 
 class CustomStorage {
@@ -1728,7 +1728,7 @@ async function setTemplate(newTemplate, newMatchTemplate, newCss = false) {
 		if( newCss.length > 0 ){
 			css += '\n\n/*MYANIMELIST-TOOLS START*/\n\n' + newCss + '\n\n/*MYANIMELIST-TOOLS END*/';
 		}
-		updateCss(css);
+		MyAnimeList.append(css);
 	}
 	alert('Import succeeded.');
 	return true;
@@ -1741,91 +1741,6 @@ async function setHeaderTemplate(newTemplate, newStyle) {
 	
 	alert('Import succeeded.');
 	return true;
-}
-
-async function updateCss( css ){
-	if( css === List.css() ){
-		return true;
-	}
-	if( css.length >= 65535 ){
-		alert('Your MAL Custom CSS may be longer than the max allowed length. If your CSS has been cut off at the end, you will need to resolve this issue.');
-	}
-
-	/* Send new CSS to MAL */
-	if( List.isModern ){
-		let styleUrl = `https://myanimelist.net/ownlist/style/theme/${List.style}`;
-
-		let stylePage = await request(styleUrl);
-		let bg_attach = $(stylePage).find('#style_edit_theme_background_image_attachment').find('[selected]').val() || '';
-		let bg_vert = $(stylePage).find('#style_edit_theme_background_image_vertical_position').find('[selected]').val() || '';
-		let bg_hori = $(stylePage).find('#style_edit_theme_background_image_horizontal_position').find('[selected]').val() || '';
-		let bg_repeat = $(stylePage).find('#style_edit_theme_background_image_repeat').find('[selected]').val() || '';
-		
-		let formData = new FormData();
-		formData.append("style_edit_theme[show_cover_image]", "1");
-		formData.append("style_edit_theme[cover_image]", new File([], ""));
-		formData.append("style_edit_theme[show_background_image]", "1");
-		formData.append("style_edit_theme[background_image]", new File([], ""));
-		formData.append("style_edit_theme[background_image_attachment]", bg_attach);
-		formData.append("style_edit_theme[background_image_vertical_position]", bg_vert);
-		formData.append("style_edit_theme[background_image_horizontal_position]", bg_hori);
-		formData.append("style_edit_theme[background_image_repeat]", bg_repeat);
-		formData.append("style_edit_theme[css]", css);
-		formData.append("style_edit_theme[save]", "");
-		formData.append("csrf_token", List.csrf);
-		
-		let post = await fetch(styleUrl, {
-			method: "POST",
-			body: formData
-		})
-		.then(response => {
-			if( !response.ok) {
-				throw new Error(`Failed to send modern CSS update request.`);
-			}
-			return true;
-		})
-		.catch(error => {
-			Log.error(error);
-			return false;
-		});
-		if( !post ){
-			return false;
-		}
-	}
-	else {
-		let styleUrl = `https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv&id=${List.style}`;
-		
-		let headerData = new Headers();
-		headerData.append('Content-Type', 'application/x-www-form-urlencoded');
-		headerData.append('Referer', styleUrl);
-
-		let formData = new URLSearchParams();
-		formData.append('cssText', css);
-		formData.append('subForm', 'Update CSS');
-		formData.append('csrf_token', List.csrf);
-		
-		let post = await fetch(styleUrl, {
-			method: "POST",
-			headers: headerData,
-			body: formData
-		})
-		.then(response => {
-			if( !response.ok ){
-				throw new Error(`Failed to send classic CSS update request.`);
-			}
-			return true;
-		})
-		.catch(error => {
-			Log.error(error);
-			return false;
-		});
-		if( !post ){
-			return false;
-		}
-	}
-
-	/* Temporarily update the page's CSS to make sure no page reload is required */
-	List.css(css);
 }
 
 /* wrapper for common fetch requests to remove some boilerplate */
@@ -1872,6 +1787,94 @@ function sleep( ms ){
 /* File Upload Integrations */
 
 const proxy = 'https://cors-anywhere-rp3l.onrender.com/';
+
+var MyAnimeList = new class {
+	async #updateCss( css ){
+		if( css === List.css() ){
+			return true;
+		}
+		if( css.length >= 65535 ){
+			Log.warn('Your MAL Custom CSS was not updated as it would be over the max allowed length. You need to switch to a different uploader or reduce the components you are using.');
+			return false;
+		}
+
+		/* Send new CSS to MAL */
+		if( List.isModern ){
+			let styleUrl = `https://myanimelist.net/ownlist/style/theme/${List.style}`;
+
+			let stylePage = await request(styleUrl);
+			let bg_attach = $(stylePage).find('#style_edit_theme_background_image_attachment').find('[selected]').val() || '';
+			let bg_vert = $(stylePage).find('#style_edit_theme_background_image_vertical_position').find('[selected]').val() || '';
+			let bg_hori = $(stylePage).find('#style_edit_theme_background_image_horizontal_position').find('[selected]').val() || '';
+			let bg_repeat = $(stylePage).find('#style_edit_theme_background_image_repeat').find('[selected]').val() || '';
+			
+			let formData = new FormData();
+			formData.append("style_edit_theme[show_cover_image]", "1");
+			formData.append("style_edit_theme[cover_image]", new File([], ""));
+			formData.append("style_edit_theme[show_background_image]", "1");
+			formData.append("style_edit_theme[background_image]", new File([], ""));
+			formData.append("style_edit_theme[background_image_attachment]", bg_attach);
+			formData.append("style_edit_theme[background_image_vertical_position]", bg_vert);
+			formData.append("style_edit_theme[background_image_horizontal_position]", bg_hori);
+			formData.append("style_edit_theme[background_image_repeat]", bg_repeat);
+			formData.append("style_edit_theme[css]", css);
+			formData.append("style_edit_theme[save]", "");
+			formData.append("csrf_token", List.csrf);
+			
+			let response = await fetch(styleUrl, {
+				method: "POST",
+				body: formData
+			});
+			if( !response.ok ) {
+				Log.error(`Failed to send modern CSS update request.`);
+				return false;
+			}
+		}
+		else {
+			let styleUrl = `https://myanimelist.net/editprofile.php?go=stylepref&do=cssadv&id=${List.style}`;
+			
+			let headerData = new Headers();
+			headerData.append('Content-Type', 'application/x-www-form-urlencoded');
+			headerData.append('Referer', styleUrl);
+
+			let formData = new URLSearchParams();
+			formData.append('cssText', css);
+			formData.append('subForm', 'Update CSS');
+			formData.append('csrf_token', List.csrf);
+			
+			let response = await fetch(styleUrl, {
+				method: "POST",
+				headers: headerData,
+				body: formData
+			});
+			if( !response.ok ){
+				Log.error(`Failed to send classic CSS update request.`);
+				return false;
+			};
+		}
+
+		/* Temporarily update the page's CSS to make sure no page reload is required */
+		List.css(css);
+		return true;
+	}
+
+	/* Surrounds any CSS to be inserted with text that will be seeked out later and replaced */
+	formatInsert( str ){
+		return `/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} START*/\n${str}\n/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} END*/`
+	}
+
+	async import( url ){
+		return await this.prepend(`@\import "${url}";`);
+	}
+
+	async prepend( str ){
+		return await this.#updateCss(this.formatInsert(str) + '\n\n' + List.cleanCss());
+	}
+
+	async append( str ){
+		return await this.#updateCss(List.cleanCss() + '\n\n' + this.formatInsert(str));
+	}
+}
 
 var Catbox = new class {
 	/* API reference at https://catbox.moe/tools.php */
@@ -2617,7 +2620,15 @@ class Worker {
 	}
 
 	async #finish( ){
-		UIState.isWorking = false;
+		let resultArgs = {
+			'didCss': this.doCss,
+			'didTags': this.doTags,
+			'didNotes': this.doNotes,
+			'didHeaders': this.doHeaders,
+			'itemCount': this.data.length,
+			'errorCount': this.errors,
+			'warningCount': this.warnings
+		};
 
 		if( this.scrapedCss.length > 0 ){
 			store.set(`last_${List.type}_run`, this.scrapedCss);
@@ -2627,24 +2638,49 @@ class Worker {
 		const uploader = settings.get(['uploader']);
 		const auto = settings.get(['automatic_import']);
 
-		switch( uploader ){
-			case 'none':
-				break;
-			case 'dropbox':
-				Log.generic(await Dropbox.upload(allCss));
-				//.replace('www.dropbox','dl.dropboxusercontent').replace('?dl=0','');
-				break;
-			case 'catbox':
-				Log.generic(await Catbox.upload(allCss));
-				break;
-			case 'myanimelist':
-				let markedCss = `/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} START*/\n\n${allCss}\n\n/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} END*/`;
-				updateCss(this.cleanCss() + '\n\n' + markedCss);
-				break;
+		Status.update('Updating CSS...');
+		Status.estimate(1, 120000);
+		if( uploader === 'none' ){
+			resultArgs['displayCss'] = true;
+		}
+		if( uploader === 'dropbox' ){
+			let url = await Dropbox.upload(allCss);
+			if( !url ){
+				resultArgs['displayCss'] = true;
+			}
+			else {
+				url = url.replace('www.dropbox','dl.dropboxusercontent').replace('?dl=0','');
+				resultArgs['url'] = url;
+				resultArgs['didUpload'] = 'Dropbox';
+				if( MyAnimeList.import(url) ){
+					resultArgs['didUpdate'] = true;
+				}
+			}
+		}
+		if( uploader === 'catbox' ){
+			let url = await Catbox.upload(allCss);
+			if( !url ){
+				resultArgs['displayCss'] = true;
+			}
+			else {
+				resultArgs['url'] = url;
+				resultArgs['didUpload'] = 'Catbox';
+				if( MyAnimeList.import(url) ){
+					resultArgs['didUpdate'] = true;
+				}
+			}
+		}
+		if( uploader === 'myanimelist' ){
+			if( MyAnimeList.append(allCss) ){
+				resultArgs['didUpdate'] = true;
+			}
 		}
 
+
+		UIState.isWorking = false;
+
 		const results = ()=>{
-			buildResults( this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
+			buildResults( resultArgs, this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
 		};
 		if( !this.silent ){
 			results();
@@ -3828,7 +3864,7 @@ function buildHeaderExport( ){
 	popupUI.open();
 }
 
-function buildResults( css, tags, notes, headers, itemCount, errors, warnings ){
+function buildResults( args ){
 	let popupUI = new SubsidiaryUI(UI, 'Job\'s Done!');
 	popupUI.nav.$right.append(
 		new Button('Exit')
@@ -3840,55 +3876,76 @@ function buildResults( css, tags, notes, headers, itemCount, errors, warnings ){
 
 	let $info = $('<div class="l-column">');
 
-	const errorPercent = errors / itemCount * 100;
-	const errorText = `\n\nOut of ${itemCount} processed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors.`;
+	const errorPercent = args['errorCount'] / args['itemCount'] * 100;
+	const errorText = `\n\nOut of ${args['itemCount']} processed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors.`;
 	let scraperText = '';
-	if( errors < 1 && warnings > 0 ){
-		scraperText = `Scraping jobs encountered ${warnings} warning(s).\n\nIt is likely that all updates were successful. However, if you notice missing images, try running the tool again.`;
+	if( args['errorCount'] < 1 && args['warningCount'] > 0 ){
+		scraperText = `Scraping jobs encountered ${args['warningCount']} warning(s).\n\nIt is likely that all updates were successful. However, if you notice missing images, try running the tool again.`;
 	}
-	else if( errors > 0 && warnings < 1 ){
-		scraperText = `Scraping jobs encountered ${errors} error(s).${errorText}`;
+	else if( args['errorCount'] > 0 && args['warningCount'] < 1 ){
+		scraperText = `Scraping jobs encountered ${args['errorCount']} error(s).${errorText}`;
 	}
-	else if( errors > 0 && warnings > 0 ){
-		scraperText = `Scraping jobs encountered ${errors} error(s) and ${warnings} warning(s).${errorText}`;
+	else if( args['errorCount'] > 0 && args['warningCount'] > 0 ){
+		scraperText = `Scraping jobs encountered ${args['errorCount']} error(s) and ${args['warningCount']} warning(s).${errorText}`;
 	}
 
 	let tasks = [];
-	if( headers ){
+	if( args['didHeaders'] ){
 		tasks.push('Category headers updated.');
 	}
-	if( css ){
+	if( args['didCss'] ){
 		tasks.push('CSS generated.');
 	}
-	if( tags ){
+	if( args['didTags'] ){
 		tasks.push('Tags updated.');
 	}
-	if( notes ){
+	if( args['didNotes'] ){
 		tasks.push('Notes updated.');
 	}
-	$info.append(new Bullets(tasks));
-	if( scraperText && (css || tags || notes) ){
+	if( args['didUpload'] ){
+		tasks.push(`Uploaded to your ${args['didUpload']} account.`);
+	}
+	if( args['didUpdate'] ){
+		tasks.push(`Updated your MyAnimeList "Custom CSS" box.`);
+	}
+	$info.append(new Paragraph('Tasks that were completed:'), new Bullets(tasks));
+	if( scraperText && (args['didCss'] || args['didTags'] || args['didNotes']) ){
 		$info.append(scraperText);
 	}
-	if( tags || notes ){
+	if( args['didTags'] || args['didNotes'] ){
 		$info.append(new Paragraph('Changes to tags or notes require a page refresh to display.'));
 	}
 
-	if( css ){
-		let cssRow = new SplitRow();
-		cssRow.$left.append(new Header('CSS Output').$main);
-		cssRow.$right.append(
+	if( args['displayCss'] ){
+		let scrapedCssRow = new SplitRow();
+		scrapedCssRow.$left.append(new Header('CSS Generator Output').$main);
+		scrapedCssRow.$right.append(
 			new Button('Copy to Clipboard')
 			.on('click', ()=>{
-				output.$box.trigger('select');
-				navigator.clipboard.writeText(output.$box.val());
+				scrapedOutput.$box.trigger('select');
+				navigator.clipboard.writeText(scrapedOutput.$box.val());
 			})
 		);
-		let output = new Textarea(false, '', {'readonly':'readonly'}, 20);
-		output.$box.val(worker.css);
+		let scrapedOutput = new Textarea(false, '', {'readonly':'readonly'}, 20);
+		scrapedOutput.$box.val(worker.scrapedCss);
+
+		let headerCssRow = new SplitRow();
+		headerCssRow.$left.append(new Header('Category Headers Output').$main);
+		headerCssRow.$right.append(
+			new Button('Copy to Clipboard')
+			.on('click', ()=>{
+				headerOutput.$box.trigger('select');
+				navigator.clipboard.writeText(headerOutput.$box.val());
+			})
+		);
+		let headerOutput = new Textarea(false, '', {'readonly':'readonly'}, 20);
+		headerOutput.$box.val(worker.headerCss);
+
 		$info.append(
-			cssRow.$main,
-			output.$raw
+			scrapedCssRow.$main,
+			scrapedOutput.$raw,
+			headerCssRow.$main,
+			headerOutput.$raw
 		);
 	}
 	/*
