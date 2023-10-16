@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         List Tools
 // @namespace    V.L
-// @version      11.0-pre30+f8_a0
+// @version      11.0-pre30+f10_a0
 // @description  Provides tools for managing your list's tags, CSS, and more.
 // @author       Valerio Lyndon
 // @match        https://myanimelist.net/animelist/*
@@ -24,7 +24,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre30+f8_a0';
+const ver = '11.0-pre30+f10_a0';
 const verMod = '2023/Aug/31';
 
 class CustomStorage {
@@ -1967,23 +1967,20 @@ var Dropbox = new class {
 	authenticated = false;
 
 	constructor( ){
-		this.createCodes();
+		this.setup();
 		if( store.has('auth_dropbox') ){
 			this.#auth = store.get('auth_dropbox');
 			this.refreshToken()
 			.then(result=>{
 				this.#auth = result;
-				Log.generic('Authenticated with Dropbox.\n'+JSON.stringify(this.#auth), false)
+				if( !this.#auth ){
+					Log.generic('Your Dropbox authorisation has expired or failed. Please repeat the authorisation process.');
+				}
 			});
 		}
 	}
 
-	base64URLEncode(buffer) {
-		let base64 = btoa(String.fromCharCode.apply(null, buffer));
-		return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-	}
-
-	async createCodes( ){
+	async setup( ){
 		/* create verifier */
 		const codeVerifier = new Uint8Array(32);
 		window.crypto.getRandomValues(codeVerifier);
@@ -1991,9 +1988,14 @@ var Dropbox = new class {
 
 		/* create challenge */
 		const encoder = new TextEncoder();
-		const data = encoder.encode(verifier);
+		const data = encoder.encode(this.#codeVerifier);
 		const hashBuffer = await crypto.subtle.digest('SHA-256', data);
 		this.#codeChallenge = this.base64URLEncode(new Uint8Array(hashBuffer));
+	}
+
+	base64URLEncode(buffer) {
+		let base64 = btoa(String.fromCharCode.apply(null, buffer));
+		return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 	}
 	
 	/* step 1 */
@@ -2030,7 +2032,6 @@ var Dropbox = new class {
 
 	/* confirms dropbox is still authenticated and refreshes token if necessary */
 	async refreshToken( ){
-		console.log(this.#auth);
 		if( !this.#auth || !('refresh_token' in this.#auth) ){
 			Log.error('Refresh token was called when initial authorisation has yet to occur.');
 			this.authenticated = false;
@@ -2080,6 +2081,7 @@ var Dropbox = new class {
 		return true;
 	}
 
+	/* upload file and get a share link */
 	async upload( txt ){
 		if( !this.refreshToken() ){
 			return false;
@@ -2103,13 +2105,95 @@ var Dropbox = new class {
 			body: new Blob([txt])
 		});
 		if( !response.ok ){
-			Log.error(`Failed to upload file: response not ok: ${response.status} ${response.statusText}`);
+			Log.error(`Failed to upload Dropbox file: response not ok: ${response.status} ${response.statusText}`);
+			return false;
+		}
+		const json = await response.json();
+		if( 'error' in json ){
+			Log.error(`Failed to upload Dropbox file: response contained an error: ${json['error_summary']}`);
+			return false;
+		}
+		if( !('path_lower' in json) ){
+			Log.error('Failed to upload Dropbox file: response did not contain necessary information.');
+			return false;
+		}
+
+		let url = false;
+		let share = this.#getShare(json['path_lower']);
+		if( share ){
+			return share;
+		}
+		else {
+			return this.#share(json['path_lower']);
+		}
+	}
+
+	async #getShare( path ){
+		let args  = {"path": path};
+
+		let response = await fetch(proxy+'https://api.dropboxapi.com/2/sharing/list_shared_links', {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${this.#auth['access_token']}`,
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(args)
+		});
+		if( !response.ok ){
+			Log.error(`Failed to get Dropbox link: response not ok: ${response.status} ${response.statusText}`);
 			return false;
 		}
 		let json = await response.json();
+		if( 'error' in json ){
+			Log.error(`Failed to get Dropbox link: response contained an error: ${json['error_summary']}`);
+			return false;
+		}
+		if( !('links' in json) ){
+			Log.error('Failed to get Dropbox link: response did not contain necessary information.');
+			return false;
+		}
 
-		Log.generic(JSON.stringify(json));
-		return json;
+		for( let link of json['links'] ){
+			if( link['path_lower'] === path ){
+				return link['url'];
+			}
+		}
+		return false;
+	}
+
+	async #share( path ){
+		let args  = {
+			"path": path,
+			"settings": {
+				"access": "viewer",
+				"allow_download": true,
+				"audience": "public"
+			}
+		};
+
+		let response = await fetch(proxy+'https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${this.#auth['access_token']}`,
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(args)
+		});
+		if( !response.ok ){
+			Log.error(`Failed to create Dropbox link: response not ok: ${response.status} ${response.statusText}`);
+			return false;
+		}
+		let json = await response.json();
+		if( 'error' in json ){
+			Log.error(`Failed to create Dropbox link: response contained an error: ${json['error_summary']}`);
+			return false;
+		}
+		if( !('url' in json) ){
+			Log.error('Failed to create Dropbox link: response did not contain necessary information.');
+			return false;
+		}
+
+		return json['url'];
 	}
 }
 
@@ -2187,7 +2271,6 @@ class ListItems {
 	}
 
 	static load( ){
-		console.log('load', this.#offset);
 		if( this.#loaded ){
 			this.#done();
 			return true;
@@ -2234,7 +2317,8 @@ class ListItems {
 }
 	
 class Worker {
-	allCss = '';
+	/* header generation vars */
+	headerCss = '';
 	
 	/* CSS generation vars */
 	scrapedCss = '';
@@ -2296,6 +2380,9 @@ class Worker {
 		}
 
 		Status.update('Updating category headers...', 'working', -1);
+
+		this.headerCss += settings.get(['header_style']);
+
 		/* fetch data and setup counts */
 
 		const names = List.type === 'anime' ? {
@@ -2332,24 +2419,19 @@ class Worker {
 
 		const template = settings.get(['header_template']);
 
-		let toAppend = `\n\n/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} START*/\n\n` + settings.get(['header_style']);
-
 		let position = 2;
 		for( const [id, count] of Object.entries(countsPer) ){
 			if( count === 0 ){
 				continue;
 			}
-			toAppend += '\n' + template
+			this.headerCss += '\n' + template
 				.replaceAll('[INDEX]', position)
 				.replaceAll('[NAME]', names[id])
 				.replaceAll('[TYPE]', List.type);
 
 			position += count;
 		}
-		toAppend += `\n\n/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} END*/`;
 
-		let css = List.cleanCss() + toAppend;
-		updateCss(css);
 		store.set('last_auto_headers', Date.now());
 	}
 
@@ -2551,8 +2633,32 @@ class Worker {
 		}, settings.get(['delay']));
 	}
 
-	#finish( ){
+	async #finish( ){
 		UIState.isWorking = false;
+
+		if( this.scrapedCss.length > 0 ){
+			store.set(`last_${List.type}_run`, this.scrapedCss);
+		}
+		const allCss = this.scrapedCss + '\n\n' + this.headerCss;
+
+		const uploader = settings.get(['uploader']);
+		const auto = settings.get(['automatic_import']);
+
+		switch( uploader ){
+			case 'none':
+				break;
+			case 'dropbox':
+				Log.generic(await Dropbox.upload(allCss));
+				//.replace('www.dropbox','dl.dropboxusercontent').replace('?dl=0','');
+				break;
+			case 'catbox':
+				Log.generic(await Catbox.upload(allCss));
+				break;
+			case 'myanimelist':
+				let markedCss = `/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} START*/\n\n${allCss}\n\n/*LIST-TOOLS HEADERS ${List.type.toUpperCase()} END*/`;
+				updateCss(this.cleanCss() + '\n\n' + markedCss);
+				break;
+		}
 
 		const results = ()=>{
 			buildResults( this.doCss, this.doTags, this.doNotes, this.doHeaders, this.data.length, this.errors, this.warnings );
@@ -2563,39 +2669,6 @@ class Worker {
 		}
 		else {
 			UIState.setIdle();
-		}
-
-		if( this.scrapedCss.length > 0 ){
-			store.set(`last_${List.type}_run`, this.scrapedCss);
-		}
-
-		if( store.has('auth_dropbox') && settings.get('auto_dropbox') === 'true' ){
-			let headerData = new Headers();
-			headerData.append('Content-Type', 'application/octet-stream');
-			headerData.append('Authorization', `Bearer ${store.get('auth_dropbox')}`);
-			headerData.append('Dropbox-API-Arg', JSON.stringify({
-				'autorename': false,
-				'mode': 'overwrite',
-				'path': `/css/${List.isModern ? 'modern' : 'classic'}_${List.style}.css`
-			}));
-			let fileData = new Blob([result.value], {
-				type: "text/css"
-			});
-
-			fetch('https://content.dropboxapi.com/2/files/upload', {
-				method: "POST",
-				headers: headerData,
-				body: fileData
-			})
-			.then((response)=>{
-				if( !response.ok ){
-					throw new Error(`${response.status} ${response.statusText}`);
-				}
-				Log.generic('File uploaded.', true);
-			})
-			.catch((err)=>{
-				Log.error(`File failed to upload: ${err}`);
-			});
 		}
 	}
 
@@ -3772,7 +3845,7 @@ function buildHeaderExport( ){
 	popupUI.open();
 }
 
-function buildResults( css, tags, notes, headers, items, errors, warnings ){
+function buildResults( css, tags, notes, headers, itemCount, errors, warnings ){
 	let popupUI = new SubsidiaryUI(UI, 'Job\'s Done!');
 	popupUI.nav.$right.append(
 		new Button('Exit')
@@ -3784,8 +3857,8 @@ function buildResults( css, tags, notes, headers, items, errors, warnings ){
 
 	let $info = $('<div class="l-column">');
 
-	const errorPercent = errors / items * 100;
-	const errorText = `\n\nOut of ${this.iteration} processsed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors.`;
+	const errorPercent = errors / itemCount * 100;
+	const errorText = `\n\nOut of ${itemCount} processed items, that represents a ${errorPercent}% error rate. Some updates were likely successful, especially if the error rate is low.\n\nBefore seeking help, try refreshing your list page and rerunning the tool to fix these errors.`;
 	let scraperText = '';
 	if( errors < 1 && warnings > 0 ){
 		scraperText = `Scraping jobs encountered ${warnings} warning(s).\n\nIt is likely that all updates were successful. However, if you notice missing images, try running the tool again.`;
