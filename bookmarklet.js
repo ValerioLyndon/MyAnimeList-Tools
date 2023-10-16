@@ -7,7 +7,7 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre30+f12_b0';
+const ver = '11.0-pre30+f13_b0';
 const verMod = '2023/Aug/31';
 
 class CustomStorage {
@@ -3912,9 +3912,6 @@ function buildResults( args ){
 	}
 
 	let tasks = [];
-	if( args['didHeaders'] ){
-		tasks.push('Category headers updated.');
-	}
 	if( args['didCss'] ){
 		tasks.push('CSS generated.');
 	}
@@ -3923,6 +3920,9 @@ function buildResults( args ){
 	}
 	if( args['didNotes'] ){
 		tasks.push('Notes updated.');
+	}
+	if( args['didHeaders'] ){
+		tasks.push('Category headers updated.');
 	}
 	if( args['didUpload'] ){
 		tasks.push(`Uploaded to your ${args['didUpload']} account.`);
@@ -3968,6 +3968,22 @@ function buildResults( args ){
 			scrapedOutput.$raw,
 			headerCssRow.$main,
 			headerOutput.$raw
+		);
+	}
+
+	if( args['didUpload'] && args['displayUrl'] ){
+		let urlField = new Field(false);
+		urlField.$box.val(args['url']);
+		let $copyBtn = new Button('Copy to Clipboard')
+		.on('click', ()=>{
+			urlField.$box.trigger('select');
+			navigator.clipboard.writeText(urlField.$box.val());
+		});
+
+		$info.append(
+			new Header('Uploaded File URL', 'For importing in your CSS.').$main,
+			urlField.$main,
+			$copyBtn
 		);
 	}
 	/*
