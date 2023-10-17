@@ -7,8 +7,8 @@ MyAnimeList-Tools
 - Further changes 2021+       by Valerio Lyndon
 */
 
-const ver = '11.0-pre32_b0';
-const verMod = '2023/Oct/15';
+const ver = '11.0-pre32+p1_b0';
+const verMod = '2023/Oct/16';
 
 class CustomStorage {
 	constructor( type = 'localStorage' ){
@@ -969,8 +969,8 @@ class Bullets {
 	}
 }
 
-function buildConfirm( title, subtitle, onYes, onNo = ()=>{} ){
-	let ui = new SubsidiaryUI(UI, title, subtitle, false);
+function buildConfirm( parentUI = UI, title, subtitle, onYes, onNo = ()=>{} ){
+	let ui = new SubsidiaryUI(parentUI, title, subtitle, false);
 	ui.$backing.off('click');
 	ui.$backing.removeClass('is-interactable');
 
@@ -1498,7 +1498,7 @@ class List {
 Settings that shouldn't be shared such as auth, dates, list-specific last run texts, and more, should be stored as separate objects. 
 requires the CustomStorage class */
 class UserSettings {
-	settings = {
+	static settings = {
 		/* application */
 		"live_preview": false,
 
@@ -1612,13 +1612,26 @@ class UserSettings {
 	text-transform: uppercase;
 }`
 	};
+	profileInfo = store.has('profiles') ? store.get('profiles') : [1]; /* Array */
+	profilePairs = store.has('active_profiles') ? store.get('active_profiles') : {}; /* Dictionary */
+	listStyle = (List.isModern ? 'Modern' : 'Classic') + List.style;
 	
 	constructor( ){
 		this.updateOlderFormats();
+		this.settings = UserSettings.settings;
+
+		/* Check active user profile and perform necessary setup */
+		if( this.listStyle in this.profilePairs ){
+			this.profile = this.profilePairs[this.listStyle];
+		}
+		else {
+			this.profile = this.profileInfo[0];
+		}
+
 		/* Read settings from storage and validate */
-		if( store.has(`${List.type}_settings`) ){
+		if( store.has(`settings_${this.profile}`) ){
 			try {
-				let workspace = store.get(`${List.type}_settings`);
+				let workspace = store.get(`settings_${this.profile}`);
 			
 				/* Check for missing settings and fill them in. This prevents errors while maintaining user settings, especially in the case of a user updating from an older version. */
 				for( let [key, value] of Object.entries(this.settings) ){
@@ -1640,6 +1653,47 @@ class UserSettings {
 				/* TODO: update this text to match new UI */
 			}
 		}
+	}
+
+	setProfile( name ){
+		this.profilePairs[this.listStyle] = name;
+		store.set('active_profiles', this.profilePairs);
+		this.refreshUI();
+	}
+
+	deleteProfile( name ){
+		/* delete profile */
+		this.profileInfo.splice(this.profileInfo.indexOf(name), 1);
+
+		/* remove traces of profile */
+		for( let [style, profile] of Object.entries(this.profilePairs) ){
+			if( profile == name ){
+				delete this.profilePairs[style];
+			}
+		}
+		
+		/* change profile if deleted one was active */
+		if( name === this.profile ){
+			let swapTo = this.profileInfo.length < 1 ? this.createProfile() : this.profileInfo[0];
+			this.setProfile(swapTo);
+		}
+
+		/* save settings */
+		store.set('profiles', this.profileInfo);
+		store.set('active_profiles', this.profilePairs);
+	}
+
+	createProfile( settings = UserSettings.settings ){
+		/* find first available int */
+		let i = 1;
+		while( this.profileInfo.includes(i) ){
+			i++;
+		}
+		
+		this.profileInfo.push(i);
+		store.set('profiles', this.profileInfo);
+		this.save(i, settings);
+		return i;
 	}
 
 	get( originalKeys, dict = this.settings ){
@@ -1670,20 +1724,24 @@ class UserSettings {
 		return dict;
 	}
 
-	save( ){
-		store.set(`${List.type}_settings`, this.settings);
+	save( profile = this.profile, settings = this.settings ){
+		store.set(`settings_${profile}`, settings);
 	}
 
-	clear( ){
-		store.remove(`${List.type}_settings`);
-		store.remove(`last_${List.type}_run`);
+	clear( profile = this.profile ){
+		store.remove(`settings_${profile}`);
+		store.remove(`last_run_${profile}`);
+		if( profile == this.profile ){
+			this.refreshUI();
+		}
+	}
+
+	refreshUI( ){
 		if( UI ){
 			UI.exit();
-			initialise();
-			UI.open();
 		}
 		else {
-			alert('Please exit and restart the tool to complete the clearing of your settings.');
+			alert('Please exit and restart the tool to complete this action.');
 		}
 	}
 
@@ -1713,6 +1771,19 @@ class UserSettings {
 
 		if( store.has(`last_${List.type}_run`) && !store.has(`last_${List.type}_run--type`) ){
 			store.set(`last_${List.type}_run`, store.get(`last_${List.type}_run`));
+		}
+
+		/* Convert v10.x -> v11.0 */
+
+		if( store.has(`${List.type}_settings`) || store.has(`last_${List.type}_run`) ){
+			let oldSettings = store.get(`${List.type}_settings`) || UserSettings.settings;
+			let oldLastRun = store.get(`last_${List.type}_run`) || '';
+		 	let newProfile = this.createProfile(oldSettings);
+			if( oldLastRun ){
+				store.set(`last_run_${newProfile}`, oldLastRun);
+			}
+		 	store.remove(`${List.type}_settings`);
+		 	store.remove(`last_${List.type}_run`);
 		}
 	}
 }
@@ -2486,8 +2557,8 @@ class Worker {
 				/* Skip old lines */
 
 				let lastRun = settings.get(['use_last_run']) === true ?
-					store.get([`last_${List.type}_run`]) ?
-						store.get([`last_${List.type}_run`]) : '' : '';
+					store.get([`last_run_${settings.profile}`]) ?
+						store.get([`last_run_${settings.profile}`]) : '' : '';
 
 				let oldLines = lastRun.replace(/\/\*[\s\S]*?Generated by MyAnimeList-Tools[\s\S]*?\*\/\s+/,'').split("\n");
 				this.imagesTotal = oldLines.length;
@@ -2643,7 +2714,7 @@ class Worker {
 		};
 
 		if( this.scrapedCss.length > 0 ){
-			store.set(`last_${List.type}_run`, this.scrapedCss);
+			store.set(`last_run_${settings.profile}`, this.scrapedCss);
 		}
 		const allCss = this.scrapedCss + '\n\n' + this.headerCss;
 
@@ -3267,23 +3338,95 @@ function buildMainUI( ){
 	.on('click', ()=>{
 		UI.swapTheme();
 	});
-	let $clearBtn = new Button('Clear Settings', {title:'Clears any stored settings from previous runs.'})
+	let $profileBtn = new Button(`Switch Profile`, {title:'Change or manage profiles.'})
 	.on('click', ()=> {
-		buildConfirm('Are you sure?', 'You will have to set your templates and other settings again.', ()=>{
-			settings.clear();
-		})
+		buildProfiles();
 	});
 	let footer = new SplitRow();
 	footer.$left.append($(`<footer class="c-footer">MyAnimeList-Tools v${ver}<br />Last modified ${verMod}</footer>`));
 	footer.$right.append(
 		$switchBtn,
-		$clearBtn
+		$profileBtn
 	);
 
 	/* Add all rows to UI */
 	UI.$window.append(controls.$main, new Hr(), $components, new Hr(), footer.$main);
 	
-	UIState.disableWhileRunning.push($clearBtn);
+	UIState.disableWhileRunning.push($profileBtn);
+}
+
+function buildProfiles( ){
+	let popupUI = new SubsidiaryUI(UI, 'Manage Profiles', 'Switch between different setting profiles for easier management.');
+
+	let $options = $('<div class="l-column o-justify-start">');
+	$options.append(new Paragraph('Profiles contain information about what settings and templates you have selected.\n\nChanging your active profile in any way (deleting, clearing, switching profile) will trigger a reload of the interface.'));
+
+	function buildProfileRow( profile ){
+		let styles = Object.keys(settings.profilePairs).filter(style=>{
+			return settings.profilePairs[style] == profile;
+		});
+
+		let row = new GroupRow();
+		if( profile == settings.profile ){
+			row.$main.css('outline', '1px solid var(--txt)');
+		}
+		row.$right.children().remove(); /* remove default settings button */
+		let $column = $('<div class="c-column">');
+		$column.append(new Paragraph(`Profile ${profile}`));
+		if( styles.length > 0 ){
+			$column.append(new Paragraph(`Active on: ${styles.join(', ')}`));
+		}
+		row.$left.append($column);
+
+		let $choose = new Button(`Choose`)
+		.on('click', ()=>{
+			popupUI.exit();
+			settings.setProfile(profile);
+		});
+		let $duplicate = new Button(`Duplicate`)
+		.on('click', ()=>{
+			buildProfileRow( settings.createProfile(store.get(`settings_${profile}`)), popupUI );
+			$options.append($create);
+		});
+		let $clear = new Button(`Clear`, {title:''})
+		.on('click', ()=> {
+			buildConfirm(popupUI, 'Are you sure?', 'This action clears any stored settings for this profile, including settings choices and previous run information.', ()=>{
+				settings.clear(profile);
+				if( profile == settings.profile ){	
+					popupUI.exit();
+				}
+			});
+		});
+		let $delete = new Button(`Delete`)
+		.on('click', ()=>{
+			buildConfirm(popupUI, 'Are you sure?', 'Deleting this profile will forever lose the settings contained within it.', ()=>{
+				settings.deleteProfile(profile);
+				if( profile == settings.profile ){	
+					popupUI.exit();
+				}
+				else {
+					row.$main.remove();
+				}
+			});
+		});
+
+		row.$right.append($choose, $duplicate, $clear, $delete);
+		$options.append(row.$main);
+	}
+
+	for( let profile of settings.profileInfo ){
+		buildProfileRow( profile, popupUI );
+	}
+
+	let $create = new Button(`Create Profile`)
+	.on('click', ()=>{
+		buildProfileRow( settings.createProfile(), popupUI );
+		$options.append($create);
+	});
+	$options.append($create);
+
+	popupUI.$window.append($options);
+	popupUI.open();
 }
 
 function buildGlobalSettings( ){
@@ -3576,7 +3719,7 @@ function buildCssSettings( ){
 		});
 	});
 
-	let key = `last_${List.type}_run`;
+	let key = `last_run_${settings.profile}`;
 	let previous = store.get(key);
 	let text = new Textarea(false, '', {}, 20);
 	if( previous ){

@@ -424,8 +424,8 @@ class Bullets {
 	}
 }
 
-function buildConfirm( title, subtitle, onYes, onNo = ()=>{} ){
-	let ui = new SubsidiaryUI(UI, title, subtitle, false);
+function buildConfirm( parentUI = UI, title, subtitle, onYes, onNo = ()=>{} ){
+	let ui = new SubsidiaryUI(parentUI, title, subtitle, false);
 	ui.$backing.off('click');
 	ui.$backing.removeClass('is-interactable');
 
